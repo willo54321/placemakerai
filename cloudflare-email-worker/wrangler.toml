@@ -1,0 +1,11 @@
+name = "placemaker-email-worker"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+# Environment variables - set these in Cloudflare dashboard or via wrangler secret
+# WEBHOOK_URL = "https://placemakerai.io/api/webhooks/email"
+# WEBHOOK_SECRET = "your-secret-here"
+# FORWARD_TO = "backup@youremail.com" (optional)
+
+[vars]
+WEBHOOK_URL = "https://placemakerai.io/api/webhooks/email"

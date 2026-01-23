@@ -2,91 +2,137 @@ import { prisma } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 
-// Webhook secret for verifying requests from Cloudflare Worker
+// Webhook secret for verifying requests
 const WEBHOOK_SECRET = process.env.EMAIL_WEBHOOK_SECRET
 
-interface IncomingEmail {
+// Resend inbound webhook format
+interface ResendInboundEmail {
+  type: 'email.received'
+  created_at: string
+  data: {
+    email_id: string
+    from: string
+    to: string[]
+    subject: string
+    text?: string
+    html?: string
+    headers?: Record<string, string>
+  }
+}
+
+// Generic/Cloudflare format
+interface GenericInboundEmail {
   from: string
   fromName?: string
-  to: string
+  to: string | string[]
   subject: string
-  text: string
+  text?: string
   html?: string
   headers?: Record<string, string>
   timestamp?: string
 }
 
-// POST /api/webhooks/email - Receive emails from Cloudflare Email Worker
+// POST /api/webhooks/email - Receive emails from Resend or other providers
 export async function POST(request: Request) {
   try {
-    // Verify webhook secret
+    // Verify webhook secret (optional but recommended)
     const headersList = headers()
     const authHeader = headersList.get('authorization')
+    const svixId = headersList.get('svix-id') // Resend uses Svix for webhooks
 
-    if (WEBHOOK_SECRET && authHeader !== `Bearer ${WEBHOOK_SECRET}`) {
+    // If we have a secret configured, verify it (skip for Resend which uses different auth)
+    if (WEBHOOK_SECRET && !svixId && authHeader !== `Bearer ${WEBHOOK_SECRET}`) {
       console.error('Invalid webhook authorization')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const email: IncomingEmail = await request.json()
+    const body = await request.json()
 
-    // Validate required fields
-    if (!email.from || !email.to || !email.subject) {
-      return NextResponse.json(
-        { error: 'Missing required fields: from, to, subject' },
-        { status: 400 }
-      )
+    // Detect if this is Resend format or generic format
+    let senderEmail: string
+    let senderName: string
+    let recipientEmails: string[]
+    let subject: string
+    let textBody: string
+    let htmlBody: string | undefined
+
+    if (body.type === 'email.received' && body.data) {
+      // Resend inbound webhook format
+      const resendEmail = body as ResendInboundEmail
+      senderEmail = resendEmail.data.from
+      senderName = senderEmail.split('@')[0]
+      recipientEmails = resendEmail.data.to
+      subject = resendEmail.data.subject || '(No Subject)'
+      textBody = resendEmail.data.text || ''
+      htmlBody = resendEmail.data.html
+    } else {
+      // Generic/Cloudflare format
+      const email = body as GenericInboundEmail
+
+      if (!email.from || !email.to || !email.subject) {
+        return NextResponse.json(
+          { error: 'Missing required fields: from, to, subject' },
+          { status: 400 }
+        )
+      }
+
+      // Extract email address from "Name <email@example.com>" format
+      const fromMatch = email.from.match(/^(?:"?([^"]*)"?\s)?<?([^>]+@[^>]+)>?$/)
+      senderEmail = fromMatch ? fromMatch[2] : email.from
+      senderName = email.fromName || (fromMatch ? fromMatch[1] : null) || senderEmail.split('@')[0]
+      recipientEmails = Array.isArray(email.to) ? email.to : [email.to]
+      subject = email.subject
+      textBody = email.text || ''
+      htmlBody = email.html
     }
 
-    // Extract email address and name from "Name <email@example.com>" format
-    const fromMatch = email.from.match(/^(?:"?([^"]*)"?\s)?<?([^>]+@[^>]+)>?$/)
-    const senderEmail = fromMatch ? fromMatch[2] : email.from
-    const senderName = email.fromName || (fromMatch ? fromMatch[1] : null) || senderEmail.split('@')[0]
+    // Clean up sender email
+    senderEmail = senderEmail.toLowerCase().trim()
 
-    // Extract the local part of the recipient email (e.g., "project-abc" from "project-abc@placemakerai.io")
-    const toMatch = email.to.match(/^<?([^@]+)@/)
-    const recipientLocal = toMatch ? toMatch[1].toLowerCase() : null
+    // Find project by matching recipient domain to project's emailFromAddress domain
+    let project = null
 
-    if (!recipientLocal) {
-      console.error('Could not parse recipient email:', email.to)
-      return NextResponse.json({ error: 'Invalid recipient format' }, { status: 400 })
-    }
+    for (const recipientEmail of recipientEmails) {
+      // Extract domain from recipient email
+      const domainMatch = recipientEmail.match(/@([^>]+)>?$/)
+      const recipientDomain = domainMatch ? domainMatch[1].toLowerCase() : null
 
-    // Find the project by matching the email local part
-    // Projects can set their emailFromAddress or we match by project slug/id
-    let project = await prisma.project.findFirst({
-      where: {
-        OR: [
-          // Match if emailFromAddress contains the local part
-          { emailFromAddress: { contains: recipientLocal, mode: 'insensitive' } },
-          // Match if project ID starts with the local part
-          { id: { startsWith: recipientLocal } }
-        ]
-      },
-      select: { id: true, name: true }
-    })
+      if (!recipientDomain) continue
 
-    // If no direct match, try to find by checking all projects' email patterns
-    if (!project) {
-      // Look for project where the local part might be a slug-like identifier
-      const allProjects = await prisma.project.findMany({
+      // Find project where emailFromAddress has the same domain
+      project = await prisma.project.findFirst({
+        where: {
+          emailFromAddress: {
+            endsWith: `@${recipientDomain}`,
+            mode: 'insensitive'
+          }
+        },
         select: { id: true, name: true, emailFromAddress: true }
       })
 
-      // Try matching based on project name slug
-      project = allProjects.find(p => {
-        const nameSlug = p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
-        return nameSlug === recipientLocal || recipientLocal.includes(nameSlug)
-      }) || null
+      if (project) break
+
+      // Also try matching the full email address
+      project = await prisma.project.findFirst({
+        where: {
+          emailFromAddress: {
+            equals: recipientEmail.replace(/[<>]/g, '').toLowerCase(),
+            mode: 'insensitive'
+          }
+        },
+        select: { id: true, name: true, emailFromAddress: true }
+      })
+
+      if (project) break
     }
 
     if (!project) {
-      console.log('No matching project found for recipient:', email.to)
-      // Still log the email for debugging but return success to prevent retries
+      console.log('No matching project found for recipients:', recipientEmails)
+      // Return success to prevent webhook retries
       return NextResponse.json({
         success: true,
         warning: 'No matching project found',
-        recipient: email.to
+        recipients: recipientEmails
       })
     }
 
@@ -99,19 +145,22 @@ export async function POST(request: Request) {
       select: { id: true, name: true, organization: true }
     })
 
+    // Use stakeholder name if found, otherwise use sender name
+    const submitterName = stakeholder?.name || senderName
+
     // Create the enquiry
     const enquiry = await prisma.enquiry.create({
       data: {
         projectId: project.id,
-        submitterName: stakeholder?.name || senderName,
+        submitterName,
         submitterEmail: senderEmail,
         submitterOrg: stakeholder?.organization || null,
-        subject: email.subject,
-        message: email.text || email.html || '(No message body)',
+        subject,
+        message: textBody || htmlBody || '(No message body)',
         category: 'email',
         priority: 'normal',
         status: 'new',
-        gdprConsent: false // Emails don't have explicit GDPR consent
+        gdprConsent: false
       }
     })
 
@@ -120,17 +169,18 @@ export async function POST(request: Request) {
       data: {
         enquiryId: enquiry.id,
         type: 'inbound',
-        content: email.text || email.html || '(No message body)',
-        authorName: stakeholder?.name || senderName
+        content: textBody || htmlBody || '(No message body)',
+        authorName: submitterName
       }
     })
 
-    console.log(`Created enquiry ${enquiry.id} for project ${project.name} from ${senderEmail}`)
+    console.log(`Created enquiry ${enquiry.id} for project "${project.name}" from ${senderEmail}`)
 
     return NextResponse.json({
       success: true,
       enquiryId: enquiry.id,
       projectId: project.id,
+      projectName: project.name,
       fromStakeholder: !!stakeholder
     })
 

@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Plus, X, Search, Filter, Send, MessageSquare,
   Clock, CheckCircle, AlertCircle, User, Mail, Phone, Building,
-  ChevronRight, UserPlus, Trash2, Edit2
+  ChevronRight, UserPlus, Trash2, Edit2, PenSquare, Loader2
 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 
@@ -190,6 +190,7 @@ export function EnquiriesTab({ projectId, project }: { projectId: string; projec
   const [selectedEnquiry, setSelectedEnquiry] = useState<EnquiryDetail | null>(null)
   const [showTeamModal, setShowTeamModal] = useState(false)
   const [showQueryModal, setShowQueryModal] = useState(false)
+  const [showComposeModal, setShowComposeModal] = useState(false)
   const [embedCode, setEmbedCode] = useState('')
 
   const enquiries = project.enquiries || []
@@ -246,6 +247,13 @@ export function EnquiriesTab({ projectId, project }: { projectId: string; projec
         </div>
         <div className="flex gap-2">
           <button
+            onClick={() => setShowComposeModal(true)}
+            className="btn-primary"
+          >
+            <PenSquare size={18} aria-hidden="true" />
+            Compose
+          </button>
+          <button
             onClick={() => setShowTeamModal(true)}
             className="btn-secondary"
           >
@@ -254,7 +262,7 @@ export function EnquiriesTab({ projectId, project }: { projectId: string; projec
           </button>
           <button
             onClick={generateEmbedCode}
-            className="btn-primary"
+            className="btn-secondary"
           >
             Embed Form
           </button>
@@ -393,6 +401,15 @@ export function EnquiriesTab({ projectId, project }: { projectId: string; projec
           teamMembers={teamMembers}
           projectId={projectId}
           onClose={() => setShowTeamModal(false)}
+        />
+      )}
+
+      {/* Compose email modal */}
+      {showComposeModal && (
+        <ComposeEmailModal
+          projectId={projectId}
+          onClose={() => setShowComposeModal(false)}
+          onSuccess={() => queryClient.invalidateQueries({ queryKey: ['project', projectId] })}
         />
       )}
     </div>
@@ -767,6 +784,166 @@ function EnquiryDetailModal({
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+// Compose Email Modal
+function ComposeEmailModal({
+  projectId,
+  stakeholders,
+  onClose,
+  onSuccess,
+}: {
+  projectId: string
+  stakeholders?: Array<{ id: string; name: string; email: string | null }>
+  onClose: () => void
+  onSuccess?: () => void
+}) {
+  const [to, setTo] = useState('')
+  const [subject, setSubject] = useState('')
+  const [message, setMessage] = useState('')
+  const [isSending, setIsSending] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState(false)
+
+  const handleSend = async () => {
+    if (!to || !subject || !message) {
+      setError('Please fill in all fields')
+      return
+    }
+
+    setIsSending(true)
+    setError('')
+
+    try {
+      const res = await fetch(`/api/projects/${projectId}/emails/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: to.split(',').map(e => e.trim()).filter(e => e),
+          subject,
+          message,
+          sentBy: 'User',
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to send email')
+      }
+
+      setSuccess(true)
+      setTimeout(() => {
+        onSuccess?.()
+        onClose()
+      }, 1500)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to send email')
+    } finally {
+      setIsSending(false)
+    }
+  }
+
+  return (
+    <>
+      <div className="modal-overlay" onClick={onClose} aria-hidden="true" />
+      <div className="modal" role="dialog" aria-modal="true">
+        <div className="modal-content max-w-xl">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-slate-900">Compose Email</h2>
+            <button onClick={onClose} className="btn-icon" aria-label="Close">
+              <X size={20} />
+            </button>
+          </div>
+
+          {success ? (
+            <div className="text-center py-8">
+              <CheckCircle size={48} className="text-green-500 mx-auto mb-4" />
+              <p className="text-lg font-medium text-slate-900">Email sent successfully!</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <label className="label">To</label>
+                <input
+                  type="text"
+                  value={to}
+                  onChange={(e) => setTo(e.target.value)}
+                  placeholder="email@example.com (separate multiple with commas)"
+                  className="input"
+                />
+                {stakeholders && stakeholders.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {stakeholders.filter(s => s.email).slice(0, 5).map(s => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => setTo(prev => prev ? `${prev}, ${s.email}` : s.email || '')}
+                        className="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded"
+                      >
+                        + {s.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="label">Subject</label>
+                <input
+                  type="text"
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  placeholder="Email subject"
+                  className="input"
+                />
+              </div>
+
+              <div>
+                <label className="label">Message</label>
+                <textarea
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder="Type your message..."
+                  rows={8}
+                  className="input"
+                />
+              </div>
+
+              {error && (
+                <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg">
+                  {error}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-4">
+                <button onClick={onClose} className="btn-secondary">
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSend}
+                  disabled={isSending || !to || !subject || !message}
+                  className="btn-primary"
+                >
+                  {isSending ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Send size={18} />
+                      Send Email
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </>

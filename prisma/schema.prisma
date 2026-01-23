@@ -1,0 +1,466 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Council {
+  id             String       @id @default(cuid())
+  name           String       @unique
+  mapitName      String?
+  gssCode        String?
+  type           String
+  website        String?
+  councillorsUrl String?
+  scraperType    String?
+  lastScraped    DateTime?
+  scrapeStatus   String       @default("pending")
+  scrapeError    String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  councillors    Councillor[]
+
+  @@index([gssCode])
+  @@index([mapitName])
+}
+
+model Councillor {
+  id            String   @id @default(cuid())
+  councilId     String
+  name          String
+  title         String?
+  firstName     String?
+  lastName      String?
+  party         String?
+  wardName      String
+  wardMapitName String?
+  email         String?
+  phone         String?
+  profileUrl    String?
+  photoUrl      String?
+  cabinetRole   String?
+  committees    String?
+  source        String   @default("scrape")
+  verified      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  council       Council  @relation(fields: [councilId], references: [id], onDelete: Cascade)
+
+  @@unique([councilId, wardName, name])
+  @@index([wardMapitName])
+  @@index([wardName])
+}
+
+model Enquiry {
+  id               String           @id @default(cuid())
+  projectId        String
+  submitterName    String
+  submitterEmail   String
+  submitterPhone   String?
+  submitterOrg     String?
+  subject          String
+  message          String
+  category         String           @default("general")
+  priority         String           @default("normal")
+  status           String           @default("new")
+  assignedToId     String?
+  draftResponse    String?
+  finalResponse    String?
+  sentAt           DateTime?
+  gdprConsent      Boolean          @default(false)
+  gdprConsentDate  DateTime?
+  mailingConsent   Boolean          @default(false)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  assignedTo       TeamMember?      @relation(fields: [assignedToId], references: [id])
+  project          Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  messages         EnquiryMessage[]
+  queries          EnquiryQuery[]
+}
+
+model EnquiryMessage {
+  id         String   @id @default(cuid())
+  enquiryId  String
+  type       String
+  content    String
+  authorName String
+  createdAt  DateTime @default(now())
+  enquiry    Enquiry  @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+}
+
+model EnquiryQuery {
+  id           String     @id @default(cuid())
+  enquiryId    String
+  teamMemberId String
+  question     String
+  response     String?
+  token        String     @unique @default(cuid())
+  status       String     @default("pending")
+  sentAt       DateTime   @default(now())
+  respondedAt  DateTime?
+  enquiry      Enquiry    @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+  teamMember   TeamMember @relation(fields: [teamMemberId], references: [id], onDelete: Cascade)
+}
+
+model FeedbackForm {
+  id               String             @id @default(cuid())
+  projectId        String
+  name             String
+  fields           Json
+  active           Boolean            @default(true)
+  createdAt        DateTime           @default(now())
+  updatedAt DateTime @updatedAt
+  Project          Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  responses FeedbackResponse[]
+}
+
+model FeedbackResponse {
+  id              String       @id @default(cuid())
+  formId          String
+  data            Json
+  submittedAt     DateTime     @default(now())
+  gdprConsent     Boolean      @default(false)
+  gdprConsentDate DateTime?
+  mailingConsent  Boolean      @default(false)
+  form            FeedbackForm @relation(fields: [formId], references: [id], onDelete: Cascade)
+}
+
+model GeoLayer {
+  id        String   @id @default(cuid())
+  projectId String
+  name      String
+  type      String   @default("boundary")
+  geojson   Json
+  style     Json?
+  visible   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model ImageOverlay {
+  id        String   @id @default(cuid())
+  projectId String
+  name      String
+  imageUrl  String
+  southLat  Float
+  westLng   Float
+  northLat  Float
+  eastLng   Float
+  opacity   Float    @default(0.7)
+  visible   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Invitation {
+  id             String       @id @default(cuid())
+  email          String
+  organizationId String
+  role           String       @default("member")
+  token          String       @unique
+  invitedById    String
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  createdAt      DateTime     @default(now())
+  user           User         @relation(fields: [invitedById], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([email])
+  @@index([token])
+}
+
+model MapMarker {
+  id        String   @id @default(cuid())
+  projectId String
+  label     String
+  type      String   @default("point")
+  latitude  Float?
+  longitude Float?
+  color     String   @default("#3B82F6")
+  icon      String?
+  notes     String?
+  createdAt DateTime @default(now())
+  geometry  Json?
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Organization {
+  id                 String               @id @default(cuid())
+  name               String
+  slug               String               @unique
+  plan               String               @default("free")
+  stripeCustomerId   String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  invitations        Invitation[]
+  members            OrganizationMember[]
+  projects           Project[]
+}
+
+model OrganizationMember {
+  id             String       @id @default(cuid())
+  userId         String
+  organizationId String
+  role           String       @default("member")
+  joinedAt       DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+}
+
+model Project {
+  id               String         @id @default(cuid())
+  name             String
+  description      String?
+  latitude         Float?
+  longitude        Float?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  mapZoom          Int?           @default(10)
+  embedEnabled     Boolean        @default(false)
+  allowPins        Boolean        @default(true)  // Allow visitors to drop pins/comments
+  allowDrawing     Boolean        @default(false) // Allow visitors to draw shapes
+  organizationId   String?
+  // Email configuration - requires domain to be verified in Resend
+  emailFromName    String?        // e.g., "Project ABC Team"
+  emailFromAddress String?        // e.g., "noreply@projectabc.com"
+  enquiries      Enquiry[]
+  feedbackForms  FeedbackForm[]
+  geoLayers      GeoLayer[]
+  imageOverlays  ImageOverlay[]
+  mapMarkers     MapMarker[]
+  organization   Organization?  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  projectEmails  ProjectEmail[]
+  publicPins     PublicPin[]
+  stakeholders   Stakeholder[]
+  subscribers    Subscriber[]
+  teamMembers    TeamMember[]
+  analysisResults AnalysisResult[]
+  tours          Tour[]
+  userAccess     ProjectAccess[]
+}
+
+model ProjectEmail {
+  id             String   @id @default(cuid())
+  projectId      String
+  subject        String
+  body           String
+  sentBy         String
+  sentAt         DateTime @default(now())
+  recipientCount Int      @default(0)
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model PublicPin {
+  id              String   @id @default(cuid())
+  projectId       String
+  latitude        Float?
+  longitude       Float?
+  category        String   @default("comment")
+  comment         String
+  name            String?
+  email           String?
+  createdAt       DateTime @default(now())
+  votes           Int      @default(0)
+  approved        Boolean  @default(false)
+  geometry        Json?
+  shapeType       String   @default("pin")
+  gdprConsent     Boolean  @default(false)
+  gdprConsentDate DateTime?
+  mailingConsent  Boolean  @default(false)
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Stakeholder {
+  id                    String                  @id @default(cuid())
+  projectId             String
+  name                  String
+  email                 String?
+  phone                 String?
+  organization          String?
+  role                  String?
+  category              String                  @default("neutral")
+  notes                 String?
+  latitude              Float?
+  longitude             Float?
+  createdAt             DateTime                @default(now())
+  updatedAt DateTime @updatedAt
+  influence             Int?
+  interest              Int?
+  type                  String                  @default("other")
+  Project               Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  engagements StakeholderEngagement[]
+}
+
+model StakeholderEngagement {
+  id            String      @id @default(cuid())
+  stakeholderId String
+  type          String
+  title         String
+  description   String?
+  date          DateTime    @default(now())
+  outcome       String?
+  nextAction    String?
+  createdAt     DateTime    @default(now())
+  stakeholder   Stakeholder @relation(fields: [stakeholderId], references: [id], onDelete: Cascade)
+}
+
+model Subscriber {
+  id              String    @id @default(cuid())
+  projectId       String
+  email           String
+  name            String?
+  source          String    @default("manual")
+  sourceId        String?
+  subscribed      Boolean   @default(true)
+  unsubscribedAt  DateTime?
+  gdprConsent     Boolean   @default(false)
+  gdprConsentDate DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, email])
+  @@index([email])
+}
+
+model TeamMember {
+  id           String         @id @default(cuid())
+  projectId    String
+  name         String
+  email        String
+  role         String?
+  createdAt    DateTime       @default(now())
+  Enquiry      Enquiry[]
+  EnquiryQuery EnquiryQuery[]
+  Project      Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+enum SystemRole {
+  SUPER_ADMIN
+  USER
+}
+
+enum ProjectRole {
+  ADMIN
+  CLIENT
+}
+
+model User {
+  id                 String               @id @default(cuid())
+  name               String?
+  email              String               @unique
+  emailVerified      DateTime?
+  image              String?
+  password           String?
+  systemRole         SystemRole           @default(USER)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  accounts           Account[]
+  invitations        Invitation[]
+  organizationMemberships OrganizationMember[]
+  sessions           Session[]
+  projectAccess      ProjectAccess[]
+}
+
+model ProjectAccess {
+  id        String      @id @default(cuid())
+  userId    String
+  projectId String
+  role      ProjectRole @default(CLIENT)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, projectId])
+  @@index([userId])
+  @@index([projectId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model AnalysisResult {
+  id           String   @id @default(cuid())
+  projectId    String
+  type         String   // "sentiment" | "themes" | "summary" | "full"
+  data         Json     // Analysis results
+  feedbackHash String   // Hash of feedback to detect changes
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, type])
+  @@index([projectId])
+}
+
+model Tour {
+  id          String     @id @default(cuid())
+  projectId   String
+  name        String
+  description String?
+  active      Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  stops       TourStop[]
+
+  @@index([projectId])
+}
+
+model TourStop {
+  id          String   @id @default(cuid())
+  tourId      String
+  order       Int
+  title       String
+  description String
+  imageUrl    String?
+  latitude    Float
+  longitude   Float
+  zoom        Int      @default(16)
+  highlight   Json?    // Optional polygon geometry to highlight
+  showOverlay String?  // Optional overlay ID to show at this stop
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tour        Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
+
+  @@index([tourId])
+}

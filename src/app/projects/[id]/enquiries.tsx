@@ -210,9 +210,19 @@ export function EnquiriesTab({ projectId, project }: { projectId: string; projec
 
   // Load enquiry detail
   const loadEnquiryDetail = async (enquiryId: string) => {
-    const res = await fetch(`/api/projects/${projectId}/enquiries/${enquiryId}`)
-    const data = await res.json()
-    setSelectedEnquiry(data)
+    try {
+      const res = await fetch(`/api/projects/${projectId}/enquiries/${enquiryId}`)
+      if (!res.ok) {
+        // Enquiry might have been deleted
+        setSelectedEnquiry(null)
+        return
+      }
+      const data = await res.json()
+      setSelectedEnquiry(data)
+    } catch (error) {
+      console.error('Error loading enquiry:', error)
+      setSelectedEnquiry(null)
+    }
   }
 
   // Generate embed code
@@ -368,7 +378,10 @@ export function EnquiriesTab({ projectId, project }: { projectId: string; projec
           projectId={projectId}
           onClose={() => setSelectedEnquiry(null)}
           onUpdate={() => {
-            loadEnquiryDetail(selectedEnquiry.id)
+            // Only reload detail if enquiry still exists (not after delete)
+            if (selectedEnquiry) {
+              loadEnquiryDetail(selectedEnquiry.id)
+            }
             queryClient.invalidateQueries({ queryKey: ['project', projectId] })
           }}
         />

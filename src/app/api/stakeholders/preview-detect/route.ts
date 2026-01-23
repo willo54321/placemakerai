@@ -111,16 +111,6 @@ export async function POST(request: Request) {
           // Capture council name
           if (['DIS', 'MTD', 'UTA', 'LBO', 'CTY'].includes(area.type)) {
             councilName = area.name
-
-            // Add council planning department
-            stakeholders.push({
-              name: `${area.name} - Planning Department`,
-              organization: area.name,
-              role: 'Local Planning Authority',
-              type: 'political',
-              source: 'MapIt API',
-              notes: `Contact the planning department for development consultations.`
-            })
           }
 
           // Capture ward name
@@ -151,6 +141,7 @@ export async function POST(request: Request) {
         const councillors = await findCouncillors(councilName, wardName)
 
         if (councillors.length > 0) {
+          // Add each councillor individually
           for (const councillor of councillors) {
             stakeholders.push({
               name: `Cllr ${councillor.name}`,
@@ -166,17 +157,8 @@ export async function POST(request: Request) {
               email: councillor.email
             })
           }
-        } else {
-          // No councillors found - add placeholder
-          stakeholders.push({
-            name: `Ward Councillor(s) - ${wardName}`,
-            organization: councilName,
-            role: `Councillor for ${wardName} Ward`,
-            type: 'political',
-            source: 'MapIt API',
-            notes: `Councillor data not available. Search your council website to find ward councillors.`
-          })
         }
+        // No fallback placeholder - only add councillors if we have their data
       } catch (error) {
         console.error('Error looking up councillors:', error)
       }

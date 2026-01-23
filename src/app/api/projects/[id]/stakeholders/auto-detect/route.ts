@@ -119,16 +119,6 @@ export async function POST(
         // Capture council name for councillor lookup
         if (['DIS', 'MTD', 'UTA', 'LBO', 'CTY'].includes(area.type)) {
           councilName = area.name
-
-          // Add council planning department as a stakeholder
-          detectedStakeholders.push({
-            name: `${area.name} - Planning Department`,
-            organization: area.name,
-            role: 'Local Planning Authority',
-            type: 'political',
-            source: 'MapIt API',
-            notes: `Contact the planning department for development consultations. Search "${area.name} planning contact" to find their details.`
-          })
         }
 
         // Capture ward name for councillor lookup
@@ -163,7 +153,7 @@ export async function POST(
       if (councillors.length > 0) {
         councillorDataAvailable = true
 
-        // We found councillors in our database!
+        // Add each councillor individually
         for (const councillor of councillors) {
           detectedStakeholders.push({
             name: `Cllr ${councillor.name}`,
@@ -179,28 +169,11 @@ export async function POST(
             email: councillor.email
           })
         }
-      } else {
-        // No councillors in database - add placeholder with guidance
-        detectedStakeholders.push({
-          name: `Ward Councillor(s) - ${wardName}`,
-          organization: councilName,
-          role: `Councillor for ${wardName} Ward`,
-          type: 'political',
-          source: 'MapIt API',
-          notes: `Councillor data not yet scraped for ${councilName}. Use the Councils API to populate councillor data.`
-        })
       }
+      // No fallback placeholder - only add councillors if we have their data
     } catch (error) {
       console.error('Error looking up councillors:', error)
-      // Fallback to placeholder
-      detectedStakeholders.push({
-        name: `Ward Councillor(s) - ${wardName}`,
-        organization: councilName,
-        role: `Councillor for ${wardName} Ward`,
-        type: 'political',
-        source: 'MapIt API',
-        notes: `Find ward councillors at your council's website. Search "${councilName} ${wardName} ward councillor".`
-      })
+      // No fallback - only add councillors if we have their data
     }
   }
 

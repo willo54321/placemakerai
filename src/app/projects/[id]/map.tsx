@@ -466,23 +466,47 @@ export function MapTab({ projectId, project }: { projectId: string; project: Pro
     setPendingDrawing(null)
   }
 
-  const handleOverlayUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const [isUploading, setIsUploading] = useState(false)
+
+  const handleOverlayUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
     setOverlayError(null)
 
-    // Check file size - Vercel has 4.5MB body limit, base64 adds ~33% overhead
-    // So original file should be under ~3MB to be safe
-    if (file.size > 3 * 1024 * 1024) {
-      setOverlayError('Image too large. Please use an image under 3MB.')
+    // Check file size - allow up to 50MB with Vercel Blob
+    if (file.size > 50 * 1024 * 1024) {
+      setOverlayError('Image too large. Maximum size is 50MB.')
       e.target.value = ''
       return
     }
 
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      const imageUrl = event.target?.result as string
+    // Check file type
+    if (!file.type.startsWith('image/')) {
+      setOverlayError('Please upload an image file.')
+      e.target.value = ''
+      return
+    }
+
+    setIsUploading(true)
+
+    try {
+      // Upload to Vercel Blob
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const uploadRes = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!uploadRes.ok) {
+        const errorData = await uploadRes.json()
+        throw new Error(errorData.error || 'Upload failed')
+      }
+
+      const { url: imageUrl } = await uploadRes.json()
+
       const tempId = Date.now().toString()
       const newOverlay: ImageOverlay = {
         id: tempId,
@@ -500,12 +524,12 @@ export function MapTab({ projectId, project }: { projectId: string; project: Pro
       setSelectedOverlayId(tempId)
       // Save to database
       createOverlay.mutate({ ...newOverlay, tempId } as any)
+    } catch (error) {
+      setOverlayError(error instanceof Error ? error.message : 'Failed to upload image.')
+    } finally {
+      setIsUploading(false)
+      e.target.value = ''
     }
-    reader.onerror = () => {
-      setOverlayError('Failed to read image file.')
-    }
-    reader.readAsDataURL(file)
-    e.target.value = ''
   }
 
   const updateOverlayBounds = (overlayId: string, bounds: [[number, number], [number, number]]) => {
@@ -853,8 +877,13 @@ export function MapTab({ projectId, project }: { projectId: string; project: Pro
                   {sidebarMode === 'overlays' && (
                     <>
                       <div className="p-3 border-b border-gray-100">
-                        <label className={`flex items-center justify-center gap-2 p-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-brand-400 hover:bg-brand-50 transition-colors ${createOverlay.isPending ? 'opacity-50 pointer-events-none' : ''}`}>
-                          {createOverlay.isPending ? (
+                        <label className={`flex items-center justify-center gap-2 p-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-brand-400 hover:bg-brand-50 transition-colors ${(isUploading || createOverlay.isPending) ? 'opacity-50 pointer-events-none' : ''}`}>
+                          {isUploading ? (
+                            <>
+                              <span className="animate-spin w-4 h-4 border-2 border-brand-500 border-t-transparent rounded-full" />
+                              <span className="text-sm text-gray-600">Uploading...</span>
+                            </>
+                          ) : createOverlay.isPending ? (
                             <>
                               <span className="animate-spin w-4 h-4 border-2 border-brand-500 border-t-transparent rounded-full" />
                               <span className="text-sm text-gray-600">Saving...</span>
@@ -862,10 +891,10 @@ export function MapTab({ projectId, project }: { projectId: string; project: Pro
                           ) : (
                             <>
                               <Upload size={18} className="text-gray-400" />
-                              <span className="text-sm text-gray-600">Add Overlay</span>
+                              <span className="text-sm text-gray-600">Add Overlay (up to 50MB)</span>
                             </>
                           )}
-                          <input type="file" accept="image/*" onChange={handleOverlayUpload} className="hidden" disabled={createOverlay.isPending} />
+                          <input type="file" accept="image/*" onChange={handleOverlayUpload} className="hidden" disabled={isUploading || createOverlay.isPending} />
                         </label>
                         {overlayError && (
                           <p className="text-xs text-red-600 mt-2 text-center">{overlayError}</p>
@@ -1054,9 +1083,9 @@ export function MapTab({ projectId, project }: { projectId: string; project: Pro
 
               {sidebarCollapsed && (
                 <div className="flex-1 flex flex-col items-center py-4 gap-3">
-                  <label className="p-2 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded cursor-pointer transition-colors" title="Add Overlay">
-                    <Upload size={20} />
-                    <input type="file" accept="image/*" onChange={handleOverlayUpload} className="hidden" />
+                  <label className={`p-2 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded cursor-pointer transition-colors ${isUploading ? 'opacity-50 pointer-events-none' : ''}`} title="Add Overlay (up to 50MB)">
+                    {isUploading ? <span className="animate-spin w-5 h-5 border-2 border-brand-500 border-t-transparent rounded-full inline-block" /> : <Upload size={20} />}
+                    <input type="file" accept="image/*" onChange={handleOverlayUpload} className="hidden" disabled={isUploading} />
                   </label>
                   <label className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded cursor-pointer transition-colors" title="Import Geo Data">
                     <FileUp size={20} />

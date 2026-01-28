@@ -7,6 +7,7 @@ const publicRoutes = [
   '/login',
   '/verify',
   '/api/auth',
+  '/api/webhooks',
   '/embed',
   '/api/embed',
 ]

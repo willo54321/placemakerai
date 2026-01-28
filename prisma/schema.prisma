@@ -248,6 +248,10 @@ model Project {
   // Email configuration - requires domain to be verified in Resend
   emailFromName    String?        // e.g., "Project ABC Team"
   emailFromAddress String?        // e.g., "noreply@projectabc.com"
+  // Auto-reply settings for inbound emails
+  autoReplyEnabled Boolean        @default(false)
+  autoReplySubject String?        // e.g., "Thank you for your enquiry"
+  autoReplyMessage String?        // The auto-reply email body (supports HTML)
   enquiries      Enquiry[]
   feedbackForms  FeedbackForm[]
   geoLayers      GeoLayer[]

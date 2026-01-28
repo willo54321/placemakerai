@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
-import { Save, Trash2, AlertTriangle, Mail, Info } from 'lucide-react'
+import { Save, Trash2, AlertTriangle, Mail, Info, Reply, ToggleLeft, ToggleRight, ChevronDown, ChevronUp, ExternalLink, Check, Copy, Globe } from 'lucide-react'
 import { toast } from 'sonner'
 import { usePermissions } from '@/hooks/usePermissions'
 
@@ -17,6 +17,9 @@ interface Project {
   embedEnabled: boolean
   emailFromName: string | null
   emailFromAddress: string | null
+  autoReplyEnabled: boolean
+  autoReplySubject: string | null
+  autoReplyMessage: string | null
   createdAt: string
   updatedAt: string
   _count?: {
@@ -41,11 +44,37 @@ export function SettingsTab({ projectId, project }: SettingsTabProps) {
   const [description, setDescription] = useState(project.description || '')
   const [emailFromName, setEmailFromName] = useState(project.emailFromName || '')
   const [emailFromAddress, setEmailFromAddress] = useState(project.emailFromAddress || '')
+  const [autoReplyEnabled, setAutoReplyEnabled] = useState(project.autoReplyEnabled || false)
+  const [autoReplySubject, setAutoReplySubject] = useState(project.autoReplySubject || 'Thank you for your enquiry')
+  const [autoReplyMessage, setAutoReplyMessage] = useState(project.autoReplyMessage || `Dear {{name}},
+
+Thank you for contacting us about {{subject}}.
+
+We have received your enquiry and a member of our team will respond as soon as possible.
+
+Kind regards,
+The {{project}} Team`)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [showDomainWizard, setShowDomainWizard] = useState(false)
+  const [copiedRecord, setCopiedRecord] = useState<string | null>(null)
+
+  const copyToClipboard = (text: string, recordType: string) => {
+    navigator.clipboard.writeText(text)
+    setCopiedRecord(recordType)
+    setTimeout(() => setCopiedRecord(null), 2000)
+  }
 
   const updateProject = useMutation({
-    mutationFn: (data: { name: string; description: string; emailFromName?: string; emailFromAddress?: string }) =>
+    mutationFn: (data: {
+      name: string
+      description: string
+      emailFromName?: string
+      emailFromAddress?: string
+      autoReplyEnabled?: boolean
+      autoReplySubject?: string
+      autoReplyMessage?: string
+    }) =>
       fetch(`/api/projects/${projectId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -82,6 +111,9 @@ export function SettingsTab({ projectId, project }: SettingsTabProps) {
       description: description.trim(),
       emailFromName: emailFromName.trim() || undefined,
       emailFromAddress: emailFromAddress.trim() || undefined,
+      autoReplyEnabled,
+      autoReplySubject: autoReplySubject.trim() || undefined,
+      autoReplyMessage: autoReplyMessage.trim() || undefined,
     })
   }
 
@@ -94,7 +126,10 @@ export function SettingsTab({ projectId, project }: SettingsTabProps) {
   const hasChanges = name !== project.name ||
     description !== (project.description || '') ||
     emailFromName !== (project.emailFromName || '') ||
-    emailFromAddress !== (project.emailFromAddress || '')
+    emailFromAddress !== (project.emailFromAddress || '') ||
+    autoReplyEnabled !== (project.autoReplyEnabled || false) ||
+    autoReplySubject !== (project.autoReplySubject || 'Thank you for your enquiry') ||
+    autoReplyMessage !== (project.autoReplyMessage || '')
 
   return (
     <div className="space-y-8">
@@ -198,21 +233,148 @@ export function SettingsTab({ projectId, project }: SettingsTabProps) {
           <h3 className="text-lg font-semibold text-slate-900">Email Settings</h3>
         </div>
 
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-          <div className="flex gap-3">
-            <Info size={18} className="text-blue-600 flex-shrink-0 mt-0.5" />
-            <div className="text-sm text-blue-800">
-              <p className="font-medium mb-1">Setting up project-specific email</p>
-              <p>To send emails from your own domain (e.g., noreply@yourproject.com):</p>
-              <ol className="list-decimal list-inside mt-2 space-y-1">
-                <li>Add your domain in <a href="https://resend.com/domains" target="_blank" rel="noopener noreferrer" className="underline">Resend Dashboard</a></li>
-                <li>Add the DNS records Resend provides (SPF, DKIM, DMARC)</li>
-                <li>Wait for domain verification (usually a few minutes)</li>
-                <li>Enter your sender details below</li>
-              </ol>
+        {/* Domain Setup Wizard Toggle */}
+        <button
+          type="button"
+          onClick={() => setShowDomainWizard(!showDomainWizard)}
+          className="w-full bg-gradient-to-r from-violet-50 to-blue-50 border border-violet-200 rounded-lg p-4 mb-6 flex items-center justify-between hover:from-violet-100 hover:to-blue-100 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <Globe size={24} className="text-violet-600" />
+            <div className="text-left">
+              <p className="font-medium text-slate-900">Domain Setup Wizard</p>
+              <p className="text-sm text-slate-600">Step-by-step guide to configure your custom email domain</p>
             </div>
           </div>
-        </div>
+          {showDomainWizard ? (
+            <ChevronUp size={20} className="text-slate-500" />
+          ) : (
+            <ChevronDown size={20} className="text-slate-500" />
+          )}
+        </button>
+
+        {/* Domain Setup Wizard Content */}
+        {showDomainWizard && (
+          <div className="bg-slate-50 rounded-lg p-6 mb-6 space-y-6">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-full bg-violet-600 text-white flex items-center justify-center font-bold text-sm flex-shrink-0">1</div>
+              <div className="flex-1">
+                <h4 className="font-semibold text-slate-900 mb-2">Add your domain to Resend</h4>
+                <p className="text-sm text-slate-600 mb-3">
+                  Go to Resend and add your project domain (e.g., yourproject.com)
+                </p>
+                <a
+                  href="https://resend.com/domains/add"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-sm text-violet-600 hover:text-violet-700 font-medium"
+                >
+                  Open Resend Domains <ExternalLink size={14} />
+                </a>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-full bg-violet-600 text-white flex items-center justify-center font-bold text-sm flex-shrink-0">2</div>
+              <div className="flex-1">
+                <h4 className="font-semibold text-slate-900 mb-2">Add DNS records for sending (Resend provides these)</h4>
+                <p className="text-sm text-slate-600 mb-3">
+                  Copy the DNS records from Resend and add them to your domain registrar (e.g., Hostinger, GoDaddy, Cloudflare).
+                  These typically include SPF, DKIM, and DMARC records.
+                </p>
+                <div className="bg-white rounded border border-slate-200 p-3 text-xs font-mono text-slate-700">
+                  <p className="mb-1"><span className="text-violet-600">TXT</span> - SPF record (email sending authorization)</p>
+                  <p className="mb-1"><span className="text-violet-600">TXT</span> - DKIM record (email authentication)</p>
+                  <p><span className="text-violet-600">TXT</span> - DMARC record (email policy)</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-full bg-violet-600 text-white flex items-center justify-center font-bold text-sm flex-shrink-0">3</div>
+              <div className="flex-1">
+                <h4 className="font-semibold text-slate-900 mb-2">Add MX record for receiving (inbound emails)</h4>
+                <p className="text-sm text-slate-600 mb-3">
+                  To receive emails at your domain, add this MX record. This allows people to email your project directly.
+                </p>
+                <div className="bg-white rounded border border-slate-200 p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-slate-500">Type: MX | Priority: 4</p>
+                      <p className="text-sm font-mono text-slate-800">inbound-smtp.eu-west-1.amazonaws.com</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard('inbound-smtp.eu-west-1.amazonaws.com', 'mx')}
+                      className="p-2 hover:bg-slate-100 rounded"
+                      title="Copy to clipboard"
+                    >
+                      {copiedRecord === 'mx' ? (
+                        <Check size={16} className="text-green-600" />
+                      ) : (
+                        <Copy size={16} className="text-slate-500" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+                <p className="text-xs text-amber-600 mt-2">
+                  Important: Delete any existing MX records before adding this one to avoid conflicts.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-full bg-violet-600 text-white flex items-center justify-center font-bold text-sm flex-shrink-0">4</div>
+              <div className="flex-1">
+                <h4 className="font-semibold text-slate-900 mb-2">Configure webhook in Resend</h4>
+                <p className="text-sm text-slate-600 mb-3">
+                  Set up a webhook in Resend to forward incoming emails to Placemaker.
+                </p>
+                <div className="bg-white rounded border border-slate-200 p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-slate-500">Webhook URL:</p>
+                      <p className="text-sm font-mono text-slate-800">https://www.placemakerai.io/api/webhooks/email</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard('https://www.placemakerai.io/api/webhooks/email', 'webhook')}
+                      className="p-2 hover:bg-slate-100 rounded"
+                      title="Copy to clipboard"
+                    >
+                      {copiedRecord === 'webhook' ? (
+                        <Check size={16} className="text-green-600" />
+                      ) : (
+                        <Copy size={16} className="text-slate-500" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+                <a
+                  href="https://resend.com/webhooks"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-sm text-violet-600 hover:text-violet-700 font-medium mt-2"
+                >
+                  Configure Webhooks in Resend <ExternalLink size={14} />
+                </a>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-full bg-green-600 text-white flex items-center justify-center font-bold text-sm flex-shrink-0">
+                <Check size={16} />
+              </div>
+              <div className="flex-1">
+                <h4 className="font-semibold text-slate-900 mb-2">Enter your email address below</h4>
+                <p className="text-sm text-slate-600">
+                  Once your domain is verified in Resend, enter your sender email address below (e.g., info@yourproject.com).
+                  Emails sent to this address will appear in your Enquiries inbox.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="space-y-4">
           <div>
@@ -243,11 +405,11 @@ export function SettingsTab({ projectId, project }: SettingsTabProps) {
               value={emailFromAddress}
               onChange={(e) => setEmailFromAddress(e.target.value)}
               className="input w-full"
-              placeholder="e.g., noreply@yourproject.com"
+              placeholder="e.g., info@yourproject.com"
               disabled={!canEdit}
             />
             <p className="text-xs text-slate-500 mt-1">
-              Must be from a verified domain in Resend. Leave blank to use the default.
+              Must be from a verified domain in Resend. Emails sent to this address will appear in your inbox.
             </p>
           </div>
 
@@ -270,6 +432,114 @@ export function SettingsTab({ projectId, project }: SettingsTabProps) {
               >
                 <Save size={18} aria-hidden="true" />
                 {updateProject.isPending ? 'Saving...' : 'Save Email Settings'}
+              </button>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Auto-Reply Settings */}
+      <section className="card p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Reply size={20} className="text-slate-600" />
+          <h3 className="text-lg font-semibold text-slate-900">Auto-Reply Settings</h3>
+        </div>
+
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+          <div className="flex gap-3">
+            <Info size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-amber-800">
+              <p className="font-medium mb-1">Automatic acknowledgement emails</p>
+              <p>When enabled, an automatic reply will be sent to anyone who emails your project inbox.</p>
+              <p className="mt-2">Available placeholders: <code className="bg-amber-100 px-1 rounded">{"{{name}}"}</code> <code className="bg-amber-100 px-1 rounded">{"{{subject}}"}</code> <code className="bg-amber-100 px-1 rounded">{"{{project}}"}</code></p>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="label mb-0">Enable Auto-Reply</label>
+              <p className="text-xs text-slate-500">Send automatic acknowledgement when emails are received</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAutoReplyEnabled(!autoReplyEnabled)}
+              disabled={!canEdit || !emailFromAddress}
+              className={`relative flex items-center ${!canEdit || !emailFromAddress ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+              aria-label={autoReplyEnabled ? 'Disable auto-reply' : 'Enable auto-reply'}
+            >
+              {autoReplyEnabled ? (
+                <ToggleRight size={40} className="text-violet-600" />
+              ) : (
+                <ToggleLeft size={40} className="text-slate-400" />
+              )}
+            </button>
+          </div>
+
+          {!emailFromAddress && (
+            <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
+              Configure your email sender address above to enable auto-replies.
+            </p>
+          )}
+
+          {autoReplyEnabled && emailFromAddress && (
+            <>
+              <div>
+                <label htmlFor="auto-reply-subject" className="label">
+                  Auto-Reply Subject
+                </label>
+                <input
+                  id="auto-reply-subject"
+                  type="text"
+                  value={autoReplySubject}
+                  onChange={(e) => setAutoReplySubject(e.target.value)}
+                  className="input w-full"
+                  placeholder="e.g., Thank you for your enquiry"
+                  disabled={!canEdit}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="auto-reply-message" className="label">
+                  Auto-Reply Message
+                </label>
+                <textarea
+                  id="auto-reply-message"
+                  value={autoReplyMessage}
+                  onChange={(e) => setAutoReplyMessage(e.target.value)}
+                  className="input w-full min-h-[180px] resize-y font-mono text-sm"
+                  placeholder="Enter the auto-reply message..."
+                  disabled={!canEdit}
+                  rows={8}
+                />
+                <p className="text-xs text-slate-500 mt-1">
+                  Use {"{{name}}"} for sender name, {"{{subject}}"} for email subject, {"{{project}}"} for project name
+                </p>
+              </div>
+
+              <div className="bg-slate-50 rounded-lg p-4">
+                <p className="text-xs text-slate-500 mb-2 font-medium">Preview:</p>
+                <div className="text-sm text-slate-700 whitespace-pre-wrap">
+                  {autoReplyMessage
+                    .replace(/\{\{name\}\}/gi, 'John Smith')
+                    .replace(/\{\{subject\}\}/gi, 'Question about the project')
+                    .replace(/\{\{project\}\}/gi, project.name)}
+                </div>
+              </div>
+            </>
+          )}
+
+          {canEdit && (
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={!hasChanges || updateProject.isPending}
+                className="btn-primary"
+              >
+                <Save size={18} aria-hidden="true" />
+                {updateProject.isPending ? 'Saving...' : 'Save Auto-Reply Settings'}
               </button>
             </div>
           )}

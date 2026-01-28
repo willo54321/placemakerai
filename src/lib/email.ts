@@ -223,6 +223,71 @@ export async function sendMailingListEmail({
   }
 }
 
+export async function sendAutoReplyEmail({
+  to,
+  submitterName,
+  originalSubject,
+  autoReplySubject,
+  autoReplyMessage,
+  projectName,
+  projectEmailFromName,
+  projectEmailFromAddress,
+}: {
+  to: string
+  submitterName: string
+  originalSubject: string
+  autoReplySubject: string
+  autoReplyMessage: string
+  projectName: string
+  projectEmailFromName?: string | null
+  projectEmailFromAddress?: string | null
+}) {
+  const client = getResend()
+  if (!client) {
+    console.log('RESEND_API_KEY not configured, skipping auto-reply')
+    return null
+  }
+
+  try {
+    // Replace placeholders in the message
+    const personalizedMessage = autoReplyMessage
+      .replace(/\{\{name\}\}/gi, submitterName)
+      .replace(/\{\{subject\}\}/gi, originalSubject)
+      .replace(/\{\{project\}\}/gi, projectName)
+
+    const personalizedSubject = autoReplySubject
+      .replace(/\{\{subject\}\}/gi, originalSubject)
+      .replace(/\{\{project\}\}/gi, projectName)
+
+    const { data, error } = await client.emails.send({
+      from: getFromAddress(projectEmailFromName, projectEmailFromAddress),
+      to: [to],
+      subject: personalizedSubject,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="white-space: pre-wrap; color: #1e293b;">${personalizedMessage}</div>
+
+          <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 30px 0;">
+
+          <p style="color: #94a3b8; font-size: 12px;">
+            This is an automated acknowledgement from the ${projectName} consultation.
+          </p>
+        </div>
+      `,
+    })
+
+    if (error) {
+      console.error('Failed to send auto-reply email:', error)
+      return null
+    }
+
+    return data
+  } catch (err) {
+    console.error('Auto-reply email send error:', err)
+    return null
+  }
+}
+
 export async function sendEnquiryResponseEmail({
   to,
   submitterName,

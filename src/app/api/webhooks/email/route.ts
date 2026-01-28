@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { headers } from 'next/headers'
+import { sendAutoReplyEmail } from '@/lib/email'
 
 // Webhook secret for verifying requests
 const WEBHOOK_SECRET = process.env.EMAIL_WEBHOOK_SECRET
@@ -107,7 +108,15 @@ export async function POST(request: Request) {
             mode: 'insensitive'
           }
         },
-        select: { id: true, name: true, emailFromAddress: true }
+        select: {
+          id: true,
+          name: true,
+          emailFromName: true,
+          emailFromAddress: true,
+          autoReplyEnabled: true,
+          autoReplySubject: true,
+          autoReplyMessage: true
+        }
       })
 
       if (project) break
@@ -120,7 +129,15 @@ export async function POST(request: Request) {
             mode: 'insensitive'
           }
         },
-        select: { id: true, name: true, emailFromAddress: true }
+        select: {
+          id: true,
+          name: true,
+          emailFromName: true,
+          emailFromAddress: true,
+          autoReplyEnabled: true,
+          autoReplySubject: true,
+          autoReplyMessage: true
+        }
       })
 
       if (project) break
@@ -176,12 +193,50 @@ export async function POST(request: Request) {
 
     console.log(`Created enquiry ${enquiry.id} for project "${project.name}" from ${senderEmail}`)
 
+    // Send auto-reply if enabled
+    let autoReplySent = false
+    if (project.autoReplyEnabled && project.autoReplySubject && project.autoReplyMessage) {
+      try {
+        const autoReplyResult = await sendAutoReplyEmail({
+          to: senderEmail,
+          submitterName,
+          originalSubject: subject,
+          autoReplySubject: project.autoReplySubject,
+          autoReplyMessage: project.autoReplyMessage,
+          projectName: project.name,
+          projectEmailFromName: project.emailFromName,
+          projectEmailFromAddress: project.emailFromAddress
+        })
+
+        if (autoReplyResult) {
+          autoReplySent = true
+          // Log the auto-reply as an outbound message in the thread
+          await prisma.enquiryMessage.create({
+            data: {
+              enquiryId: enquiry.id,
+              type: 'outbound',
+              content: project.autoReplyMessage
+                .replace(/\{\{name\}\}/gi, submitterName)
+                .replace(/\{\{subject\}\}/gi, subject)
+                .replace(/\{\{project\}\}/gi, project.name),
+              authorName: 'Auto-Reply'
+            }
+          })
+          console.log(`Auto-reply sent to ${senderEmail} for enquiry ${enquiry.id}`)
+        }
+      } catch (autoReplyError) {
+        console.error('Failed to send auto-reply:', autoReplyError)
+        // Don't fail the webhook if auto-reply fails
+      }
+    }
+
     return NextResponse.json({
       success: true,
       enquiryId: enquiry.id,
       projectId: project.id,
       projectName: project.name,
-      fromStakeholder: !!stakeholder
+      fromStakeholder: !!stakeholder,
+      autoReplySent
     })
 
   } catch (error) {

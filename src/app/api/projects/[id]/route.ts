@@ -110,6 +110,9 @@ export async function PATCH(
     if (body.allowDrawing !== undefined) updateData.allowDrawing = body.allowDrawing
     if ('emailFromName' in body) updateData.emailFromName = body.emailFromName || null
     if ('emailFromAddress' in body) updateData.emailFromAddress = body.emailFromAddress || null
+    if (body.autoReplyEnabled !== undefined) updateData.autoReplyEnabled = body.autoReplyEnabled
+    if ('autoReplySubject' in body) updateData.autoReplySubject = body.autoReplySubject || null
+    if ('autoReplyMessage' in body) updateData.autoReplyMessage = body.autoReplyMessage || null
 
     const project = await prisma.project.update({
       where: { id: params.id },

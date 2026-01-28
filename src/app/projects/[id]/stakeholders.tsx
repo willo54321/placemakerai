@@ -3,7 +3,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Plus, Edit2, Trash2, X, Users, Search, Filter, ChevronRight,
-  Calendar, Mail, Phone, Building, MessageSquare, History, ThumbsUp, ThumbsDown, Minus, Wand2
+  Calendar, Mail, Phone, Building, MessageSquare, History, ThumbsUp, ThumbsDown, Minus, Wand2,
+  Send, Loader2, CheckCircle
 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { usePermissions } from '@/hooks/usePermissions'
@@ -87,6 +88,8 @@ export function StakeholderTab({ projectId, stakeholders }: { projectId: string;
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [selectedStakeholder, setSelectedStakeholder] = useState<string | null>(null)
   const [showEngagementForm, setShowEngagementForm] = useState(false)
+  const [showEmailModal, setShowEmailModal] = useState(false)
+  const [emailRecipient, setEmailRecipient] = useState<{ id: string; name: string; email: string } | null>(null)
   const nameInputRef = useRef<HTMLInputElement>(null)
   const [form, setForm] = useState({
     name: '',
@@ -798,11 +801,27 @@ export function StakeholderTab({ projectId, stakeholders }: { projectId: string;
                 {/* Contact info */}
                 <div className="p-4 border-b border-slate-200 space-y-2">
                   {stakeholderDetail.email && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <Mail size={14} className="text-slate-400" />
-                      <a href={`mailto:${stakeholderDetail.email}`} className="text-blue-600 hover:text-blue-700">
-                        {stakeholderDetail.email}
-                      </a>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Mail size={14} className="text-slate-400" />
+                        <a href={`mailto:${stakeholderDetail.email}`} className="text-blue-600 hover:text-blue-700">
+                          {stakeholderDetail.email}
+                        </a>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setEmailRecipient({
+                            id: stakeholderDetail.id,
+                            name: stakeholderDetail.name,
+                            email: stakeholderDetail.email!,
+                          })
+                          setShowEmailModal(true)
+                        }}
+                        className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                      >
+                        <Send size={12} />
+                        Send Email
+                      </button>
                     </div>
                   )}
                   {stakeholderDetail.phone && (
@@ -1040,6 +1059,165 @@ export function StakeholderTab({ projectId, stakeholders }: { projectId: string;
           </div>
         </>
       )}
+
+      {/* Email Compose Modal */}
+      {showEmailModal && emailRecipient && (
+        <StakeholderEmailModal
+          projectId={projectId}
+          recipient={emailRecipient}
+          onClose={() => {
+            setShowEmailModal(false)
+            setEmailRecipient(null)
+          }}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ['stakeholder', projectId, selectedStakeholder] })
+          }}
+        />
+      )}
     </div>
+  )
+}
+
+// Stakeholder Email Compose Modal
+function StakeholderEmailModal({
+  projectId,
+  recipient,
+  onClose,
+  onSuccess,
+}: {
+  projectId: string
+  recipient: { id: string; name: string; email: string }
+  onClose: () => void
+  onSuccess?: () => void
+}) {
+  const [subject, setSubject] = useState('')
+  const [message, setMessage] = useState('')
+  const [isSending, setIsSending] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState(false)
+
+  const handleSend = async () => {
+    if (!subject || !message) {
+      setError('Please fill in subject and message')
+      return
+    }
+
+    setIsSending(true)
+    setError('')
+
+    try {
+      const res = await fetch(`/api/projects/${projectId}/emails/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: recipient.email,
+          subject,
+          message,
+          stakeholderId: recipient.id,
+          sentBy: 'User',
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to send email')
+      }
+
+      setSuccess(true)
+      setTimeout(() => {
+        onSuccess?.()
+        onClose()
+      }, 1500)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to send email')
+    } finally {
+      setIsSending(false)
+    }
+  }
+
+  return (
+    <>
+      <div className="modal-overlay" onClick={onClose} aria-hidden="true" />
+      <div className="modal" role="dialog" aria-modal="true">
+        <div className="modal-content max-w-xl">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-slate-900">Send Email</h2>
+            <button onClick={onClose} className="btn-icon" aria-label="Close">
+              <X size={20} />
+            </button>
+          </div>
+
+          {success ? (
+            <div className="text-center py-8">
+              <CheckCircle size={48} className="text-green-500 mx-auto mb-4" />
+              <p className="text-lg font-medium text-slate-900">Email sent successfully!</p>
+              <p className="text-sm text-slate-500 mt-1">Engagement logged to stakeholder history</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <label className="label">To</label>
+                <div className="input bg-slate-50 text-slate-600">
+                  {recipient.name} &lt;{recipient.email}&gt;
+                </div>
+              </div>
+
+              <div>
+                <label className="label">Subject</label>
+                <input
+                  type="text"
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  placeholder="Email subject"
+                  className="input"
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="label">Message</label>
+                <textarea
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder="Type your message..."
+                  rows={8}
+                  className="input"
+                />
+              </div>
+
+              {error && (
+                <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg">
+                  {error}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-4">
+                <button onClick={onClose} className="btn-secondary">
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSend}
+                  disabled={isSending || !subject || !message}
+                  className="btn-primary"
+                >
+                  {isSending ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Send size={18} />
+                      Send Email
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
   )
 }

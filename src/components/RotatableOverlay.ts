@@ -104,11 +104,17 @@ export class RotatableOverlay implements IRotatableOverlay {
         const width = ne.x - sw.x
         const height = sw.y - ne.y
 
-        this.div.style.left = sw.x + 'px'
-        this.div.style.top = ne.y + 'px'
+        // Calculate center point for stable rotation
+        const centerX = (sw.x + ne.x) / 2
+        const centerY = (sw.y + ne.y) / 2
+
+        // Position from center using translate, then rotate
+        // This ensures rotation happens around the geographic center
+        this.div.style.left = '0'
+        this.div.style.top = '0'
         this.div.style.width = width + 'px'
         this.div.style.height = height + 'px'
-        this.div.style.transform = `rotate(${self._rotation}deg)`
+        this.div.style.transform = `translate(${centerX - width/2}px, ${centerY - height/2}px) rotate(${self._rotation}deg)`
       }
 
       onRemove(): void {

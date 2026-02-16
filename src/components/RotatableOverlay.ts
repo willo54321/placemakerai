@@ -92,29 +92,23 @@ export class RotatableOverlay implements IRotatableOverlay {
         const overlayProjection = this.getProjection()
         if (!overlayProjection) return
 
-        const sw = overlayProjection.fromLatLngToDivPixel(
-          new google.maps.LatLng(self._bounds[0][0], self._bounds[0][1])
-        )
-        const ne = overlayProjection.fromLatLngToDivPixel(
-          new google.maps.LatLng(self._bounds[1][0], self._bounds[1][1])
-        )
+        const swLatLng = new google.maps.LatLng(self._bounds[0][0], self._bounds[0][1])
+        const neLatLng = new google.maps.LatLng(self._bounds[1][0], self._bounds[1][1])
+
+        const sw = overlayProjection.fromLatLngToDivPixel(swLatLng)
+        const ne = overlayProjection.fromLatLngToDivPixel(neLatLng)
 
         if (!sw || !ne) return
 
-        const width = ne.x - sw.x
-        const height = sw.y - ne.y
+        const width = Math.abs(ne.x - sw.x)
+        const height = Math.abs(sw.y - ne.y)
 
-        // Calculate center point for stable rotation
-        const centerX = (sw.x + ne.x) / 2
-        const centerY = (sw.y + ne.y) / 2
-
-        // Position from center using translate, then rotate
-        // This ensures rotation happens around the geographic center
-        this.div.style.left = '0'
-        this.div.style.top = '0'
+        // Position at the top-left corner (ne.y is top, sw.x is left)
+        this.div.style.left = Math.min(sw.x, ne.x) + 'px'
+        this.div.style.top = Math.min(sw.y, ne.y) + 'px'
         this.div.style.width = width + 'px'
         this.div.style.height = height + 'px'
-        this.div.style.transform = `translate(${centerX - width/2}px, ${centerY - height/2}px) rotate(${self._rotation}deg)`
+        this.div.style.transform = `rotate(${self._rotation}deg)`
       }
 
       onRemove(): void {

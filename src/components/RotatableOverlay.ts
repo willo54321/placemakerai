@@ -92,27 +92,20 @@ export class RotatableOverlay implements IRotatableOverlay {
         const overlayProjection = this.getProjection()
         if (!overlayProjection) return
 
-        const swLatLng = new google.maps.LatLng(self._bounds[0][0], self._bounds[0][1])
-        const neLatLng = new google.maps.LatLng(self._bounds[1][0], self._bounds[1][1])
+        const sw = overlayProjection.fromLatLngToDivPixel(
+          new google.maps.LatLng(self._bounds[0][0], self._bounds[0][1])
+        )
+        const ne = overlayProjection.fromLatLngToDivPixel(
+          new google.maps.LatLng(self._bounds[1][0], self._bounds[1][1])
+        )
 
-        // Calculate geographic center for stable rotation anchor
-        const centerLat = (self._bounds[0][0] + self._bounds[1][0]) / 2
-        const centerLng = (self._bounds[0][1] + self._bounds[1][1]) / 2
-        const centerLatLng = new google.maps.LatLng(centerLat, centerLng)
+        if (!sw || !ne) return
 
-        const sw = overlayProjection.fromLatLngToDivPixel(swLatLng)
-        const ne = overlayProjection.fromLatLngToDivPixel(neLatLng)
-        const center = overlayProjection.fromLatLngToDivPixel(centerLatLng)
+        const width = ne.x - sw.x
+        const height = sw.y - ne.y
 
-        if (!sw || !ne || !center) return
-
-        const width = Math.abs(ne.x - sw.x)
-        const height = Math.abs(sw.y - ne.y)
-
-        // Position element so its center aligns with geographic center
-        // This ensures rotation happens around the correct geographic point
-        this.div.style.left = (center.x - width / 2) + 'px'
-        this.div.style.top = (center.y - height / 2) + 'px'
+        this.div.style.left = sw.x + 'px'
+        this.div.style.top = ne.y + 'px'
         this.div.style.width = width + 'px'
         this.div.style.height = height + 'px'
         this.div.style.transform = `rotate(${self._rotation}deg)`

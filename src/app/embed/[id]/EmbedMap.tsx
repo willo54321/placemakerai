@@ -362,7 +362,8 @@ export default function EmbedMap({
     draggable: true,
     scrollwheel: true,
     draggableCursor: 'grab',
-    draggingCursor: 'grabbing'
+    draggingCursor: 'grabbing',
+    maxZoom: 18
   }), [])
 
   // Drawing manager options - always available

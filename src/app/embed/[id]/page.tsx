@@ -623,9 +623,12 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
                   </div>
                 </div>
 
-                <p className="text-xs text-gray-400">
-                  Your feedback will be visible to other visitors and reviewed by the project team.
-                </p>
+                {/* Moderation Notice */}
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <p className="text-sm text-amber-800">
+                    <strong>Please note:</strong> All comments are moderated before being published. There may be a short delay between submitting your feedback and it appearing on the map.
+                  </p>
+                </div>
 
                 {/* GDPR Consent */}
                 <div className="space-y-3 pt-2 border-t border-gray-200">

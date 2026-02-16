@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react'
-import { GoogleMap, useJsApiLoader, MarkerF, PolygonF, PolylineF, DrawingManagerF, RectangleF, OverlayView } from '@react-google-maps/api'
+import { GoogleMap, useJsApiLoader, MarkerF, PolygonF, PolylineF, DrawingManagerF, OverlayView } from '@react-google-maps/api'
 import { X } from 'lucide-react'
+import { RotatableOverlay, calculateRotationAngle, snapAngle } from './RotatableOverlay'
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''
 const LIBRARIES: ("drawing" | "geometry")[] = ['drawing', 'geometry']
@@ -34,6 +35,7 @@ export interface ImageOverlay {
   imageUrl: string
   bounds: [[number, number], [number, number]]
   opacity: number
+  rotation: number
   visible: boolean
 }
 
@@ -74,6 +76,7 @@ interface InteractiveMapProps {
   onBoundsChange?: (center: [number, number], zoom: number) => void
   onOverlayClick?: (overlayId: string) => void
   onOverlayBoundsChange?: (overlayId: string, bounds: [[number, number], [number, number]]) => void
+  onOverlayRotationChange?: (overlayId: string, rotation: number) => void
 }
 
 function createMarkerIcon(color: string, isHovered: boolean = false): google.maps.Icon {
@@ -113,6 +116,17 @@ function createResizeHandleIcon(): google.maps.Symbol {
   }
 }
 
+function createRotationHandleIcon(): google.maps.Symbol {
+  return {
+    path: 'M -8 0 A 8 8 0 1 1 8 0 A 8 8 0 1 1 -8 0 M -4 -2 L 0 -6 L 4 -2',
+    scale: 1,
+    fillColor: '#059669',
+    fillOpacity: 1,
+    strokeColor: '#FFFFFF',
+    strokeWeight: 2,
+  }
+}
+
 const InteractiveMap = forwardRef<InteractiveMapRef, InteractiveMapProps>(({
   center,
   zoom,
@@ -131,7 +145,8 @@ const InteractiveMap = forwardRef<InteractiveMapRef, InteractiveMapProps>(({
   onDrawingClick,
   onBoundsChange,
   onOverlayClick,
-  onOverlayBoundsChange
+  onOverlayBoundsChange,
+  onOverlayRotationChange
 }, ref) => {
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script-embed',
@@ -146,7 +161,9 @@ const InteractiveMap = forwardRef<InteractiveMapRef, InteractiveMapProps>(({
   const [isDraggingOverlay, setIsDraggingOverlay] = useState(false)
   const [dragStartPos, setDragStartPos] = useState<{ lat: number; lng: number } | null>(null)
   const [dragStartBounds, setDragStartBounds] = useState<[[number, number], [number, number]] | null>(null)
-  const overlayRefs = useRef(new globalThis.Map<string, google.maps.GroundOverlay>())
+  const [isRotatingOverlay, setIsRotatingOverlay] = useState(false)
+  const [rotationStartAngle, setRotationStartAngle] = useState<number>(0)
+  const overlayRefs = useRef(new globalThis.Map<string, RotatableOverlay>())
   const drawingManagerRef = useRef<google.maps.drawing.DrawingManager | null>(null)
 
   const mapCenter = useMemo(() => ({ lat: center[0], lng: center[1] }), [center[0], center[1]])
@@ -209,23 +226,19 @@ const InteractiveMap = forwardRef<InteractiveMapRef, InteractiveMapProps>(({
     overlayRefs.current.clear()
 
     overlays.filter(o => o.visible).forEach(overlay => {
-      const bounds = new google.maps.LatLngBounds(
-        { lat: overlay.bounds[0][0], lng: overlay.bounds[0][1] },
-        { lat: overlay.bounds[1][0], lng: overlay.bounds[1][1] }
-      )
-
-      const groundOverlay = new google.maps.GroundOverlay(
-        overlay.imageUrl,
-        bounds,
-        { opacity: overlay.opacity, clickable: true }
-      )
-
-      groundOverlay.setMap(map)
-      groundOverlay.addListener('click', () => {
-        onOverlayClick?.(overlay.id)
+      const rotatableOverlay = new RotatableOverlay({
+        imageUrl: overlay.imageUrl,
+        bounds: overlay.bounds,
+        rotation: overlay.rotation || 0,
+        opacity: overlay.opacity,
+        clickable: true,
+        onClick: () => {
+          onOverlayClick?.(overlay.id)
+        }
       })
 
-      overlayRefs.current.set(overlay.id, groundOverlay)
+      rotatableOverlay.setMap(map)
+      overlayRefs.current.set(overlay.id, rotatableOverlay)
     })
 
     return () => {
@@ -353,6 +366,34 @@ const InteractiveMap = forwardRef<InteractiveMapRef, InteractiveMapProps>(({
 
     onOverlayBoundsChange(overlay.id, newBounds)
   }, [onOverlayBoundsChange])
+
+  // Rotation handle handlers
+  const handleRotationStart = useCallback((overlay: ImageOverlay, e: google.maps.MapMouseEvent) => {
+    if (!e.latLng) return
+    setIsRotatingOverlay(true)
+    setRotationStartAngle(overlay.rotation || 0)
+  }, [])
+
+  const handleRotationDrag = useCallback((overlay: ImageOverlay, e: google.maps.MapMouseEvent) => {
+    if (!e.latLng || !isRotatingOverlay || !onOverlayRotationChange) return
+
+    const centerLat = (overlay.bounds[0][0] + overlay.bounds[1][0]) / 2
+    const centerLng = (overlay.bounds[0][1] + overlay.bounds[1][1]) / 2
+    const mouseLat = e.latLng.lat()
+    const mouseLng = e.latLng.lng()
+
+    let newRotation = calculateRotationAngle(centerLat, centerLng, mouseLat, mouseLng)
+
+    // Snap to 15 degree increments when shift key would be held (we can't detect shift in drag, so skip for now)
+    // newRotation = snapAngle(newRotation)
+
+    onOverlayRotationChange(overlay.id, newRotation)
+  }, [isRotatingOverlay, onOverlayRotationChange])
+
+  const handleRotationEnd = useCallback(() => {
+    setIsRotatingOverlay(false)
+    setRotationStartAngle(0)
+  }, [])
 
   if (!isLoaded) {
     return (
@@ -663,37 +704,80 @@ const InteractiveMap = forwardRef<InteractiveMapRef, InteractiveMapProps>(({
           )
         })()}
 
-        {selectedOverlay && (
-          <RectangleF
-            bounds={{
-              south: selectedOverlay.bounds[0][0],
-              west: selectedOverlay.bounds[0][1],
-              north: selectedOverlay.bounds[1][0],
-              east: selectedOverlay.bounds[1][1]
-            }}
-            options={{
-              fillColor: '#7c3aed',
-              fillOpacity: 0,
-              strokeColor: '#7c3aed',
-              strokeWeight: 3,
-              strokeOpacity: 1,
-              clickable: true,
-              draggable: true,
-              zIndex: 10
-            }}
-            onDragStart={(e) => handleOverlayDragStart(selectedOverlay, e)}
-            onDrag={(e) => handleOverlayDrag(selectedOverlay, e)}
-            onDragEnd={handleOverlayDragEnd}
-          />
-        )}
+        {selectedOverlay && (() => {
+          // Calculate rotated corners for the selection outline
+          const rotation = selectedOverlay.rotation || 0
+          const rad = (rotation * Math.PI) / 180
+          const cos = Math.cos(rad)
+          const sin = Math.sin(rad)
+
+          const centerLat = (selectedOverlay.bounds[0][0] + selectedOverlay.bounds[1][0]) / 2
+          const centerLng = (selectedOverlay.bounds[0][1] + selectedOverlay.bounds[1][1]) / 2
+
+          // Original corners (unrotated)
+          const origCorners = [
+            { lat: selectedOverlay.bounds[0][0], lng: selectedOverlay.bounds[0][1] }, // SW
+            { lat: selectedOverlay.bounds[1][0], lng: selectedOverlay.bounds[0][1] }, // NW
+            { lat: selectedOverlay.bounds[1][0], lng: selectedOverlay.bounds[1][1] }, // NE
+            { lat: selectedOverlay.bounds[0][0], lng: selectedOverlay.bounds[1][1] }, // SE
+          ]
+
+          // Rotate each corner around center
+          const rotatedCorners = origCorners.map(corner => {
+            const dLat = corner.lat - centerLat
+            const dLng = corner.lng - centerLng
+            return {
+              lat: centerLat + dLat * cos - dLng * sin,
+              lng: centerLng + dLat * sin + dLng * cos
+            }
+          })
+
+          return (
+            <PolygonF
+              paths={rotatedCorners}
+              options={{
+                fillColor: '#7c3aed',
+                fillOpacity: 0,
+                strokeColor: '#7c3aed',
+                strokeWeight: 3,
+                strokeOpacity: 1,
+                clickable: true,
+                draggable: true,
+                zIndex: 10
+              }}
+              onDragStart={(e) => handleOverlayDragStart(selectedOverlay, e)}
+              onDrag={(e) => handleOverlayDrag(selectedOverlay, e)}
+              onDragEnd={handleOverlayDragEnd}
+            />
+          )
+        })()}
 
         {selectedOverlay && (() => {
-          const corners = [
+          // Calculate rotated corner positions for resize handles
+          const rotation = selectedOverlay.rotation || 0
+          const rad = (rotation * Math.PI) / 180
+          const cos = Math.cos(rad)
+          const sin = Math.sin(rad)
+
+          const centerLat = (selectedOverlay.bounds[0][0] + selectedOverlay.bounds[1][0]) / 2
+          const centerLng = (selectedOverlay.bounds[0][1] + selectedOverlay.bounds[1][1]) / 2
+
+          const origCorners = [
             { id: 'sw', lat: selectedOverlay.bounds[0][0], lng: selectedOverlay.bounds[0][1] },
             { id: 'nw', lat: selectedOverlay.bounds[1][0], lng: selectedOverlay.bounds[0][1] },
             { id: 'ne', lat: selectedOverlay.bounds[1][0], lng: selectedOverlay.bounds[1][1] },
             { id: 'se', lat: selectedOverlay.bounds[0][0], lng: selectedOverlay.bounds[1][1] },
           ]
+
+          const corners = origCorners.map(corner => {
+            const dLat = corner.lat - centerLat
+            const dLng = corner.lng - centerLng
+            return {
+              id: corner.id,
+              lat: centerLat + dLat * cos - dLng * sin,
+              lng: centerLng + dLat * sin + dLng * cos
+            }
+          })
 
           return corners.map(corner => (
             <MarkerF
@@ -705,6 +789,38 @@ const InteractiveMap = forwardRef<InteractiveMapRef, InteractiveMapProps>(({
               zIndex={11}
             />
           ))
+        })()}
+
+        {/* Rotation handle - positioned above the top edge of the overlay */}
+        {selectedOverlay && (() => {
+          const rotation = selectedOverlay.rotation || 0
+          const rad = (rotation * Math.PI) / 180
+          const cos = Math.cos(rad)
+          const sin = Math.sin(rad)
+
+          const centerLat = (selectedOverlay.bounds[0][0] + selectedOverlay.bounds[1][0]) / 2
+          const centerLng = (selectedOverlay.bounds[0][1] + selectedOverlay.bounds[1][1]) / 2
+
+          // Position handle above the north edge
+          const northLat = selectedOverlay.bounds[1][0]
+          const handleOffset = (northLat - centerLat) * 1.2 // 20% above the top edge
+
+          // Rotate the handle position
+          const handleLat = centerLat + handleOffset * cos
+          const handleLng = centerLng + handleOffset * sin
+
+          return (
+            <MarkerF
+              key={`${selectedOverlay.id}-rotation`}
+              position={{ lat: handleLat, lng: handleLng }}
+              draggable={true}
+              icon={createRotationHandleIcon()}
+              onDragStart={(e) => handleRotationStart(selectedOverlay, e)}
+              onDrag={(e) => handleRotationDrag(selectedOverlay, e)}
+              onDragEnd={handleRotationEnd}
+              zIndex={12}
+            />
+          )
         })()}
       </GoogleMap>
     </div>

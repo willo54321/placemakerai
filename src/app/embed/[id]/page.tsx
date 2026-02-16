@@ -39,6 +39,7 @@ interface Overlay {
   imageUrl: string
   bounds: [[number, number], [number, number]]
   opacity: number
+  rotation: number
 }
 
 interface TourStop {

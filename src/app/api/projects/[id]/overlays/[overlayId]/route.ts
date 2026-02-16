@@ -12,6 +12,7 @@ export async function PATCH(
 
   if (body.name !== undefined) updateData.name = body.name
   if (body.opacity !== undefined) updateData.opacity = body.opacity
+  if (body.rotation !== undefined) updateData.rotation = body.rotation
   if (body.visible !== undefined) updateData.visible = body.visible
   if (body.bounds !== undefined) {
     updateData.southLat = body.bounds[0][0]
@@ -34,6 +35,7 @@ export async function PATCH(
     imageUrl: overlay.imageUrl,
     bounds: [[overlay.southLat, overlay.westLng], [overlay.northLat, overlay.eastLng]],
     opacity: overlay.opacity,
+    rotation: overlay.rotation,
     visible: overlay.visible,
   })
 }

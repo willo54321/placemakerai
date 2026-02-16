@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { GoogleMap, useJsApiLoader, MarkerF, OverlayView, PolygonF, PolylineF, DrawingManagerF } from '@react-google-maps/api'
 import { ThumbsUp, ThumbsDown, Lightbulb, MessageCircle, X } from 'lucide-react'
+import { RotatableOverlay } from '@/components/RotatableOverlay'
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''
 const LIBRARIES: ("drawing" | "geometry" | "places")[] = ['drawing', 'geometry']
@@ -18,6 +19,7 @@ interface Overlay {
   imageUrl: string
   bounds: [[number, number], [number, number]]
   opacity: number
+  rotation: number
 }
 
 interface PublicPin {
@@ -199,7 +201,7 @@ export default function EmbedMap({
     }
   }, [selectedPin])
 
-  const overlayRefs = useRef<Map<string, google.maps.GroundOverlay>>(new Map())
+  const overlayRefs = useRef<Map<string, RotatableOverlay>>(new Map())
 
   const mapCenter = useMemo(() => ({ lat: center[0], lng: center[1] }), [center[0], center[1]])
 
@@ -304,21 +306,22 @@ export default function EmbedMap({
         if (existingOverlay.getOpacity() !== overlay.opacity) {
           existingOverlay.setOpacity(overlay.opacity)
         }
+        // Update rotation if changed
+        if (existingOverlay.getRotation() !== (overlay.rotation || 0)) {
+          existingOverlay.setRotation(overlay.rotation || 0)
+        }
       } else {
-        // Create new overlay
-        const bounds = new google.maps.LatLngBounds(
-          { lat: overlay.bounds[0][0], lng: overlay.bounds[0][1] },
-          { lat: overlay.bounds[1][0], lng: overlay.bounds[1][1] }
-        )
+        // Create new overlay using RotatableOverlay
+        const rotatableOverlay = new RotatableOverlay({
+          imageUrl: overlay.imageUrl,
+          bounds: overlay.bounds,
+          rotation: overlay.rotation || 0,
+          opacity: overlay.opacity,
+          clickable: false
+        })
 
-        const groundOverlay = new google.maps.GroundOverlay(
-          overlay.imageUrl,
-          bounds,
-          { opacity: overlay.opacity, clickable: false }
-        )
-
-        groundOverlay.setMap(map)
-        overlayRefs.current.set(overlay.id, groundOverlay)
+        rotatableOverlay.setMap(map)
+        overlayRefs.current.set(overlay.id, rotatableOverlay)
       }
     })
 
@@ -328,7 +331,7 @@ export default function EmbedMap({
       })
       overlayRefs.current.clear()
     }
-  }, [map, JSON.stringify(overlays.map(o => ({ id: o.id, opacity: o.opacity })))])
+  }, [map, JSON.stringify(overlays.map(o => ({ id: o.id, opacity: o.opacity, rotation: o.rotation })))])
 
   // Update drawing manager mode when drawMode changes
   useEffect(() => {

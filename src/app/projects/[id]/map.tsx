@@ -73,6 +73,7 @@ interface DBImageOverlay {
   northLat: number
   eastLng: number
   opacity: number
+  rotation: number
   visible: boolean
 }
 
@@ -141,6 +142,7 @@ export function MapTab({ projectId, project }: { projectId: string; project: Pro
       imageUrl: o.imageUrl,
       bounds: [[o.southLat, o.westLng], [o.northLat, o.eastLng]] as [[number, number], [number, number]],
       opacity: o.opacity,
+      rotation: o.rotation || 0,
       visible: o.visible,
     }))
   const [overlays, setOverlays] = useState<ImageOverlay[]>(() => convertOverlays(project.imageOverlays))
@@ -261,7 +263,7 @@ export function MapTab({ projectId, project }: { projectId: string; project: Pro
   })
 
   const updateOverlay = useMutation({
-    mutationFn: async ({ id, ...data }: { id: string; bounds?: [[number, number], [number, number]]; opacity?: number; visible?: boolean }) => {
+    mutationFn: async ({ id, ...data }: { id: string; bounds?: [[number, number], [number, number]]; opacity?: number; rotation?: number; visible?: boolean }) => {
       const response = await fetch(`/api/projects/${projectId}/overlays/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -469,63 +471,83 @@ export function MapTab({ projectId, project }: { projectId: string; project: Pro
   const [isUploading, setIsUploading] = useState(false)
 
   const handleOverlayUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const files = e.target.files
+    if (!files || files.length === 0) return
 
     setOverlayError(null)
 
-    // Check file size - allow up to 50MB with Vercel Blob
-    if (file.size > 50 * 1024 * 1024) {
-      setOverlayError('Image too large. Maximum size is 50MB.')
-      e.target.value = ''
-      return
-    }
-
-    // Check file type
-    if (!file.type.startsWith('image/')) {
-      setOverlayError('Please upload an image file.')
-      e.target.value = ''
-      return
+    // Validate all files first
+    const validFiles: File[] = []
+    for (const file of Array.from(files)) {
+      if (file.size > 50 * 1024 * 1024) {
+        setOverlayError(`${file.name} is too large. Maximum size is 50MB.`)
+        e.target.value = ''
+        return
+      }
+      if (!file.type.startsWith('image/')) {
+        setOverlayError(`${file.name} is not an image file.`)
+        e.target.value = ''
+        return
+      }
+      validFiles.push(file)
     }
 
     setIsUploading(true)
 
     try {
-      // Upload to Vercel Blob
-      const formData = new FormData()
-      formData.append('file', file)
+      // Upload all files and create overlays
+      const newOverlays: ImageOverlay[] = []
+      let lastTempId = ''
 
-      const uploadRes = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      })
+      for (let i = 0; i < validFiles.length; i++) {
+        const file = validFiles[i]
 
-      if (!uploadRes.ok) {
-        const errorData = await uploadRes.json()
-        throw new Error(errorData.error || 'Upload failed')
+        // Upload to Vercel Blob
+        const formData = new FormData()
+        formData.append('file', file)
+
+        const uploadRes = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        })
+
+        if (!uploadRes.ok) {
+          const errorData = await uploadRes.json()
+          throw new Error(errorData.error || `Upload failed for ${file.name}`)
+        }
+
+        const { url: imageUrl } = await uploadRes.json()
+
+        // Offset each overlay slightly so they don't stack exactly on top of each other
+        const offset = i * 0.005
+        const tempId = (Date.now() + i).toString()
+        lastTempId = tempId
+
+        const newOverlay: ImageOverlay = {
+          id: tempId,
+          name: file.name.replace(/\.[^/.]+$/, ''),
+          imageUrl,
+          bounds: [
+            [mapCenter[0] - 0.01 + offset, mapCenter[1] - 0.01 + offset],
+            [mapCenter[0] + 0.01 + offset, mapCenter[1] + 0.01 + offset],
+          ],
+          opacity: 0.7,
+          rotation: 0,
+          visible: true,
+        }
+
+        newOverlays.push(newOverlay)
+
+        // Save to database
+        createOverlay.mutate({ ...newOverlay, tempId } as any)
       }
 
-      const { url: imageUrl } = await uploadRes.json()
-
-      const tempId = Date.now().toString()
-      const newOverlay: ImageOverlay = {
-        id: tempId,
-        name: file.name.replace(/\.[^/.]+$/, ''),
-        imageUrl,
-        bounds: [
-          [mapCenter[0] - 0.01, mapCenter[1] - 0.01],
-          [mapCenter[0] + 0.01, mapCenter[1] + 0.01],
-        ],
-        opacity: 0.7,
-        visible: true,
-      }
-      // Optimistically add to local state
-      setOverlays([...overlays, newOverlay])
-      setSelectedOverlayId(tempId)
-      // Save to database
-      createOverlay.mutate({ ...newOverlay, tempId } as any)
+      // Add all overlays to local state at once
+      setOverlays(prev => [...prev, ...newOverlays])
+      // Select the last uploaded overlay
+      setSelectedOverlayId(lastTempId)
     } catch (error) {
-      setOverlayError(error instanceof Error ? error.message : 'Failed to upload image.')
+      setOverlayError(error instanceof Error ? error.message : 'Failed to upload images.')
     } finally {
       setIsUploading(false)
       e.target.value = ''
@@ -548,6 +570,15 @@ export function MapTab({ projectId, project }: { projectId: string; project: Pro
     ))
     // Save to database
     updateOverlay.mutate({ id: overlayId, opacity })
+  }
+
+  const updateOverlayRotation = (overlayId: string, rotation: number) => {
+    // Update local state immediately
+    setOverlays(overlays.map(o =>
+      o.id === overlayId ? { ...o, rotation } : o
+    ))
+    // Save to database
+    updateOverlay.mutate({ id: overlayId, rotation })
   }
 
   const toggleOverlayVisibility = (overlayId: string) => {
@@ -825,6 +856,7 @@ export function MapTab({ projectId, project }: { projectId: string; project: Pro
               }}
               onOverlayClick={(id: string) => setSelectedOverlayId(id)}
               onOverlayBoundsChange={updateOverlayBounds}
+              onOverlayRotationChange={updateOverlayRotation}
             />
             </div>
 
@@ -894,7 +926,7 @@ export function MapTab({ projectId, project }: { projectId: string; project: Pro
                               <span className="text-sm text-gray-600">Add Overlay (up to 50MB)</span>
                             </>
                           )}
-                          <input type="file" accept="image/*" onChange={handleOverlayUpload} className="hidden" disabled={isUploading || createOverlay.isPending} />
+                          <input type="file" accept="image/*" multiple onChange={handleOverlayUpload} className="hidden" disabled={isUploading || createOverlay.isPending} />
                         </label>
                         {overlayError && (
                           <p className="text-xs text-red-600 mt-2 text-center">{overlayError}</p>
@@ -956,6 +988,22 @@ export function MapTab({ projectId, project }: { projectId: string; project: Pro
                                       onClick={(e) => e.stopPropagation()}
                                     />
                                   </div>
+                                  <div>
+                                    <div className="flex justify-between text-xs mb-1">
+                                      <span className="text-gray-500">Rotation</span>
+                                      <span className="text-gray-700 font-medium">{Math.round(overlay.rotation || 0)}°</span>
+                                    </div>
+                                    <input
+                                      type="range"
+                                      min="0"
+                                      max="360"
+                                      step="1"
+                                      value={overlay.rotation || 0}
+                                      onChange={(e) => updateOverlayRotation(overlay.id, parseFloat(e.target.value))}
+                                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
+                                  </div>
                                   <div className="flex gap-2">
                                     <button
                                       onClick={(e) => { e.stopPropagation(); fitToOverlay(overlay) }}
@@ -964,13 +1012,20 @@ export function MapTab({ projectId, project }: { projectId: string; project: Pro
                                       <ZoomIn size={14} /> Fit to View
                                     </button>
                                     <button
+                                      onClick={(e) => { e.stopPropagation(); updateOverlayRotation(overlay.id, 0) }}
+                                      className="flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                                      title="Reset rotation"
+                                    >
+                                      0°
+                                    </button>
+                                    <button
                                       onClick={(e) => { e.stopPropagation(); deleteOverlay(overlay.id) }}
                                       className="flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded transition-colors"
                                     >
                                       <Trash2 size={14} />
                                     </button>
                                   </div>
-                                  <p className="text-xs text-gray-400 text-center">Drag corner handles to resize</p>
+                                  <p className="text-xs text-gray-400 text-center">Drag green handle to rotate, corners to resize</p>
                                 </div>
                               )}
                             </div>
@@ -1085,7 +1140,7 @@ export function MapTab({ projectId, project }: { projectId: string; project: Pro
                 <div className="flex-1 flex flex-col items-center py-4 gap-3">
                   <label className={`p-2 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded cursor-pointer transition-colors ${isUploading ? 'opacity-50 pointer-events-none' : ''}`} title="Add Overlay (up to 50MB)">
                     {isUploading ? <span className="animate-spin w-5 h-5 border-2 border-brand-500 border-t-transparent rounded-full inline-block" /> : <Upload size={20} />}
-                    <input type="file" accept="image/*" onChange={handleOverlayUpload} className="hidden" disabled={isUploading} />
+                    <input type="file" accept="image/*" multiple onChange={handleOverlayUpload} className="hidden" disabled={isUploading} />
                   </label>
                   <label className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded cursor-pointer transition-colors" title="Import Geo Data">
                     <FileUp size={20} />

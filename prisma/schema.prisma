@@ -169,6 +169,7 @@ model ImageOverlay {
   northLat  Float
   eastLng   Float
   opacity   Float    @default(0.7)
+  rotation  Float    @default(0)
   visible   Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

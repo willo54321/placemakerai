@@ -26,6 +26,7 @@ export async function POST(
         northLat: body.bounds[1][0],
         eastLng: body.bounds[1][1],
         opacity: body.opacity ?? 0.7,
+        rotation: body.rotation ?? 0,
         visible: body.visible ?? true,
       }
     })
@@ -37,6 +38,7 @@ export async function POST(
       imageUrl: overlay.imageUrl,
       bounds: [[overlay.southLat, overlay.westLng], [overlay.northLat, overlay.eastLng]],
       opacity: overlay.opacity,
+      rotation: overlay.rotation,
       visible: overlay.visible,
     })
   } catch (error) {

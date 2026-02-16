@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { GoogleMap, useJsApiLoader } from '@react-google-maps/api'
+import { RotatableOverlay } from '@/components/RotatableOverlay'
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''
 const LIBRARIES: ("drawing" | "geometry")[] = ['drawing', 'geometry']
@@ -12,6 +13,7 @@ interface Overlay {
   imageUrl: string
   bounds: [[number, number], [number, number]]
   opacity: number
+  rotation: number
 }
 
 interface TourMapProps {
@@ -36,7 +38,7 @@ export default function TourMap({
   })
 
   const [map, setMap] = useState<google.maps.Map | null>(null)
-  const overlayRefs = useRef<Map<string, google.maps.GroundOverlay>>(new Map())
+  const overlayRefs = useRef<Map<string, RotatableOverlay>>(new Map())
 
   const mapCenter = useMemo(() => ({ lat: center[0], lng: center[1] }), [center[0], center[1]])
 
@@ -92,19 +94,16 @@ export default function TourMap({
     overlayRefs.current.clear()
 
     overlays.forEach(overlay => {
-      const bounds = new google.maps.LatLngBounds(
-        { lat: overlay.bounds[0][0], lng: overlay.bounds[0][1] },
-        { lat: overlay.bounds[1][0], lng: overlay.bounds[1][1] }
-      )
+      const rotatableOverlay = new RotatableOverlay({
+        imageUrl: overlay.imageUrl,
+        bounds: overlay.bounds,
+        rotation: overlay.rotation || 0,
+        opacity: overlay.opacity,
+        clickable: false
+      })
 
-      const groundOverlay = new google.maps.GroundOverlay(
-        overlay.imageUrl,
-        bounds,
-        { opacity: overlay.opacity, clickable: false }
-      )
-
-      groundOverlay.setMap(map)
-      overlayRefs.current.set(overlay.id, groundOverlay)
+      rotatableOverlay.setMap(map)
+      overlayRefs.current.set(overlay.id, rotatableOverlay)
     })
 
     return () => {

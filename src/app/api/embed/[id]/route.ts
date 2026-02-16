@@ -53,7 +53,8 @@ export async function GET(
       name: o.name,
       imageUrl: o.imageUrl,
       bounds: [[o.southLat, o.westLng], [o.northLat, o.eastLng]],
-      opacity: o.opacity
+      opacity: o.opacity,
+      rotation: o.rotation
     })),
     pins: project.publicPins.map(p => ({
       id: p.id,

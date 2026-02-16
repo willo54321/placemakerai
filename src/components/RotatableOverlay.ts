@@ -14,201 +14,192 @@ export interface RotatableOverlayOptions {
   onClick?: () => void
 }
 
-export class RotatableOverlay extends google.maps.OverlayView {
-  private div: HTMLDivElement | null = null
-  private imageUrl: string
-  private bounds: [[number, number], [number, number]]
-  private rotation: number
-  private opacity: number
-  private clickable: boolean
-  private onClick?: () => void
-  private image: HTMLImageElement | null = null
+export interface IRotatableOverlay {
+  setMap(map: google.maps.Map | null): void
+  setBounds(bounds: [[number, number], [number, number]]): void
+  setRotation(rotation: number): void
+  setOpacity(opacity: number): void
+  setImageUrl(imageUrl: string): void
+  getBounds(): [[number, number], [number, number]]
+  getRotation(): number
+  getOpacity(): number
+  getCenter(): { lat: number; lng: number }
+}
+
+/**
+ * Factory class that wraps the actual OverlayView implementation.
+ * This avoids the "google is not defined" error by only accessing
+ * google.maps.OverlayView when methods are called (after Maps API has loaded).
+ */
+export class RotatableOverlay implements IRotatableOverlay {
+  private overlay: google.maps.OverlayView | null = null
+  private options: RotatableOverlayOptions
+  private _bounds: [[number, number], [number, number]]
+  private _rotation: number
+  private _opacity: number
+  private _imageUrl: string
 
   constructor(options: RotatableOverlayOptions) {
-    super()
-    this.imageUrl = options.imageUrl
-    this.bounds = options.bounds
-    this.rotation = options.rotation
-    this.opacity = options.opacity
-    this.clickable = options.clickable ?? true
-    this.onClick = options.onClick
+    this.options = options
+    this._bounds = options.bounds
+    this._rotation = options.rotation
+    this._opacity = options.opacity
+    this._imageUrl = options.imageUrl
   }
 
-  onAdd(): void {
-    this.div = document.createElement('div')
-    this.div.style.position = 'absolute'
-    this.div.style.transformOrigin = 'center center'
-    this.div.style.pointerEvents = this.clickable ? 'auto' : 'none'
-    this.div.style.cursor = this.clickable ? 'pointer' : 'default'
+  private createOverlay(): google.maps.OverlayView {
+    const self = this
+    const options = this.options
 
-    this.image = document.createElement('img')
-    this.image.src = this.imageUrl
-    this.image.style.width = '100%'
-    this.image.style.height = '100%'
-    this.image.style.display = 'block'
-    this.image.style.opacity = String(this.opacity)
-    this.image.draggable = false
-    this.image.style.userSelect = 'none'
+    class InternalOverlay extends google.maps.OverlayView {
+      private div: HTMLDivElement | null = null
+      private image: HTMLImageElement | null = null
 
-    this.div.appendChild(this.image)
+      onAdd(): void {
+        this.div = document.createElement('div')
+        this.div.style.position = 'absolute'
+        this.div.style.transformOrigin = 'center center'
+        this.div.style.pointerEvents = (options.clickable ?? true) ? 'auto' : 'none'
+        this.div.style.cursor = (options.clickable ?? true) ? 'pointer' : 'default'
 
-    if (this.clickable && this.onClick) {
-      this.div.addEventListener('click', (e) => {
-        e.stopPropagation()
-        this.onClick?.()
-      })
+        this.image = document.createElement('img')
+        this.image.src = self._imageUrl
+        this.image.style.width = '100%'
+        this.image.style.height = '100%'
+        this.image.style.display = 'block'
+        this.image.style.opacity = String(self._opacity)
+        this.image.draggable = false
+        this.image.style.userSelect = 'none'
+
+        this.div.appendChild(this.image)
+
+        if ((options.clickable ?? true) && options.onClick) {
+          this.div.addEventListener('click', (e) => {
+            e.stopPropagation()
+            options.onClick?.()
+          })
+        }
+
+        const panes = this.getPanes()
+        if (panes) {
+          panes.overlayLayer.appendChild(this.div)
+        }
+      }
+
+      draw(): void {
+        if (!this.div) return
+
+        const overlayProjection = this.getProjection()
+        if (!overlayProjection) return
+
+        const sw = overlayProjection.fromLatLngToDivPixel(
+          new google.maps.LatLng(self._bounds[0][0], self._bounds[0][1])
+        )
+        const ne = overlayProjection.fromLatLngToDivPixel(
+          new google.maps.LatLng(self._bounds[1][0], self._bounds[1][1])
+        )
+
+        if (!sw || !ne) return
+
+        const width = ne.x - sw.x
+        const height = sw.y - ne.y
+
+        this.div.style.left = sw.x + 'px'
+        this.div.style.top = ne.y + 'px'
+        this.div.style.width = width + 'px'
+        this.div.style.height = height + 'px'
+        this.div.style.transform = `rotate(${self._rotation}deg)`
+      }
+
+      onRemove(): void {
+        if (this.div) {
+          this.div.parentNode?.removeChild(this.div)
+          this.div = null
+          this.image = null
+        }
+      }
+
+      updateOpacity(opacity: number): void {
+        if (this.image) {
+          this.image.style.opacity = String(opacity)
+        }
+      }
+
+      updateRotation(rotation: number): void {
+        if (this.div) {
+          this.div.style.transform = `rotate(${rotation}deg)`
+        }
+      }
+
+      updateImageUrl(imageUrl: string): void {
+        if (this.image) {
+          this.image.src = imageUrl
+        }
+      }
     }
 
-    const panes = this.getPanes()
-    if (panes) {
-      panes.overlayLayer.appendChild(this.div)
+    return new InternalOverlay()
+  }
+
+  setMap(map: google.maps.Map | null): void {
+    if (map && !this.overlay) {
+      this.overlay = this.createOverlay()
+    }
+    if (this.overlay) {
+      this.overlay.setMap(map)
     }
   }
 
-  draw(): void {
-    if (!this.div) return
-
-    const overlayProjection = this.getProjection()
-    if (!overlayProjection) return
-
-    // Convert lat/lng bounds to pixel positions
-    const sw = overlayProjection.fromLatLngToDivPixel(
-      new google.maps.LatLng(this.bounds[0][0], this.bounds[0][1])
-    )
-    const ne = overlayProjection.fromLatLngToDivPixel(
-      new google.maps.LatLng(this.bounds[1][0], this.bounds[1][1])
-    )
-
-    if (!sw || !ne) return
-
-    // Calculate dimensions
-    const width = ne.x - sw.x
-    const height = sw.y - ne.y
-
-    // Position the div
-    this.div.style.left = sw.x + 'px'
-    this.div.style.top = ne.y + 'px'
-    this.div.style.width = width + 'px'
-    this.div.style.height = height + 'px'
-
-    // Apply rotation
-    this.div.style.transform = `rotate(${this.rotation}deg)`
-  }
-
-  onRemove(): void {
-    if (this.div) {
-      this.div.parentNode?.removeChild(this.div)
-      this.div = null
-      this.image = null
-    }
-  }
-
-  // Update methods
   setBounds(bounds: [[number, number], [number, number]]): void {
-    this.bounds = bounds
-    this.draw()
+    this._bounds = bounds
+    if (this.overlay) {
+      (this.overlay as any).draw()
+    }
   }
 
   setRotation(rotation: number): void {
-    this.rotation = rotation
-    if (this.div) {
-      this.div.style.transform = `rotate(${rotation}deg)`
+    this._rotation = rotation
+    if (this.overlay) {
+      (this.overlay as any).updateRotation(rotation)
     }
   }
 
   setOpacity(opacity: number): void {
-    this.opacity = opacity
-    if (this.image) {
-      this.image.style.opacity = String(opacity)
+    this._opacity = opacity
+    if (this.overlay) {
+      (this.overlay as any).updateOpacity(opacity)
     }
   }
 
   setImageUrl(imageUrl: string): void {
-    this.imageUrl = imageUrl
-    if (this.image) {
-      this.image.src = imageUrl
+    this._imageUrl = imageUrl
+    if (this.overlay) {
+      (this.overlay as any).updateImageUrl(imageUrl)
     }
   }
 
-  // Getters
   getBounds(): [[number, number], [number, number]] {
-    return this.bounds
+    return this._bounds
   }
 
   getRotation(): number {
-    return this.rotation
+    return this._rotation
   }
 
   getOpacity(): number {
-    return this.opacity
+    return this._opacity
   }
 
-  /**
-   * Get the center point of the overlay in lat/lng
-   */
   getCenter(): { lat: number; lng: number } {
     return {
-      lat: (this.bounds[0][0] + this.bounds[1][0]) / 2,
-      lng: (this.bounds[0][1] + this.bounds[1][1]) / 2
-    }
-  }
-
-  /**
-   * Calculate rotated corner positions for display
-   * This is useful for showing where the corners actually appear after rotation
-   */
-  getRotatedCorners(): { sw: google.maps.LatLng; nw: google.maps.LatLng; ne: google.maps.LatLng; se: google.maps.LatLng } | null {
-    const projection = this.getProjection()
-    if (!projection) return null
-
-    const center = this.getCenter()
-    const centerPixel = projection.fromLatLngToDivPixel(new google.maps.LatLng(center.lat, center.lng))
-    if (!centerPixel) return null
-
-    // Original corner positions in pixels
-    const sw = projection.fromLatLngToDivPixel(new google.maps.LatLng(this.bounds[0][0], this.bounds[0][1]))
-    const ne = projection.fromLatLngToDivPixel(new google.maps.LatLng(this.bounds[1][0], this.bounds[1][1]))
-    if (!sw || !ne) return null
-
-    const nw = { x: sw.x, y: ne.y }
-    const se = { x: ne.x, y: sw.y }
-
-    // Rotate corners around center
-    const rad = (this.rotation * Math.PI) / 180
-    const cos = Math.cos(rad)
-    const sin = Math.sin(rad)
-
-    const rotatePoint = (px: number, py: number) => {
-      const dx = px - centerPixel.x
-      const dy = py - centerPixel.y
-      return {
-        x: centerPixel.x + dx * cos - dy * sin,
-        y: centerPixel.y + dx * sin + dy * cos
-      }
-    }
-
-    const rotatedSW = rotatePoint(sw.x, sw.y)
-    const rotatedNW = rotatePoint(nw.x, nw.y)
-    const rotatedNE = rotatePoint(ne.x, ne.y)
-    const rotatedSE = rotatePoint(se.x, se.y)
-
-    // Convert back to LatLng
-    return {
-      sw: projection.fromDivPixelToLatLng(new google.maps.Point(rotatedSW.x, rotatedSW.y))!,
-      nw: projection.fromDivPixelToLatLng(new google.maps.Point(rotatedNW.x, rotatedNW.y))!,
-      ne: projection.fromDivPixelToLatLng(new google.maps.Point(rotatedNE.x, rotatedNE.y))!,
-      se: projection.fromDivPixelToLatLng(new google.maps.Point(rotatedSE.x, rotatedSE.y))!
+      lat: (this._bounds[0][0] + this._bounds[1][0]) / 2,
+      lng: (this._bounds[0][1] + this._bounds[1][1]) / 2
     }
   }
 }
 
 /**
  * Helper function to calculate rotation angle from mouse position relative to center
- * @param centerLat Center latitude of overlay
- * @param centerLng Center longitude of overlay
- * @param mouseLat Mouse latitude
- * @param mouseLng Mouse longitude
- * @returns Rotation angle in degrees (0-360)
  */
 export function calculateRotationAngle(
   centerLat: number,
@@ -220,7 +211,6 @@ export function calculateRotationAngle(
   const dy = mouseLat - centerLat
   let angle = Math.atan2(dx, dy) * (180 / Math.PI)
 
-  // Normalize to 0-360
   if (angle < 0) {
     angle += 360
   }

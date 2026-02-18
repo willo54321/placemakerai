@@ -225,6 +225,16 @@ const InteractiveMap = forwardRef<InteractiveMapRef, InteractiveMapProps>(({
     return () => google.maps.event.removeListener(listener)
   }, [map, onBoundsChange])
 
+  // Sync zoom when prop changes (for tour wizard zoom slider)
+  useEffect(() => {
+    if (map) {
+      const currentZoom = map.getZoom()
+      if (currentZoom !== zoom) {
+        map.setZoom(zoom)
+      }
+    }
+  }, [map, zoom])
+
   useEffect(() => {
     if (!map) return
 

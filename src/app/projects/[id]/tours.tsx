@@ -2,9 +2,9 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, GripVertical, Edit2, Trash2, MapPin, Eye, EyeOff, ChevronDown, ChevronUp, X } from 'lucide-react'
+import { Plus, GripVertical, Edit2, Trash2, MapPin, Eye, EyeOff, ChevronDown, ChevronUp, X, Pentagon, Highlighter } from 'lucide-react'
 import dynamic from 'next/dynamic'
-import type { ImageOverlay } from '@/components/InteractiveMap'
+import type { ImageOverlay, MapDrawing } from '@/components/InteractiveMap'
 
 const InteractiveMap = dynamic(
   () => import('@/components/InteractiveMap'),
@@ -18,6 +18,11 @@ const InteractiveMap = dynamic(
   }
 )
 
+interface HighlightGeometry {
+  type: 'Polygon'
+  coordinates: number[][][]
+}
+
 interface TourStop {
   id: string
   order: number
@@ -27,7 +32,7 @@ interface TourStop {
   latitude: number
   longitude: number
   zoom: number
-  highlight: unknown | null
+  highlight: HighlightGeometry | null
   showOverlay: string | null
 }
 
@@ -82,6 +87,8 @@ export function ToursTab({ projectId, project }: { projectId: string; project: P
   const [clickedPosition, setClickedPosition] = useState<{ lat: number; lng: number } | null>(null)
   const [expandedTourId, setExpandedTourId] = useState<string | null>(null)
   const [overlays, setOverlays] = useState<ImageOverlay[]>(() => convertOverlays(project.imageOverlays))
+  const [isDrawingHighlight, setIsDrawingHighlight] = useState(false)
+  const [currentHighlight, setCurrentHighlight] = useState<HighlightGeometry | null>(null)
 
   // Sync overlays when project data changes
   useEffect(() => {
@@ -216,7 +223,7 @@ export function ToursTab({ projectId, project }: { projectId: string; project: P
   })
 
   const handleMapClick = useCallback((lat: number, lng: number) => {
-    if (isAddingStop) {
+    if (isAddingStop && !isDrawingHighlight) {
       setClickedPosition({ lat, lng })
       setEditingStop({
         id: '',
@@ -231,7 +238,21 @@ export function ToursTab({ projectId, project }: { projectId: string; project: P
         showOverlay: null
       })
     }
-  }, [isAddingStop])
+  }, [isAddingStop, isDrawingHighlight])
+
+  const handleDrawingCreated = useCallback((geometry: GeoJSON.Geometry, type: 'polygon' | 'line') => {
+    if (type === 'polygon' && geometry.type === 'Polygon') {
+      const highlight: HighlightGeometry = {
+        type: 'Polygon',
+        coordinates: geometry.coordinates as number[][][]
+      }
+      setCurrentHighlight(highlight)
+      if (editingStop) {
+        setEditingStop({ ...editingStop, highlight })
+      }
+      setIsDrawingHighlight(false)
+    }
+  }, [editingStop])
 
   const moveStop = (tour: Tour, stopId: string, direction: 'up' | 'down') => {
     const stopIndex = tour.stops.findIndex(s => s.id === stopId)
@@ -395,7 +416,15 @@ export function ToursTab({ projectId, project }: { projectId: string; project: P
                           {index + 1}
                         </span>
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-slate-900 truncate">{stop.title}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-slate-900 truncate">{stop.title}</p>
+                            {stop.highlight && (
+                              <span className="flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
+                                <Pentagon size={10} />
+                                Highlight
+                              </span>
+                            )}
+                          </div>
                           <p className="text-xs text-slate-500 truncate">{stop.description}</p>
                         </div>
                         <div className="flex items-center gap-1">
@@ -438,19 +467,25 @@ export function ToursTab({ projectId, project }: { projectId: string; project: P
                   {isAddingStop && expandedTourId === tour.id ? (
                     <div className="space-y-4">
                       <div className="flex justify-between items-center">
-                        <p className="text-sm text-slate-600">Click on the map to place the stop</p>
+                        <p className="text-sm text-slate-600">
+                          {isDrawingHighlight
+                            ? 'Draw a polygon to highlight an area'
+                            : 'Click on the map to place the stop'}
+                        </p>
                         <button
                           onClick={() => {
                             setIsAddingStop(false)
                             setClickedPosition(null)
                             setEditingStop(null)
+                            setCurrentHighlight(null)
+                            setIsDrawingHighlight(false)
                           }}
                           className="text-sm text-slate-500 hover:text-slate-700"
                         >
                           Cancel
                         </button>
                       </div>
-                      <div className="h-64 rounded-lg overflow-hidden border border-slate-200">
+                      <div className="h-80 rounded-lg overflow-hidden border border-slate-200">
                         <InteractiveMap
                           center={[project.latitude || 51.5074, project.longitude || -0.1278]}
                           zoom={project.mapZoom || 14}
@@ -474,9 +509,20 @@ export function ToursTab({ projectId, project }: { projectId: string; project: P
                               notes: null,
                             }] : [])
                           ]}
+                          drawings={currentHighlight ? [{
+                            id: 'current-highlight',
+                            type: 'polygon' as const,
+                            geometry: currentHighlight,
+                            label: 'Highlight',
+                            color: '#F59E0B',
+                          }] : []}
                           overlays={overlays}
-                          isAddingMarker={true}
+                          isAddingMarker={!isDrawingHighlight}
+                          isDrawingMode={isDrawingHighlight}
+                          activeDrawingTool={isDrawingHighlight ? 'polygon' : null}
+                          activeDrawingColor="#F59E0B"
                           onMapClick={handleMapClick}
+                          onDrawingCreated={handleDrawingCreated}
                         />
                       </div>
 
@@ -526,19 +572,66 @@ export function ToursTab({ projectId, project }: { projectId: string; project: P
                               />
                             </div>
                           </div>
+
+                          {/* Highlight Area Controls */}
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Highlight Area (optional)</label>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setIsDrawingHighlight(!isDrawingHighlight)}
+                                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                  isDrawingHighlight
+                                    ? 'bg-amber-100 text-amber-700 border-2 border-amber-400'
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-300'
+                                }`}
+                              >
+                                <Pentagon size={16} />
+                                {isDrawingHighlight ? 'Drawing...' : 'Draw Highlight'}
+                              </button>
+                              {(currentHighlight || editingStop.highlight) && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setCurrentHighlight(null)
+                                    setEditingStop({ ...editingStop, highlight: null })
+                                  }}
+                                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
+                                >
+                                  <Trash2 size={16} />
+                                  Clear
+                                </button>
+                              )}
+                            </div>
+                            {isDrawingHighlight && (
+                              <p className="text-xs text-amber-600 mt-2">
+                                Click on the map to draw a polygon. Click points to create the shape, then close it by clicking near the start point.
+                              </p>
+                            )}
+                            {(currentHighlight || editingStop.highlight) && !isDrawingHighlight && (
+                              <p className="text-xs text-green-600 mt-2 flex items-center gap-1">
+                                <Highlighter size={12} />
+                                Highlight area set - will be shown during the tour
+                              </p>
+                            )}
+                          </div>
                           <div className="flex gap-2">
                             <button
-                              onClick={() => createStop.mutate({
-                                tourId: tour.id,
-                                data: {
-                                  title: editingStop.title,
-                                  description: editingStop.description,
-                                  imageUrl: editingStop.imageUrl,
-                                  latitude: clickedPosition.lat,
-                                  longitude: clickedPosition.lng,
-                                  zoom: editingStop.zoom,
-                                }
-                              })}
+                              onClick={() => {
+                                createStop.mutate({
+                                  tourId: tour.id,
+                                  data: {
+                                    title: editingStop.title,
+                                    description: editingStop.description,
+                                    imageUrl: editingStop.imageUrl,
+                                    latitude: clickedPosition.lat,
+                                    longitude: clickedPosition.lng,
+                                    zoom: editingStop.zoom,
+                                    highlight: currentHighlight || editingStop.highlight,
+                                  }
+                                })
+                                setCurrentHighlight(null)
+                              }}
                               disabled={!editingStop.title.trim() || !editingStop.description.trim() || createStop.isPending}
                               className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
                             >
@@ -548,6 +641,8 @@ export function ToursTab({ projectId, project }: { projectId: string; project: P
                               onClick={() => {
                                 setClickedPosition(null)
                                 setEditingStop(null)
+                                setCurrentHighlight(null)
+                                setIsDrawingHighlight(false)
                               }}
                               className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-100"
                             >
@@ -675,6 +770,29 @@ export function ToursTab({ projectId, project }: { projectId: string; project: P
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                 />
               </div>
+              {/* Highlight Status */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Highlight Area</label>
+                {editingStop.highlight ? (
+                  <div className="flex items-center justify-between p-3 bg-amber-50 rounded-lg border border-amber-200">
+                    <span className="flex items-center gap-2 text-sm text-amber-700">
+                      <Pentagon size={16} />
+                      Highlight area set
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setEditingStop({ ...editingStop, highlight: null })}
+                      className="text-sm text-red-600 hover:text-red-700"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-500 italic">
+                    No highlight area. Create a new stop to add one.
+                  </p>
+                )}
+              </div>
               <div className="flex gap-2">
                 <button
                   onClick={() => {
@@ -688,6 +806,7 @@ export function ToursTab({ projectId, project }: { projectId: string; project: P
                           description: editingStop.description,
                           imageUrl: editingStop.imageUrl,
                           zoom: editingStop.zoom,
+                          highlight: editingStop.highlight,
                         }
                       })
                     }

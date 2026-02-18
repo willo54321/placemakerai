@@ -59,7 +59,7 @@ interface Project {
   imageOverlays?: DBImageOverlay[]
 }
 
-// Convert DB overlays to component format
+// Convert DB overlays to component format - always visible for tours
 const convertOverlays = (dbOverlays: DBImageOverlay[] | undefined): ImageOverlay[] =>
   (dbOverlays || []).map(o => ({
     id: o.id,
@@ -68,7 +68,7 @@ const convertOverlays = (dbOverlays: DBImageOverlay[] | undefined): ImageOverlay
     bounds: [[o.southLat, o.westLng], [o.northLat, o.eastLng]] as [[number, number], [number, number]],
     opacity: o.opacity,
     rotation: o.rotation || 0,
-    visible: o.visible,
+    visible: true, // Always show overlays in tours map
   }))
 
 export function ToursTab({ projectId, project }: { projectId: string; project: Project }) {

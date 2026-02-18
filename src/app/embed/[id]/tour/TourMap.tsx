@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
-import { GoogleMap, useJsApiLoader } from '@react-google-maps/api'
+import { GoogleMap, useJsApiLoader, PolygonF } from '@react-google-maps/api'
 import { RotatableOverlay } from '@/components/RotatableOverlay'
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''
@@ -16,12 +16,18 @@ interface Overlay {
   rotation: number
 }
 
+interface HighlightGeometry {
+  type: 'Polygon'
+  coordinates: number[][][]
+}
+
 interface TourMapProps {
   center: [number, number]
   zoom: number
   overlays: Overlay[]
   mapType: 'roadmap' | 'satellite'
   animateToCenter?: boolean
+  highlight?: HighlightGeometry | null
 }
 
 export default function TourMap({
@@ -29,7 +35,8 @@ export default function TourMap({
   zoom,
   overlays,
   mapType,
-  animateToCenter = false
+  animateToCenter = false,
+  highlight = null
 }: TourMapProps) {
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script-embed',
@@ -159,7 +166,36 @@ export default function TourMap({
         }}
         onLoad={onLoad}
         onUnmount={onUnmount}
-      />
+      >
+        {/* Spotlight effect - dark overlay with hole for highlighted area */}
+        {highlight && highlight.coordinates && highlight.coordinates[0] && (
+          <PolygonF
+            paths={[
+              // Outer bounds covering the world (clockwise)
+              [
+                { lat: -85, lng: -180 },
+                { lat: 85, lng: -180 },
+                { lat: 85, lng: 180 },
+                { lat: -85, lng: 180 },
+              ],
+              // Inner hole - the spotlight area (counter-clockwise for hole)
+              highlight.coordinates[0].map(coord => ({
+                lat: coord[1],
+                lng: coord[0]
+              })).reverse()
+            ]}
+            options={{
+              fillColor: '#000000',
+              fillOpacity: 0.5,
+              strokeColor: '#F59E0B',
+              strokeWeight: 3,
+              strokeOpacity: 1,
+              clickable: false,
+              zIndex: 5
+            }}
+          />
+        )}
+      </GoogleMap>
     </>
   )
 }

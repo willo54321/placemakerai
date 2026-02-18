@@ -4,6 +4,11 @@ import { useState, useEffect } from 'react'
 import { X, ChevronLeft, ChevronRight, Play, MapPin } from 'lucide-react'
 import Image from 'next/image'
 
+interface HighlightGeometry {
+  type: 'Polygon'
+  coordinates: number[][][]
+}
+
 interface TourStop {
   id: string
   order: number
@@ -13,7 +18,7 @@ interface TourStop {
   latitude: number
   longitude: number
   zoom: number
-  highlight: unknown | null
+  highlight: HighlightGeometry | null
   showOverlay: string | null
 }
 
@@ -26,7 +31,7 @@ interface Tour {
 
 interface TourPlayerProps {
   tour: Tour
-  onNavigate: (lat: number, lng: number, zoom: number) => void
+  onNavigate: (lat: number, lng: number, zoom: number, highlight: HighlightGeometry | null) => void
   onClose: () => void
   onFeedback?: (stopId: string) => void
 }
@@ -43,7 +48,7 @@ export function TourPlayer({ tour, onNavigate, onClose, onFeedback }: TourPlayer
   useEffect(() => {
     if (currentStop) {
       setIsAnimating(true)
-      onNavigate(currentStop.latitude, currentStop.longitude, currentStop.zoom)
+      onNavigate(currentStop.latitude, currentStop.longitude, currentStop.zoom, currentStop.highlight)
       // Reset animation state after transition
       const timer = setTimeout(() => setIsAnimating(false), 1000)
       return () => clearTimeout(timer)

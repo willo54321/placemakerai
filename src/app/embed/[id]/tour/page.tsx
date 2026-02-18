@@ -23,6 +23,11 @@ interface Overlay {
   rotation: number
 }
 
+interface HighlightGeometry {
+  type: 'Polygon'
+  coordinates: number[][][]
+}
+
 interface TourStop {
   id: string
   order: number
@@ -32,7 +37,7 @@ interface TourStop {
   latitude: number
   longitude: number
   zoom: number
-  highlight: unknown | null
+  highlight: HighlightGeometry | null
   showOverlay: string | null
 }
 
@@ -64,6 +69,7 @@ export default function TourEmbedPage({ params }: { params: { id: string } }) {
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null)
   const [mapZoom, setMapZoom] = useState<number | null>(null)
   const [mapType, setMapType] = useState<'roadmap' | 'satellite'>('satellite')
+  const [currentHighlight, setCurrentHighlight] = useState<HighlightGeometry | null>(null)
 
   useEffect(() => {
     fetch(`/api/embed/${params.id}`)
@@ -82,15 +88,17 @@ export default function TourEmbedPage({ params }: { params: { id: string } }) {
   }, [params.id])
 
   // Tour navigation handler
-  const handleTourNavigate = useCallback((lat: number, lng: number, zoom: number) => {
+  const handleTourNavigate = useCallback((lat: number, lng: number, zoom: number, highlight: HighlightGeometry | null) => {
     setMapCenter({ lat, lng })
     setMapZoom(zoom)
+    setCurrentHighlight(highlight)
   }, [])
 
   const handleTourClose = () => {
     setIsTourActive(false)
     setMapCenter(null)
     setMapZoom(null)
+    setCurrentHighlight(null)
   }
 
   const handleStartTour = () => {
@@ -152,6 +160,7 @@ export default function TourEmbedPage({ params }: { params: { id: string } }) {
           overlays={project.overlays}
           mapType={mapType}
           animateToCenter={mapCenter !== null}
+          highlight={currentHighlight}
         />
 
         {/* Map Type Button - Bottom Right */}

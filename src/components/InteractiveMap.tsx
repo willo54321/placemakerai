@@ -113,7 +113,7 @@ function createResizeHandleIcon(): google.maps.Symbol {
     fillOpacity: 1,
     strokeColor: '#FFFFFF',
     strokeWeight: 2,
-  }
+  } as google.maps.Symbol
 }
 
 function createRotationHandleIcon(): google.maps.Symbol {
@@ -453,6 +453,8 @@ const InteractiveMap = forwardRef<InteractiveMapRef, InteractiveMapProps>(({
           panControl: false,
           tilt: 0,
           gestureHandling: 'greedy',
+          maxZoom: 17,
+          minZoom: 10,
         }}
         onClick={handleMapClick}
         onLoad={onLoad}

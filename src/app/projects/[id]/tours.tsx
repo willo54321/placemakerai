@@ -1,12 +1,22 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, GripVertical, Edit2, Trash2, MapPin, Eye, EyeOff, ChevronDown, ChevronUp, X } from 'lucide-react'
-import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api'
+import dynamic from 'next/dynamic'
+import type { ImageOverlay } from '@/components/InteractiveMap'
 
-const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''
-const LIBRARIES: ("drawing" | "geometry")[] = ['drawing', 'geometry']
+const InteractiveMap = dynamic(
+  () => import('@/components/InteractiveMap'),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-full w-full flex items-center justify-center bg-gray-100 rounded-lg">
+        <div className="text-gray-500">Loading map...</div>
+      </div>
+    )
+  }
+)
 
 interface TourStop {
   id: string
@@ -29,11 +39,37 @@ interface Tour {
   stops: TourStop[]
 }
 
+interface DBImageOverlay {
+  id: string
+  name: string
+  imageUrl: string
+  southLat: number
+  westLng: number
+  northLat: number
+  eastLng: number
+  opacity: number
+  rotation: number
+  visible: boolean
+}
+
 interface Project {
   latitude: number | null
   longitude: number | null
   mapZoom: number | null
+  imageOverlays?: DBImageOverlay[]
 }
+
+// Convert DB overlays to component format
+const convertOverlays = (dbOverlays: DBImageOverlay[] | undefined): ImageOverlay[] =>
+  (dbOverlays || []).map(o => ({
+    id: o.id,
+    name: o.name,
+    imageUrl: o.imageUrl,
+    bounds: [[o.southLat, o.westLng], [o.northLat, o.eastLng]] as [[number, number], [number, number]],
+    opacity: o.opacity,
+    rotation: o.rotation || 0,
+    visible: o.visible,
+  }))
 
 export function ToursTab({ projectId, project }: { projectId: string; project: Project }) {
   const queryClient = useQueryClient()
@@ -45,12 +81,12 @@ export function ToursTab({ projectId, project }: { projectId: string; project: P
   const [newTourDesc, setNewTourDesc] = useState('')
   const [clickedPosition, setClickedPosition] = useState<{ lat: number; lng: number } | null>(null)
   const [expandedTourId, setExpandedTourId] = useState<string | null>(null)
+  const [overlays, setOverlays] = useState<ImageOverlay[]>(() => convertOverlays(project.imageOverlays))
 
-  const { isLoaded } = useJsApiLoader({
-    id: 'google-map-script-embed',
-    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
-    libraries: LIBRARIES
-  })
+  // Sync overlays when project data changes
+  useEffect(() => {
+    setOverlays(convertOverlays(project.imageOverlays))
+  }, [project.imageOverlays])
 
   // Fetch tours
   const { data: tours = [], isLoading } = useQuery<Tour[]>({
@@ -179,20 +215,17 @@ export function ToursTab({ projectId, project }: { projectId: string; project: P
     }
   })
 
-  const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
-    if (isAddingStop && e.latLng) {
-      setClickedPosition({
-        lat: e.latLng.lat(),
-        lng: e.latLng.lng()
-      })
+  const handleMapClick = useCallback((lat: number, lng: number) => {
+    if (isAddingStop) {
+      setClickedPosition({ lat, lng })
       setEditingStop({
         id: '',
         order: 0,
         title: '',
         description: '',
         imageUrl: null,
-        latitude: e.latLng.lat(),
-        longitude: e.latLng.lng(),
+        latitude: lat,
+        longitude: lng,
         zoom: 16,
         highlight: null,
         showOverlay: null
@@ -417,47 +450,35 @@ export function ToursTab({ projectId, project }: { projectId: string; project: P
                           Cancel
                         </button>
                       </div>
-                      {isLoaded && (
-                        <div className="h-64 rounded-lg overflow-hidden border border-slate-200">
-                          <GoogleMap
-                            mapContainerStyle={{ width: '100%', height: '100%' }}
-                            center={{
-                              lat: project.latitude || 51.5074,
-                              lng: project.longitude || -0.1278
-                            }}
-                            zoom={project.mapZoom || 14}
-                            onClick={handleMapClick}
-                            options={{
-                              streetViewControl: false,
-                              mapTypeControl: false,
-                            }}
-                          >
-                            {/* Existing stops */}
-                            {tour.stops.map((stop, idx) => (
-                              <Marker
-                                key={stop.id}
-                                position={{ lat: stop.latitude, lng: stop.longitude }}
-                                label={{ text: String(idx + 1), color: 'white' }}
-                              />
-                            ))}
-                            {/* Clicked position */}
-                            {clickedPosition && (
-                              <Marker
-                                position={clickedPosition}
-                                icon={{
-                                  url: 'data:image/svg+xml,' + encodeURIComponent(`
-                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                      <circle cx="12" cy="12" r="10" fill="#16a34a" stroke="white" stroke-width="2"/>
-                                      <path d="M12 7v5M12 14v2" stroke="white" stroke-width="2" stroke-linecap="round"/>
-                                    </svg>
-                                  `),
-                                  scaledSize: new google.maps.Size(32, 32),
-                                }}
-                              />
-                            )}
-                          </GoogleMap>
-                        </div>
-                      )}
+                      <div className="h-64 rounded-lg overflow-hidden border border-slate-200">
+                        <InteractiveMap
+                          center={[project.latitude || 51.5074, project.longitude || -0.1278]}
+                          zoom={project.mapZoom || 14}
+                          markers={[
+                            // Existing stops as markers
+                            ...tour.stops.map((stop, idx) => ({
+                              id: stop.id,
+                              label: String(idx + 1),
+                              latitude: stop.latitude,
+                              longitude: stop.longitude,
+                              color: '#3B82F6',
+                              notes: stop.title,
+                            })),
+                            // Clicked position as a new marker
+                            ...(clickedPosition ? [{
+                              id: 'new-stop',
+                              label: 'New',
+                              latitude: clickedPosition.lat,
+                              longitude: clickedPosition.lng,
+                              color: '#16a34a',
+                              notes: null,
+                            }] : [])
+                          ]}
+                          overlays={overlays}
+                          isAddingMarker={true}
+                          onMapClick={handleMapClick}
+                        />
+                      </div>
 
                       {/* Stop Form (when position is clicked) */}
                       {editingStop && clickedPosition && (

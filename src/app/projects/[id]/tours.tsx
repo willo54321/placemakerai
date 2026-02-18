@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, GripVertical, Edit2, Trash2, MapPin, Eye, EyeOff, ChevronDown, ChevronUp, X, Pentagon, Highlighter } from 'lucide-react'
 import dynamic from 'next/dynamic'
-import type { ImageOverlay, MapDrawing } from '@/components/InteractiveMap'
+import type { ImageOverlay, MapDrawing, SpotlightPolygon } from '@/components/InteractiveMap'
 
 const InteractiveMap = dynamic(
   () => import('@/components/InteractiveMap'),
@@ -485,7 +485,7 @@ export function ToursTab({ projectId, project }: { projectId: string; project: P
                           Cancel
                         </button>
                       </div>
-                      <div className="h-80 rounded-lg overflow-hidden border border-slate-200">
+                      <div className="h-96 rounded-lg overflow-hidden border border-slate-200">
                         <InteractiveMap
                           center={[project.latitude || 51.5074, project.longitude || -0.1278]}
                           zoom={project.mapZoom || 14}
@@ -509,14 +509,12 @@ export function ToursTab({ projectId, project }: { projectId: string; project: P
                               notes: null,
                             }] : [])
                           ]}
-                          drawings={currentHighlight ? [{
-                            id: 'current-highlight',
-                            type: 'polygon' as const,
-                            geometry: currentHighlight,
-                            label: 'Highlight',
-                            color: '#F59E0B',
-                          }] : []}
                           overlays={overlays}
+                          spotlightPolygon={(currentHighlight || editingStop?.highlight) ? {
+                            coordinates: (currentHighlight || editingStop?.highlight)!.coordinates,
+                            strokeColor: '#F59E0B',
+                            strokeWeight: 3
+                          } : null}
                           isAddingMarker={!isDrawingHighlight}
                           isDrawingMode={isDrawingHighlight}
                           activeDrawingTool={isDrawingHighlight ? 'polygon' : null}

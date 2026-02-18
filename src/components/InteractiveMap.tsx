@@ -57,6 +57,12 @@ export interface InteractiveMapRef {
   fitToOverlay: (bounds: [[number, number], [number, number]]) => void
 }
 
+export interface SpotlightPolygon {
+  coordinates: number[][][] // GeoJSON Polygon coordinates
+  strokeColor?: string
+  strokeWeight?: number
+}
+
 interface InteractiveMapProps {
   center: [number, number]
   zoom: number
@@ -65,6 +71,7 @@ interface InteractiveMapProps {
   overlays?: ImageOverlay[]
   geoLayers?: GeoLayer[]
   selectedOverlayId?: string | null
+  spotlightPolygon?: SpotlightPolygon | null // Spotlight effect - darkens map except this area
   isAddingMarker?: boolean
   isDrawingMode?: boolean
   activeDrawingTool?: 'polygon' | 'line' | null
@@ -135,6 +142,7 @@ const InteractiveMap = forwardRef<InteractiveMapRef, InteractiveMapProps>(({
   overlays = [],
   geoLayers = [],
   selectedOverlayId = null,
+  spotlightPolygon = null,
   isAddingMarker = false,
   isDrawingMode = false,
   activeDrawingTool = null,
@@ -601,6 +609,35 @@ const InteractiveMap = forwardRef<InteractiveMapRef, InteractiveMapProps>(({
           }
           return null
         })}
+
+        {/* Spotlight effect - dark overlay with hole for highlighted area */}
+        {spotlightPolygon && spotlightPolygon.coordinates && spotlightPolygon.coordinates[0] && (
+          <PolygonF
+            paths={[
+              // Outer bounds covering the world (clockwise)
+              [
+                { lat: -85, lng: -180 },
+                { lat: 85, lng: -180 },
+                { lat: 85, lng: 180 },
+                { lat: -85, lng: 180 },
+              ],
+              // Inner hole - the spotlight area (counter-clockwise for hole)
+              spotlightPolygon.coordinates[0].map(coord => ({
+                lat: coord[1],
+                lng: coord[0]
+              })).reverse()
+            ]}
+            options={{
+              fillColor: '#000000',
+              fillOpacity: 0.5,
+              strokeColor: spotlightPolygon.strokeColor || '#F59E0B',
+              strokeWeight: spotlightPolygon.strokeWeight ?? 3,
+              strokeOpacity: 1,
+              clickable: false,
+              zIndex: 5
+            }}
+          />
+        )}
 
         {markers.filter(m => m.latitude != null && m.longitude != null).map(marker => (
           <MarkerF

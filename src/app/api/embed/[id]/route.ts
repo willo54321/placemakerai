@@ -82,7 +82,8 @@ export async function GET(
         longitude: s.longitude,
         zoom: s.zoom,
         highlight: s.highlight,
-        showOverlay: s.showOverlay
+        showOverlay: s.showOverlay,
+        icon: s.icon
       }))
     } : null
   })

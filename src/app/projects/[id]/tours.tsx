@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, GripVertical, Edit2, Trash2, MapPin, Eye, EyeOff, ChevronDown, ChevronUp, X, Pentagon, Check, Play } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import type { ImageOverlay, MapDrawing, SpotlightPolygon } from '@/components/InteractiveMap'
+import { TOUR_STOP_ICONS } from '@/components/InteractiveMap'
 
 const InteractiveMap = dynamic(
   () => import('@/components/InteractiveMap'),
@@ -35,6 +36,7 @@ interface TourStop {
   zoom: number
   highlight: HighlightGeometry | null
   showOverlay: string | null
+  icon: string | null
 }
 
 interface Tour {
@@ -94,6 +96,7 @@ export function ToursTab({ projectId, project }: { projectId: string; project: P
   const [stopTitle, setStopTitle] = useState('')
   const [stopDescription, setStopDescription] = useState('')
   const [stopImageUrl, setStopImageUrl] = useState('')
+  const [stopIcon, setStopIcon] = useState<string>('number')
   const [isPreviewMode, setIsPreviewMode] = useState(false)
 
   // Sync overlays when project data changes
@@ -470,6 +473,7 @@ export function ToursTab({ projectId, project }: { projectId: string; project: P
                             setStopTitle('')
                             setStopDescription('')
                             setStopImageUrl('')
+                            setStopIcon('number')
                           }}
                           className="text-slate-400 hover:text-slate-600"
                         >
@@ -497,6 +501,7 @@ export function ToursTab({ projectId, project }: { projectId: string; project: P
                                   longitude: stop.longitude,
                                   color: '#3B82F6',
                                   notes: stop.title,
+                                  type: stop.icon || 'number',
                                 })),
                                 ...(clickedPosition ? [{
                                   id: 'new-stop',
@@ -505,6 +510,7 @@ export function ToursTab({ projectId, project }: { projectId: string; project: P
                                   longitude: clickedPosition.lng,
                                   color: '#16a34a',
                                   notes: null,
+                                  type: stopIcon,
                                 }] : [])
                               ]}
                               overlays={overlays}
@@ -650,6 +656,31 @@ export function ToursTab({ projectId, project }: { projectId: string; project: P
                             )}
                           </div>
 
+                          {/* Icon selector */}
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">
+                              Marker Icon
+                            </label>
+                            <div className="grid grid-cols-4 gap-2">
+                              {TOUR_STOP_ICONS.map((iconOption) => (
+                                <button
+                                  key={iconOption.id}
+                                  type="button"
+                                  onClick={() => setStopIcon(iconOption.id)}
+                                  className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-colors ${
+                                    stopIcon === iconOption.id
+                                      ? 'border-green-500 bg-green-50'
+                                      : 'border-slate-200 hover:border-slate-300'
+                                  }`}
+                                  title={iconOption.label}
+                                >
+                                  <span className="text-lg">{iconOption.icon}</span>
+                                  <span className="text-xs text-slate-500 mt-0.5 truncate w-full text-center">{iconOption.label}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
                           {/* Preview button */}
                           {clickedPosition && stopTitle.trim() && stopDescription.trim() && (
                             <button
@@ -672,6 +703,7 @@ export function ToursTab({ projectId, project }: { projectId: string; project: P
                                 setStopTitle('')
                                 setStopDescription('')
                                 setStopImageUrl('')
+                                setStopIcon('number')
                               }}
                               className="flex-1 px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
                             >
@@ -690,6 +722,7 @@ export function ToursTab({ projectId, project }: { projectId: string; project: P
                                       longitude: clickedPosition.lng,
                                       zoom: stopZoom,
                                       highlight: currentHighlight,
+                                      icon: stopIcon === 'number' ? null : stopIcon,
                                     }
                                   })
                                   setCurrentHighlight(null)
@@ -697,6 +730,7 @@ export function ToursTab({ projectId, project }: { projectId: string; project: P
                                   setStopTitle('')
                                   setStopDescription('')
                                   setStopImageUrl('')
+                                  setStopIcon('number')
                                 }
                               }}
                               disabled={!clickedPosition || !stopTitle.trim() || !stopDescription.trim() || createStop.isPending}
@@ -718,6 +752,7 @@ export function ToursTab({ projectId, project }: { projectId: string; project: P
                         setStopTitle('')
                         setStopDescription('')
                         setStopImageUrl('')
+                        setStopIcon('number')
                       }}
                       className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-slate-300 rounded-lg text-slate-500 hover:border-green-400 hover:text-green-600 transition-colors"
                     >

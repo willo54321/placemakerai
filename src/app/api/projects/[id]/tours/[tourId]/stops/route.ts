@@ -49,6 +49,7 @@ export async function POST(
       zoom: body.zoom ?? 16,
       highlight: body.highlight || null,
       showOverlay: body.showOverlay || null,
+      icon: body.icon || null,
     }
   })
 

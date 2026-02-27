@@ -44,6 +44,7 @@ export async function PATCH(
       zoom: body.zoom,
       highlight: body.highlight,
       showOverlay: body.showOverlay,
+      icon: body.icon,
     }
   })
 

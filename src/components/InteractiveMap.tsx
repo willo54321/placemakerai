@@ -140,6 +140,64 @@ function createNumberedMarkerIcon(color: string, number: string | number, isHove
   }
 }
 
+// Icon paths for tour stop markers
+const MARKER_ICON_PATHS: Record<string, string> = {
+  nature: 'M18 6c-2 0-3.5 1.5-3.5 3.5c0 1.2.6 2.3 1.5 3v.5h4v-.5c.9-.7 1.5-1.8 1.5-3C21.5 7.5 20 6 18 6zm-2 10v4h4v-4h2v6h-8v-6h2z', // Tree
+  access: 'M18 8a2 2 0 1 0 0-4a2 2 0 0 0 0 4zm2 3h-4a1 1 0 0 0-1 1v4h2v8h2v-8h2v-4a1 1 0 0 0-1-1z', // Wheelchair/person
+  parking: 'M12 6h5a4 4 0 0 1 0 8h-3v6h-2V6zm2 6h3a2 2 0 1 0 0-4h-3v4z', // P
+  info: 'M18 6a2 2 0 1 0 0 4a2 2 0 0 0 0-4zm-1 6h2v10h-2V12z', // i
+  home: 'M18 6l-8 6v12h5v-6h6v6h5V12l-8-6z', // House
+  food: 'M11 6v8h2v10h2V14h2V6h-2v6h-2V6h-2zm10 0v18h2V6h-2z', // Fork & knife
+  play: 'M10 6v18l14-9L10 6z', // Play triangle
+  water: 'M18 6c-4 4-6 7-6 10a6 6 0 1 0 12 0c0-3-2-6-6-10z', // Water drop
+  start: 'M18 6l2 4l4.5.7l-3.3 3.2l.8 4.5L18 16l-4 2.4l.8-4.5l-3.3-3.2L16 10l2-4z', // Star
+  view: 'M18 8c-5 0-9 4-9 8s4 8 9 8s9-4 9-8s-4-8-9-8zm0 14c-3.3 0-6-2.7-6-6s2.7-6 6-6s6 2.7 6 6s-2.7 6-6 6zm0-10a4 4 0 1 0 0 8a4 4 0 0 0 0-8z', // Eye/viewpoint
+}
+
+export const TOUR_STOP_ICONS = [
+  { id: 'number', label: 'Number', icon: '1' },
+  { id: 'nature', label: 'Nature', icon: '🌳' },
+  { id: 'access', label: 'Access', icon: '♿' },
+  { id: 'parking', label: 'Parking', icon: '🅿️' },
+  { id: 'info', label: 'Info', icon: 'ℹ️' },
+  { id: 'home', label: 'Building', icon: '🏠' },
+  { id: 'food', label: 'Food', icon: '🍴' },
+  { id: 'play', label: 'Recreation', icon: '▶️' },
+  { id: 'water', label: 'Water', icon: '💧' },
+  { id: 'start', label: 'Start', icon: '⭐' },
+  { id: 'view', label: 'Viewpoint', icon: '👁️' },
+]
+
+function createIconMarkerIcon(color: string, iconType: string, isHovered: boolean = false): google.maps.Icon {
+  const shadowBlur = isHovered ? '3' : '2'
+  const shadowOpacity = isHovered ? '0.3' : '0.2'
+  const size = isHovered ? 40 : 36
+  const height = isHovered ? 50 : 45
+  const iconPath = MARKER_ICON_PATHS[iconType] || MARKER_ICON_PATHS.info
+
+  const svg = `
+    <svg width="${size}" height="${height}" viewBox="0 0 36 45" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="shadow" x="-30%" y="-20%" width="160%" height="150%">
+          <feDropShadow dx="0" dy="2" stdDeviation="${shadowBlur}" flood-color="#000000" flood-opacity="${shadowOpacity}"/>
+        </filter>
+      </defs>
+      <g filter="url(#shadow)">
+        <path d="M18 2C9.7 2 3 8.7 3 17c0 11 15 25 15 25s15-14 15-25c0-8.3-6.7-15-15-15z" fill="${color}"/>
+        <circle cx="18" cy="16" r="10" fill="white"/>
+        <g transform="translate(9, 7) scale(0.5)">
+          <path d="${iconPath}" fill="${color}"/>
+        </g>
+      </g>
+    </svg>
+  `
+  return {
+    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
+    scaledSize: new google.maps.Size(size, height),
+    anchor: new google.maps.Point(size / 2, height)
+  }
+}
+
 function createResizeHandleIcon(): google.maps.Symbol {
   return {
     path: google.maps.SymbolPath.CIRCLE,
@@ -704,9 +762,13 @@ const InteractiveMap = forwardRef<InteractiveMapRef, InteractiveMapProps>(({
           <MarkerF
             key={marker.id}
             position={{ lat: marker.latitude!, lng: marker.longitude! }}
-            icon={marker.label && /^\d+$/.test(marker.label)
-              ? createNumberedMarkerIcon(marker.color, marker.label, hoveredMarker === marker.id)
-              : createMarkerIcon(marker.color, hoveredMarker === marker.id)}
+            icon={
+              marker.type && marker.type !== 'number' && MARKER_ICON_PATHS[marker.type]
+                ? createIconMarkerIcon(marker.color, marker.type, hoveredMarker === marker.id)
+                : marker.label && /^\d+$/.test(marker.label)
+                  ? createNumberedMarkerIcon(marker.color, marker.label, hoveredMarker === marker.id)
+                  : createMarkerIcon(marker.color, hoveredMarker === marker.id)
+            }
             onClick={() => onMarkerClick ? onMarkerClick(marker.id) : setSelectedMarker(marker.id)}
             onMouseOver={() => setHoveredMarker(marker.id)}
             onMouseOut={() => setHoveredMarker(null)}

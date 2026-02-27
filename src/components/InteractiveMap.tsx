@@ -112,6 +112,34 @@ function createMarkerIcon(color: string, isHovered: boolean = false): google.map
   }
 }
 
+function createNumberedMarkerIcon(color: string, number: string | number, isHovered: boolean = false): google.maps.Icon {
+  const shadowBlur = isHovered ? '3' : '2'
+  const shadowOpacity = isHovered ? '0.3' : '0.2'
+  const size = isHovered ? 40 : 36
+  const height = isHovered ? 50 : 45
+  const fontSize = String(number).length > 1 ? '11' : '13'
+
+  const svg = `
+    <svg width="${size}" height="${height}" viewBox="0 0 36 45" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="shadow" x="-30%" y="-20%" width="160%" height="150%">
+          <feDropShadow dx="0" dy="2" stdDeviation="${shadowBlur}" flood-color="#000000" flood-opacity="${shadowOpacity}"/>
+        </filter>
+      </defs>
+      <g filter="url(#shadow)">
+        <path d="M18 2C9.7 2 3 8.7 3 17c0 11 15 25 15 25s15-14 15-25c0-8.3-6.7-15-15-15z" fill="${color}"/>
+        <circle cx="18" cy="16" r="9" fill="white"/>
+        <text x="18" y="20" text-anchor="middle" font-family="Arial, sans-serif" font-size="${fontSize}" font-weight="bold" fill="${color}">${number}</text>
+      </g>
+    </svg>
+  `
+  return {
+    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
+    scaledSize: new google.maps.Size(size, height),
+    anchor: new google.maps.Point(size / 2, height)
+  }
+}
+
 function createResizeHandleIcon(): google.maps.Symbol {
   return {
     path: google.maps.SymbolPath.CIRCLE,
@@ -225,12 +253,35 @@ const InteractiveMap = forwardRef<InteractiveMapRef, InteractiveMapProps>(({
     return () => google.maps.event.removeListener(listener)
   }, [map, onBoundsChange])
 
-  // Sync zoom when prop changes (for tour wizard zoom slider)
+  // Sync zoom when prop changes (for tour wizard zoom slider) with smooth easing
   useEffect(() => {
     if (map) {
       const currentZoom = map.getZoom()
-      if (currentZoom !== zoom) {
-        map.setZoom(zoom)
+      if (currentZoom !== undefined && currentZoom !== zoom) {
+        // Smooth zoom animation
+        const diff = zoom - currentZoom
+        const steps = Math.abs(diff) * 4 // More steps for smoother animation
+        const stepSize = diff / steps
+        let step = 0
+
+        const easeInOutQuad = (t: number) => {
+          return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t
+        }
+
+        const animate = () => {
+          step++
+          const progress = easeInOutQuad(step / steps)
+          const newZoom = currentZoom + (diff * progress)
+          map.setZoom(newZoom)
+
+          if (step < steps) {
+            requestAnimationFrame(animate)
+          }
+        }
+
+        if (steps > 0) {
+          requestAnimationFrame(animate)
+        }
       }
     }
   }, [map, zoom])
@@ -653,7 +704,9 @@ const InteractiveMap = forwardRef<InteractiveMapRef, InteractiveMapProps>(({
           <MarkerF
             key={marker.id}
             position={{ lat: marker.latitude!, lng: marker.longitude! }}
-            icon={createMarkerIcon(marker.color, hoveredMarker === marker.id)}
+            icon={marker.label && /^\d+$/.test(marker.label)
+              ? createNumberedMarkerIcon(marker.color, marker.label, hoveredMarker === marker.id)
+              : createMarkerIcon(marker.color, hoveredMarker === marker.id)}
             onClick={() => onMarkerClick ? onMarkerClick(marker.id) : setSelectedMarker(marker.id)}
             onMouseOver={() => setHoveredMarker(marker.id)}
             onMouseOut={() => setHoveredMarker(null)}

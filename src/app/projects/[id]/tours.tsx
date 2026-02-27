@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, GripVertical, Edit2, Trash2, MapPin, Eye, EyeOff, ChevronDown, ChevronUp, X, Pentagon, Check } from 'lucide-react'
+import { Plus, GripVertical, Edit2, Trash2, MapPin, Eye, EyeOff, ChevronDown, ChevronUp, X, Pentagon, Check, Play } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import type { ImageOverlay, MapDrawing, SpotlightPolygon } from '@/components/InteractiveMap'
 
@@ -94,6 +94,7 @@ export function ToursTab({ projectId, project }: { projectId: string; project: P
   const [stopTitle, setStopTitle] = useState('')
   const [stopDescription, setStopDescription] = useState('')
   const [stopImageUrl, setStopImageUrl] = useState('')
+  const [isPreviewMode, setIsPreviewMode] = useState(false)
 
   // Sync overlays when project data changes
   useEffect(() => {
@@ -649,6 +650,17 @@ export function ToursTab({ projectId, project }: { projectId: string; project: P
                             )}
                           </div>
 
+                          {/* Preview button */}
+                          {clickedPosition && stopTitle.trim() && stopDescription.trim() && (
+                            <button
+                              onClick={() => setIsPreviewMode(true)}
+                              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 text-sm font-medium border border-slate-200"
+                            >
+                              <Play size={16} />
+                              Preview Stop
+                            </button>
+                          )}
+
                           <div className="flex gap-2 pt-2">
                             <button
                               onClick={() => {
@@ -876,6 +888,81 @@ export function ToursTab({ projectId, project }: { projectId: string; project: P
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Preview Mode Modal */}
+      {isPreviewMode && clickedPosition && (
+        <div className="fixed inset-0 bg-black z-50 flex flex-col">
+          {/* Header */}
+          <div className="absolute top-4 right-4 z-10">
+            <button
+              onClick={() => setIsPreviewMode(false)}
+              className="bg-white/90 hover:bg-white p-2 rounded-full shadow-lg transition-colors"
+            >
+              <X size={24} className="text-slate-700" />
+            </button>
+          </div>
+
+          {/* Map */}
+          <div className="flex-1 relative">
+            <InteractiveMap
+              center={[clickedPosition.lat, clickedPosition.lng]}
+              zoom={stopZoom}
+              markers={[]}
+              overlays={overlays}
+              spotlightPolygon={currentHighlight ? {
+                coordinates: currentHighlight.coordinates,
+                strokeColor: '#F59E0B',
+                strokeWeight: 3
+              } : null}
+              isAddingMarker={false}
+            />
+          </div>
+
+          {/* Tour Player Preview Panel */}
+          <div className="absolute bottom-0 left-0 right-0 lg:bottom-4 lg:left-4 lg:right-auto lg:w-96">
+            <div className="bg-white rounded-t-2xl lg:rounded-2xl shadow-xl overflow-hidden">
+              {/* Stop Image */}
+              {stopImageUrl && (
+                <div className="h-40 overflow-hidden">
+                  <img
+                    src={stopImageUrl}
+                    alt={stopTitle}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              )}
+
+              {/* Stop Content */}
+              <div className="p-4 space-y-2">
+                <h3 className="text-lg font-semibold text-slate-900">{stopTitle || 'Stop Title'}</h3>
+                <p className="text-sm text-slate-600 line-clamp-3">{stopDescription || 'Stop description will appear here...'}</p>
+              </div>
+
+              {/* Navigation Preview */}
+              <div className="px-4 pb-4 flex items-center justify-between">
+                <div className="flex gap-1">
+                  <div className="w-2 h-2 rounded-full bg-green-600" />
+                  <div className="w-2 h-2 rounded-full bg-slate-300" />
+                  <div className="w-2 h-2 rounded-full bg-slate-300" />
+                </div>
+                <div className="flex gap-2">
+                  <button className="px-4 py-2 text-sm text-slate-500 border border-slate-200 rounded-lg">
+                    Previous
+                  </button>
+                  <button className="px-4 py-2 text-sm text-white bg-green-600 rounded-lg">
+                    Next
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Preview Label */}
+          <div className="absolute top-4 left-4 bg-amber-100 text-amber-700 px-3 py-1.5 rounded-lg text-sm font-medium shadow">
+            Preview Mode - This is how visitors will see this stop
           </div>
         </div>
       )}

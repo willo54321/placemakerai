@@ -67,26 +67,89 @@ export default function TourMap({
     }
   }, [map, mapType])
 
-  // Animate to new center/zoom when tour navigates
+  // Premium cinematic fly-to animation
   useEffect(() => {
     if (map && animateToCenter) {
-      map.panTo({ lat: center[0], lng: center[1] })
+      const currentCenter = map.getCenter()
       const currentZoom = map.getZoom() || 15
-      if (currentZoom !== zoom) {
-        const zoomDiff = zoom - currentZoom
-        const steps = Math.abs(zoomDiff) <= 2 ? 1 : 2
-        const zoomStep = zoomDiff / steps
-        let step = 0
 
-        const zoomInterval = setInterval(() => {
-          step++
-          if (step >= steps) {
-            map.setZoom(zoom)
-            clearInterval(zoomInterval)
+      if (!currentCenter) {
+        map.setCenter({ lat: center[0], lng: center[1] })
+        map.setZoom(zoom)
+        return
+      }
+
+      const startLat = currentCenter.lat()
+      const startLng = currentCenter.lng()
+      const endLat = center[0]
+      const endLng = center[1]
+      const startZoom = currentZoom
+      const endZoom = zoom
+
+      // Calculate distance for duration scaling
+      const latDiff = Math.abs(endLat - startLat)
+      const lngDiff = Math.abs(endLng - startLng)
+      const distance = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff)
+
+      // Premium easing function - cubic bezier approximation for smooth feel
+      const easeInOutCubic = (t: number): number => {
+        return t < 0.5
+          ? 4 * t * t * t
+          : 1 - Math.pow(-2 * t + 2, 3) / 2
+      }
+
+      // For longer distances, use a cinematic zoom-out-then-in effect
+      const useFlyover = distance > 0.01 // ~1km
+      const midZoom = useFlyover ? Math.min(startZoom, endZoom) - 2 : null
+
+      // Dynamic duration based on distance (1.2s to 2.5s)
+      const baseDuration = 1200
+      const maxDuration = 2500
+      const duration = Math.min(baseDuration + distance * 50000, maxDuration)
+
+      let animationFrame: number
+      const startTime = performance.now()
+
+      const animate = (currentTime: number) => {
+        const elapsed = currentTime - startTime
+        const rawProgress = Math.min(elapsed / duration, 1)
+        const progress = easeInOutCubic(rawProgress)
+
+        // Interpolate position
+        const lat = startLat + (endLat - startLat) * progress
+        const lng = startLng + (endLng - startLng) * progress
+        map.setCenter({ lat, lng })
+
+        // For flyover effect: zoom out in first half, zoom in second half
+        if (useFlyover && midZoom !== null) {
+          let currentAnimZoom: number
+          if (progress < 0.5) {
+            // First half: ease out from start to mid
+            const zoomProgress = progress * 2
+            currentAnimZoom = startZoom + (midZoom - startZoom) * zoomProgress
           } else {
-            map.setZoom(currentZoom + zoomStep * step)
+            // Second half: ease in from mid to end
+            const zoomProgress = (progress - 0.5) * 2
+            currentAnimZoom = midZoom + (endZoom - midZoom) * zoomProgress
           }
-        }, 200)
+          map.setZoom(currentAnimZoom)
+        } else {
+          // Simple zoom interpolation
+          const currentAnimZoom = startZoom + (endZoom - startZoom) * progress
+          map.setZoom(currentAnimZoom)
+        }
+
+        if (rawProgress < 1) {
+          animationFrame = requestAnimationFrame(animate)
+        }
+      }
+
+      animationFrame = requestAnimationFrame(animate)
+
+      return () => {
+        if (animationFrame) {
+          cancelAnimationFrame(animationFrame)
+        }
       }
     }
   }, [map, center, zoom, animateToCenter])

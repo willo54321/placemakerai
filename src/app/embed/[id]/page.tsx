@@ -20,6 +20,11 @@ interface GeoJSONGeometry {
   coordinates: number[][] | number[][][]
 }
 
+interface HighlightGeometry {
+  type: 'Polygon'
+  coordinates: number[][][]
+}
+
 interface PublicPin {
   id: string
   shapeType: 'pin' | 'line' | 'polygon'
@@ -51,7 +56,7 @@ interface TourStop {
   latitude: number
   longitude: number
   zoom: number
-  highlight: unknown | null
+  highlight: HighlightGeometry | null
   showOverlay: string | null
 }
 

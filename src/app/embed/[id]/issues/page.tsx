@@ -347,9 +347,10 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
                 }}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium shadow-lg transition-all ${
                   drawMode === 'pin'
-                    ? 'bg-orange-600 text-white ring-2 ring-orange-300'
+                    ? 'text-white ring-2'
                     : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
                 }`}
+                style={drawMode === 'pin' ? { backgroundColor: primaryColor, '--tw-ring-color': `${primaryColor}80` } as React.CSSProperties : undefined}
               >
                 <MapPin size={18} />
                 <span>Report Issue</span>
@@ -367,9 +368,10 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
                 }}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium shadow-lg transition-all ${
                   drawMode === 'polygon'
-                    ? 'bg-orange-600 text-white ring-2 ring-orange-300'
+                    ? 'text-white ring-2'
                     : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
                 }`}
+                style={drawMode === 'polygon' ? { backgroundColor: primaryColor, '--tw-ring-color': `${primaryColor}80` } as React.CSSProperties : undefined}
               >
                 <Pentagon size={18} />
                 <span>Mark Affected Area</span>
@@ -380,7 +382,10 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
 
         {/* Instruction Banner */}
         {drawMode && !showForm && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 bg-orange-600 text-white px-6 py-3 rounded-lg shadow-lg">
+          <div
+            className="absolute top-4 left-1/2 -translate-x-1/2 z-10 text-white px-6 py-3 rounded-lg shadow-lg"
+            style={{ backgroundColor: primaryColor }}
+          >
             <p className="font-medium">{getDrawModeInstruction()}</p>
           </div>
         )}
@@ -388,7 +393,10 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
         {/* Map Type Button */}
         <button
           onClick={() => setMapType(mapType === 'satellite' ? 'roadmap' : 'satellite')}
-          className="absolute bottom-4 right-4 z-10 bg-orange-600 text-white px-5 py-2.5 rounded-lg font-medium shadow-lg hover:bg-orange-700 transition-colors"
+          className="absolute bottom-4 right-4 z-10 text-white px-5 py-2.5 rounded-lg font-medium shadow-lg transition-colors"
+          style={{ backgroundColor: primaryColor }}
+          onMouseOver={(e) => { e.currentTarget.style.filter = 'brightness(0.9)' }}
+          onMouseOut={(e) => { e.currentTarget.style.filter = '' }}
         >
           {mapType === 'satellite' ? 'Map' : 'Satellite'}
         </button>
@@ -398,7 +406,10 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
           <div className="absolute inset-0 z-20 bg-black/30 flex items-end sm:items-center justify-center p-4">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-auto">
               {/* Form Header */}
-              <div className="bg-gradient-to-r from-orange-600 to-orange-500 text-white px-5 py-4 rounded-t-xl">
+              <div
+                className="text-white px-5 py-4 rounded-t-xl"
+                style={{ background: `linear-gradient(to right, ${primaryColor}, ${primaryColor}dd)` }}
+              >
                 <div className="flex items-center justify-between">
                   <h2 className="font-semibold text-lg">Report an Issue</h2>
                   <button
@@ -408,7 +419,7 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
                     <X size={20} />
                   </button>
                 </div>
-                <p className="text-orange-200 text-sm mt-1">
+                <p className="text-white/70 text-sm mt-1">
                   Describe the issue at this {getShapeLabel()}
                 </p>
               </div>
@@ -542,7 +553,10 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
                   <button
                     onClick={handleSubmit}
                     disabled={!form.comment.trim() || !form.name.trim() || !form.email.trim() || !form.gdprConsent || submitting}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    style={{ backgroundColor: primaryColor }}
+                    onMouseOver={(e) => { if (!submitting) e.currentTarget.style.filter = 'brightness(0.9)' }}
+                    onMouseOut={(e) => { e.currentTarget.style.filter = '' }}
                   >
                     {submitting ? (
                       <>

@@ -329,7 +329,7 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
           mapType={mapType}
           votedPins={votedPins}
           mode="issues"
-          hideStreetLabels={project.embedHideStreetLabels}
+          hideStreetLabels={project.embedHideStreetLabels || false}
           primaryColor={primaryColor}
         />
 

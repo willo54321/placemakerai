@@ -403,7 +403,7 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
           mapType={mapType}
           votedPins={votedPins}
           animateToCenter={mapCenter !== null}
-          hideStreetLabels={project.embedHideStreetLabels}
+          hideStreetLabels={project.embedHideStreetLabels || false}
           primaryColor={project.embedPrimaryColor || undefined}
         />
 

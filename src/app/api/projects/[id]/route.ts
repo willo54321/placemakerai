@@ -113,6 +113,8 @@ export async function PATCH(
     if (body.autoReplyEnabled !== undefined) updateData.autoReplyEnabled = body.autoReplyEnabled
     if ('autoReplySubject' in body) updateData.autoReplySubject = body.autoReplySubject || null
     if ('autoReplyMessage' in body) updateData.autoReplyMessage = body.autoReplyMessage || null
+    if (body.issuesEnabled !== undefined) updateData.issuesEnabled = body.issuesEnabled
+    if ('issueNotifyEmails' in body) updateData.issueNotifyEmails = body.issueNotifyEmails || null
 
     const project = await prisma.project.update({
       where: { id: params.id },

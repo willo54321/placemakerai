@@ -134,15 +134,8 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
     positive: true,
     comment: true,
   })
-  // Default to roadmap if hideStreetLabels is enabled (labels only hidden in roadmap)
-  const [mapType, setMapType] = useState<'roadmap' | 'satellite'>('satellite')
-
-  // Update map type when project loads with hideStreetLabels enabled
-  useEffect(() => {
-    if (project?.embedHideStreetLabels) {
-      setMapType('roadmap')
-    }
-  }, [project?.embedHideStreetLabels])
+  // Default to roadmap (map view) so labels are visible
+  const [mapType, setMapType] = useState<'roadmap' | 'satellite'>('roadmap')
   const [votedPins, setVotedPins] = useState<Set<string>>(new Set())
 
   // Tour state

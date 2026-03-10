@@ -69,6 +69,10 @@ export async function GET(
     allowDrawing: project.allowDrawing,
     issuesEnabled: project.issuesEnabled,
     mode: mode,
+    // Styling customization
+    embedPrimaryColor: project.embedPrimaryColor,
+    embedFontFamily: project.embedFontFamily,
+    embedHideStreetLabels: project.embedHideStreetLabels,
     overlays: project.imageOverlays.map(o => ({
       id: o.id,
       name: o.name,
@@ -87,9 +91,7 @@ export async function GET(
       comment: p.comment,
       name: p.name,
       votes: p.votes,
-      createdAt: p.createdAt,
-      // Include urgency for issues mode
-      ...(mode === 'issues' && { urgency: p.urgency })
+      createdAt: p.createdAt
     })),
     tour: project.tours[0] ? {
       id: project.tours[0].id,

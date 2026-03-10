@@ -1,7 +1,7 @@
 'use client'
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2, X, Pentagon, Minus, Eye, EyeOff, Upload, Save, ChevronLeft, ChevronRight, Image, ZoomIn, Map, Code, MessageCircle, Globe, Copy, Check, ThumbsUp, ThumbsDown, HelpCircle, ExternalLink, Clock, CheckCircle, XCircle, FileUp, Layers, MapPinned, AlertTriangle, Volume2, Wind, Car, ShieldAlert } from 'lucide-react'
+import { Plus, Trash2, X, Pentagon, Minus, Eye, EyeOff, Upload, Save, ChevronLeft, ChevronRight, Image, ZoomIn, Map, Code, MessageCircle, Globe, Copy, Check, ThumbsUp, ThumbsDown, HelpCircle, ExternalLink, Clock, CheckCircle, XCircle, FileUp, Layers, MapPinned, AlertTriangle, Volume2, Wind, Car, ShieldAlert, Palette, Type, MapIcon } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 
@@ -119,6 +119,10 @@ interface Project {
   mapMarkers: MapMarker[]
   publicPins: PublicPin[]
   imageOverlays: DBImageOverlay[]
+  // Styling customization
+  embedPrimaryColor: string | null
+  embedFontFamily: string | null
+  embedHideStreetLabels: boolean
 }
 
 const CATEGORY_CONFIG: Record<string, { color: string; icon: any; label: string; bg: string }> = {
@@ -1480,6 +1484,89 @@ export function EmbedSettingsTab({ projectId, project }: { projectId: string; pr
                   />
                 </div>
               )}
+            </div>
+
+            {/* Styling Customization */}
+            <div className="mt-6 pt-6 border-t space-y-4">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Styling</p>
+
+              {/* Primary Color */}
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center">
+                    <Palette size={20} className="text-gray-600" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">Primary Color</p>
+                    <p className="text-sm text-gray-500">Accent color for buttons and interactive elements</p>
+                  </div>
+                </div>
+                <input
+                  type="color"
+                  value={project.embedPrimaryColor || '#10B981'}
+                  onChange={(e) => {
+                    toggleSetting.mutate({ key: 'embedPrimaryColor', value: e.target.value } as any)
+                  }}
+                  className="w-12 h-10 rounded-lg border border-gray-300 cursor-pointer"
+                />
+              </div>
+
+              {/* Font Family */}
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center">
+                    <Type size={20} className="text-gray-600" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">Font Family</p>
+                    <p className="text-sm text-gray-500">Choose a Google Font for embed text</p>
+                  </div>
+                </div>
+                <select
+                  value={project.embedFontFamily || ''}
+                  onChange={(e) => {
+                    toggleSetting.mutate({ key: 'embedFontFamily', value: e.target.value || null } as any)
+                  }}
+                  className="w-40 p-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+                >
+                  <option value="">Default (System)</option>
+                  <option value="Inter">Inter</option>
+                  <option value="Roboto">Roboto</option>
+                  <option value="Open Sans">Open Sans</option>
+                  <option value="Lato">Lato</option>
+                  <option value="Montserrat">Montserrat</option>
+                  <option value="Poppins">Poppins</option>
+                  <option value="Source Sans Pro">Source Sans Pro</option>
+                  <option value="Nunito">Nunito</option>
+                  <option value="Raleway">Raleway</option>
+                </select>
+              </div>
+
+              {/* Hide Street Labels Toggle */}
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center">
+                    <MapIcon size={20} className="text-gray-600" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">Hide Street Labels</p>
+                    <p className="text-sm text-gray-500">Show a cleaner map without street names</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => toggleSetting.mutate({ key: 'embedHideStreetLabels', value: !project.embedHideStreetLabels })}
+                  disabled={toggling === 'embedHideStreetLabels'}
+                  className={`relative w-12 h-6 rounded-full transition-colors ${
+                    project.embedHideStreetLabels ? 'bg-brand-500' : 'bg-gray-300'
+                  } ${toggling === 'embedHideStreetLabels' ? 'opacity-50' : ''}`}
+                >
+                  <span
+                    className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                      project.embedHideStreetLabels ? 'left-6' : 'left-0.5'
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
 
             {/* Feedback Map Embed Code */}

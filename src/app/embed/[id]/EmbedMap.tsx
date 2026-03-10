@@ -53,6 +53,9 @@ interface EmbedMapProps {
   votedPins: Set<string>
   animateToCenter?: boolean
   mode?: 'feedback' | 'issues'
+  // Styling options
+  hideStreetLabels?: boolean
+  primaryColor?: string
 }
 
 const CATEGORY_CONFIG: Record<string, { color: string; bg: string; icon: any; label: string }> = {
@@ -235,7 +238,9 @@ export default function EmbedMap({
   mapType,
   votedPins,
   animateToCenter = false,
-  mode = 'feedback'
+  mode = 'feedback',
+  hideStreetLabels = false,
+  primaryColor
 }: EmbedMapProps) {
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script-embed',
@@ -463,6 +468,40 @@ export default function EmbedMap({
     }
   }, [drawMode])
 
+  // Map styles to hide street labels
+  const hideLabelsStyles: google.maps.MapTypeStyle[] = [
+    {
+      featureType: 'all',
+      elementType: 'labels',
+      stylers: [{ visibility: 'off' }]
+    },
+    {
+      featureType: 'administrative',
+      elementType: 'labels',
+      stylers: [{ visibility: 'off' }]
+    },
+    {
+      featureType: 'poi',
+      elementType: 'labels',
+      stylers: [{ visibility: 'off' }]
+    },
+    {
+      featureType: 'road',
+      elementType: 'labels',
+      stylers: [{ visibility: 'off' }]
+    },
+    {
+      featureType: 'transit',
+      elementType: 'labels',
+      stylers: [{ visibility: 'off' }]
+    },
+    {
+      featureType: 'water',
+      elementType: 'labels',
+      stylers: [{ visibility: 'off' }]
+    }
+  ]
+
   // Memoize map options - keep stable, mapType is controlled via useEffect
   const mapOptions = useMemo(() => ({
     mapTypeControl: false,
@@ -482,8 +521,9 @@ export default function EmbedMap({
     scrollwheel: true,
     draggableCursor: 'grab',
     draggingCursor: 'grabbing',
-    maxZoom: 18
-  }), [])
+    maxZoom: 18,
+    styles: hideStreetLabels ? hideLabelsStyles : undefined
+  }), [hideStreetLabels])
 
   // Drawing manager options - always available
   const drawingManagerOptions = useMemo(() => ({
@@ -748,9 +788,26 @@ export default function EmbedMap({
                       e.stopPropagation()
                       onVote(pin.id)
                     }}
-                    className="w-full flex items-center justify-center py-2 mb-3 border border-gray-200 rounded-lg hover:bg-brand-50 hover:border-brand-300 transition-colors cursor-pointer"
+                    className="w-full flex items-center justify-center py-2 mb-3 border border-gray-200 rounded-lg transition-colors cursor-pointer"
+                    style={{
+                      ['--hover-bg' as string]: primaryColor ? `${primaryColor}15` : undefined,
+                      ['--hover-border' as string]: primaryColor || undefined
+                    }}
+                    onMouseOver={(e) => {
+                      if (primaryColor) {
+                        e.currentTarget.style.backgroundColor = `${primaryColor}15`
+                        e.currentTarget.style.borderColor = primaryColor
+                      } else {
+                        e.currentTarget.style.backgroundColor = 'rgb(236 253 245)'
+                        e.currentTarget.style.borderColor = 'rgb(110 231 183)'
+                      }
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.backgroundColor = ''
+                      e.currentTarget.style.borderColor = ''
+                    }}
                   >
-                    <ThumbsUp size={18} className="text-brand-500 mr-2" />
+                    <ThumbsUp size={18} className="mr-2" style={{ color: primaryColor || '#10B981' }} />
                     <span className="text-gray-700 font-medium mr-1">{pin.votes}</span>
                     <span className="text-gray-500">{mode === 'issues' ? 'Support' : `Vote${pin.votes !== 1 ? 's' : ''}`}</span>
                   </button>

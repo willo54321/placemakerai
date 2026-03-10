@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { Volume2, Wind, Car, AlertTriangle, ShieldAlert, Clock, HelpCircle, X, Send, MapPin, ChevronLeft, ChevronRight, Pentagon } from 'lucide-react'
+import { Volume2, Wind, Car, AlertTriangle, ShieldAlert, Clock, HelpCircle, X, Send, MapPin, Pentagon } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
 const EmbedMap = dynamic(() => import('../EmbedMap'), {
@@ -52,6 +52,10 @@ interface ProjectData {
   allowDrawing: boolean
   overlays: Overlay[]
   pins: PublicPin[]
+  // Styling customization
+  embedPrimaryColor: string | null
+  embedFontFamily: string | null
+  embedHideStreetLabels: boolean
 }
 
 // Shape types for drawing
@@ -98,16 +102,6 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
   })
 
   // UI state
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [categoryFilters, setCategoryFilters] = useState<Record<string, boolean>>({
-    noise: true,
-    dust: true,
-    traffic: true,
-    damage: true,
-    safety: true,
-    hours: true,
-    other: true,
-  })
   const [mapType, setMapType] = useState<'roadmap' | 'satellite'>('satellite')
   const [votedPins, setVotedPins] = useState<Set<string>>(new Set())
 
@@ -158,7 +152,7 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
   }
 
   const handleSubmit = async () => {
-    if (!pendingShape || !form.comment.trim() || !form.gdprConsent) return
+    if (!pendingShape || !form.comment.trim() || !form.name.trim() || !form.email.trim() || !form.gdprConsent) return
 
     setSubmitting(true)
     try {
@@ -245,20 +239,6 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
     }
   }
 
-  const toggleCategoryFilter = (categoryId: string) => {
-    setCategoryFilters(prev => ({
-      ...prev,
-      [categoryId]: !prev[categoryId]
-    }))
-  }
-
-  const getCategoryCount = (categoryId: string) => {
-    if (!project) return 0
-    return project.pins.filter(p => p.category === categoryId).length
-  }
-
-  const filteredPins = project?.pins.filter(p => categoryFilters[p.category] !== false) || []
-
   const getDrawModeInstruction = () => {
     switch (drawMode) {
       case 'pin':
@@ -311,16 +291,34 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
     project.longitude || -0.1278
   ]
 
+  // Get font URL for Google Fonts
+  const fontFamily = project.embedFontFamily || 'DM Sans'
+  const fontUrl = `https://fonts.googleapis.com/css2?family=${fontFamily.replace(/ /g, '+')}:wght@400;500;600;700&display=swap`
+  const primaryColor = project.embedPrimaryColor || '#EA580C' // Default orange for issues
+
   return (
     <>
-      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
-      <div className="h-screen w-screen relative overflow-hidden" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <link href={fontUrl} rel="stylesheet" />
+      <style>{`
+        :root {
+          --embed-primary: ${primaryColor};
+        }
+        .bg-orange-600 { background-color: ${primaryColor} !important; }
+        .bg-orange-700 { background-color: ${primaryColor} !important; filter: brightness(0.9); }
+        .text-orange-600 { color: ${primaryColor} !important; }
+        .border-orange-500 { border-color: ${primaryColor} !important; }
+        .bg-orange-50 { background-color: ${primaryColor}15 !important; }
+        .ring-orange-300 { --tw-ring-color: ${primaryColor}50 !important; }
+        .focus\\:ring-orange-500:focus { --tw-ring-color: ${primaryColor} !important; }
+        .focus\\:border-orange-500:focus { border-color: ${primaryColor} !important; }
+      `}</style>
+      <div className="h-screen w-screen relative overflow-hidden" style={{ fontFamily: `'${fontFamily}', sans-serif` }}>
         {/* Map fills entire screen */}
         <EmbedMap
           center={center}
           zoom={project.mapZoom || 15}
           overlays={project.overlays}
-          pins={filteredPins}
+          pins={project.pins}
           pendingPin={pendingShape?.type === 'pin' ? { lat: pendingShape.lat!, lng: pendingShape.lng! } : null}
           pendingShape={pendingShape && pendingShape.type === 'polygon' ? { type: pendingShape.type, geometry: pendingShape.geometry } : null}
           isAddingPin={drawMode === 'pin'}
@@ -331,6 +329,8 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
           mapType={mapType}
           votedPins={votedPins}
           mode="issues"
+          hideStreetLabels={project.embedHideStreetLabels}
+          primaryColor={primaryColor}
         />
 
         {/* Report Issue Buttons - Top Right */}
@@ -384,73 +384,6 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
             <p className="font-medium">{getDrawModeInstruction()}</p>
           </div>
         )}
-
-        {/* Left Sidebar */}
-        <div className={`absolute top-4 left-4 z-10 transition-all duration-300 ${sidebarCollapsed ? 'w-auto' : 'w-80'}`}>
-          <div className={`bg-orange-600 p-4 flex items-start justify-between ${sidebarCollapsed ? 'rounded-xl' : 'rounded-t-xl'}`}>
-            {!sidebarCollapsed && (
-              <div className="text-white flex-1 mr-3">
-                <h2 className="font-bold text-lg">Construction Issues</h2>
-                <p className="text-orange-200 text-sm mt-1">
-                  Report issues affecting your area during construction.
-                </p>
-              </div>
-            )}
-            <button
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="p-2 bg-orange-500/50 hover:bg-orange-500 rounded-lg transition-colors text-white shrink-0"
-            >
-              {sidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-            </button>
-          </div>
-
-          {!sidebarCollapsed && (
-            <div className="bg-white rounded-b-xl shadow-lg">
-              <div className="p-4">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
-                  Issue Types
-                </p>
-                <div className="space-y-2">
-                  {ISSUE_CATEGORIES.map(cat => {
-                    const count = getCategoryCount(cat.id)
-                    const isEnabled = categoryFilters[cat.id]
-                    return (
-                      <div
-                        key={cat.id}
-                        className="flex items-center justify-between p-3 border border-gray-100 rounded-xl hover:border-gray-200 transition-colors"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div
-                            className="w-10 h-10 rounded-xl flex items-center justify-center"
-                            style={{ backgroundColor: cat.bg }}
-                          >
-                            <cat.icon size={20} style={{ color: cat.color }} />
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-900 text-sm">{cat.label}</p>
-                            <p className="text-xs text-gray-400">{count} report{count !== 1 ? 's' : ''}</p>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => toggleCategoryFilter(cat.id)}
-                          className={`relative w-12 h-7 rounded-full transition-colors ${
-                            isEnabled ? 'bg-orange-500' : 'bg-gray-200'
-                          }`}
-                        >
-                          <div
-                            className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                              isEnabled ? 'left-6' : 'left-1'
-                            }`}
-                          />
-                        </button>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
 
         {/* Map Type Button */}
         <button
@@ -531,7 +464,7 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Name (optional)
+                      Name *
                     </label>
                     <input
                       type="text"
@@ -540,11 +473,12 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
                       placeholder="Your name"
                       className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                       maxLength={100}
+                      required
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Email (optional)
+                      Email *
                     </label>
                     <input
                       type="email"
@@ -553,6 +487,7 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
                       placeholder="your@email.com"
                       className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                       maxLength={255}
+                      required
                     />
                   </div>
                 </div>
@@ -582,20 +517,18 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
                     </label>
                   </div>
 
-                  {form.email && (
-                    <div className="flex items-start gap-3">
-                      <input
-                        id="mailingConsent"
-                        type="checkbox"
-                        checked={form.mailingConsent}
-                        onChange={e => setForm({ ...form, mailingConsent: e.target.checked })}
-                        className="mt-1 w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-600"
-                      />
-                      <label htmlFor="mailingConsent" className="text-xs text-gray-600">
-                        I would like to receive updates about this project (optional)
-                      </label>
-                    </div>
-                  )}
+                  <div className="flex items-start gap-3">
+                    <input
+                      id="mailingConsent"
+                      type="checkbox"
+                      checked={form.mailingConsent}
+                      onChange={e => setForm({ ...form, mailingConsent: e.target.checked })}
+                      className="mt-1 w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-600"
+                    />
+                    <label htmlFor="mailingConsent" className="text-xs text-gray-600">
+                      I would like to receive updates about this project (optional)
+                    </label>
+                  </div>
                 </div>
 
                 {/* Submit */}
@@ -608,7 +541,7 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
                   </button>
                   <button
                     onClick={handleSubmit}
-                    disabled={!form.comment.trim() || !form.gdprConsent || submitting}
+                    disabled={!form.comment.trim() || !form.name.trim() || !form.email.trim() || !form.gdprConsent || submitting}
                     className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     {submitting ? (

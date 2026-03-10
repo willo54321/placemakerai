@@ -79,6 +79,10 @@ interface ProjectData {
   overlays: Overlay[]
   pins: PublicPin[]
   tour: Tour | null
+  // Styling customization
+  embedPrimaryColor: string | null
+  embedFontFamily: string | null
+  embedHideStreetLabels: boolean
 }
 
 // Shape types for drawing
@@ -361,10 +365,28 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
     project.longitude || -0.1278
   ]
 
+  // Get font URL for Google Fonts
+  const fontFamily = project.embedFontFamily || 'DM Sans'
+  const fontUrl = `https://fonts.googleapis.com/css2?family=${fontFamily.replace(/ /g, '+')}:wght@400;500;600;700&display=swap`
+  const primaryColor = project.embedPrimaryColor || '#10B981'
+
   return (
     <>
-      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
-      <div className="h-screen w-screen relative overflow-hidden" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <link href={fontUrl} rel="stylesheet" />
+      <style>{`
+        :root {
+          --embed-primary: ${primaryColor};
+        }
+        .bg-brand-600 { background-color: ${primaryColor} !important; }
+        .bg-brand-700 { background-color: ${primaryColor} !important; filter: brightness(0.9); }
+        .text-brand-600 { color: ${primaryColor} !important; }
+        .border-brand-500 { border-color: ${primaryColor} !important; }
+        .bg-brand-50 { background-color: ${primaryColor}15 !important; }
+        .ring-brand-300 { --tw-ring-color: ${primaryColor}50 !important; }
+        .focus\\:ring-brand-500:focus { --tw-ring-color: ${primaryColor} !important; }
+        .focus\\:border-brand-500:focus { border-color: ${primaryColor} !important; }
+      `}</style>
+      <div className="h-screen w-screen relative overflow-hidden" style={{ fontFamily: `'${fontFamily}', sans-serif` }}>
         {/* Map fills entire screen */}
         <EmbedMap
           center={mapCenter ? [mapCenter.lat, mapCenter.lng] : center}
@@ -381,6 +403,8 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
           mapType={mapType}
           votedPins={votedPins}
           animateToCenter={mapCenter !== null}
+          hideStreetLabels={project.embedHideStreetLabels}
+          primaryColor={project.embedPrimaryColor || undefined}
         />
 
         {/* Feedback Buttons - Top Right (only if pins or drawing allowed) */}

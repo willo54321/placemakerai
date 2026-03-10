@@ -11,7 +11,6 @@ const getResend = () => {
 // Issue categories for validation
 const ISSUE_CATEGORIES = ['noise', 'dust', 'traffic', 'damage', 'safety', 'hours', 'other']
 const FEEDBACK_CATEGORIES = ['positive', 'negative', 'question', 'comment']
-const URGENCY_LEVELS = ['low', 'medium', 'high', 'urgent']
 
 // Public API - submit feedback or issue (pin, line, or polygon)
 export async function POST(
@@ -81,10 +80,14 @@ export async function POST(
   const defaultCategory = mode === 'issues' ? 'other' : 'comment'
   const category = validCategories.includes(body.category) ? body.category : defaultCategory
 
-  // Validate urgency for issues mode
-  let urgency: string | null = null
+  // For issues mode, name and email are required
   if (mode === 'issues') {
-    urgency = URGENCY_LEVELS.includes(body.urgency) ? body.urgency : 'medium'
+    if (!body.name?.trim() || !body.email?.trim()) {
+      return NextResponse.json(
+        { error: 'Name and email are required for issue reports' },
+        { status: 400 }
+      )
+    }
   }
 
   // GDPR consent is required
@@ -108,7 +111,6 @@ export async function POST(
       gdprConsentDate: new Date(),
       mailingConsent: body.mailingConsent || false,
       mode,
-      urgency,
     }
   })
 
@@ -118,19 +120,17 @@ export async function POST(
     const resend = getResend()
     if (notifyEmails.length > 0 && resend) {
       try {
-        const urgencyLabel = urgency ? urgency.charAt(0).toUpperCase() + urgency.slice(1) : 'Medium'
         const categoryLabel = category.charAt(0).toUpperCase() + category.slice(1)
 
         await resend.emails.send({
           from: 'PlaceMaker AI <notifications@placemaker.ai>',
           to: notifyEmails,
-          subject: `[${urgencyLabel}] New ${categoryLabel} Issue Reported - ${project.name}`,
+          subject: `New ${categoryLabel} Issue Reported - ${project.name}`,
           html: `
             <h2>New Construction Issue Reported</h2>
             <p><strong>Project:</strong> ${project.name}</p>
             <p><strong>Category:</strong> ${categoryLabel}</p>
-            <p><strong>Urgency:</strong> ${urgencyLabel}</p>
-            <p><strong>Reported by:</strong> ${pin.name || 'Anonymous'}${pin.email ? ` (${pin.email})` : ''}</p>
+            <p><strong>Reported by:</strong> ${pin.name} (${pin.email})</p>
             <hr>
             <p><strong>Description:</strong></p>
             <p>${pin.comment}</p>
@@ -188,7 +188,6 @@ export async function POST(
     name: pin.name,
     votes: pin.votes,
     createdAt: pin.createdAt,
-    mode: pin.mode,
-    urgency: pin.urgency
+    mode: pin.mode
   })
 }

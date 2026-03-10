@@ -115,6 +115,9 @@ export async function PATCH(
     if ('autoReplyMessage' in body) updateData.autoReplyMessage = body.autoReplyMessage || null
     if (body.issuesEnabled !== undefined) updateData.issuesEnabled = body.issuesEnabled
     if ('issueNotifyEmails' in body) updateData.issueNotifyEmails = body.issueNotifyEmails || null
+    if ('embedPrimaryColor' in body) updateData.embedPrimaryColor = body.embedPrimaryColor || null
+    if ('embedFontFamily' in body) updateData.embedFontFamily = body.embedFontFamily || null
+    if (body.embedHideStreetLabels !== undefined) updateData.embedHideStreetLabels = body.embedHideStreetLabels
 
     const project = await prisma.project.update({
       where: { id: params.id },

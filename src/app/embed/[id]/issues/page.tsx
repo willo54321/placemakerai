@@ -30,7 +30,6 @@ interface PublicPin {
   name: string | null
   votes: number
   createdAt: string
-  urgency: string | null
 }
 
 interface Overlay {
@@ -77,13 +76,6 @@ const ISSUE_CATEGORIES = [
   { id: 'other', label: 'Other Issue', icon: HelpCircle, color: '#6B7280', bg: '#F3F4F6' },
 ]
 
-const URGENCY_LEVELS = [
-  { id: 'low', label: 'Low', color: '#22C55E', description: 'Not time-sensitive' },
-  { id: 'medium', label: 'Medium', color: '#F59E0B', description: 'Should be addressed soon' },
-  { id: 'high', label: 'High', color: '#EF4444', description: 'Needs prompt attention' },
-  { id: 'urgent', label: 'Urgent', color: '#DC2626', description: 'Requires immediate action' },
-]
-
 export default function IssuesEmbedPage({ params }: { params: { id: string } }) {
   const [project, setProject] = useState<ProjectData | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -96,7 +88,6 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
 
   // Form state
   const [selectedCategory, setSelectedCategory] = useState('noise')
-  const [selectedUrgency, setSelectedUrgency] = useState('medium')
   const [submitting, setSubmitting] = useState(false)
   const [form, setForm] = useState({
     comment: '',
@@ -175,7 +166,6 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
         mode: 'issues',
         shapeType: pendingShape.type,
         category: selectedCategory,
-        urgency: selectedUrgency,
         comment: form.comment,
         name: form.name || null,
         email: form.email || null,
@@ -219,7 +209,6 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
     setDrawMode(null)
     setForm({ comment: '', name: '', email: '', gdprConsent: false, mailingConsent: false })
     setSelectedCategory('noise')
-    setSelectedUrgency('medium')
   }
 
   const handleVote = async (pinId: string) => {
@@ -515,32 +504,6 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
                           <cat.icon size={16} style={{ color: cat.color }} />
                         </div>
                         <span className="font-medium text-gray-700 text-sm">{cat.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Urgency Selection */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Urgency level
-                  </label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {URGENCY_LEVELS.map(level => (
-                      <button
-                        key={level.id}
-                        onClick={() => setSelectedUrgency(level.id)}
-                        className={`p-2 rounded-lg border-2 transition-all text-center ${
-                          selectedUrgency === level.id
-                            ? 'border-orange-500 bg-orange-50'
-                            : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                      >
-                        <div
-                          className="w-4 h-4 rounded-full mx-auto mb-1"
-                          style={{ backgroundColor: level.color }}
-                        />
-                        <span className="text-xs font-medium text-gray-700">{level.label}</span>
                       </button>
                     ))}
                   </div>

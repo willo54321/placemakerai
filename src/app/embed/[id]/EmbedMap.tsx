@@ -33,7 +33,6 @@ interface PublicPin {
   name: string | null
   votes: number
   createdAt: string
-  urgency?: string | null
 }
 
 type DrawMode = 'pin' | 'polygon' | null
@@ -72,13 +71,6 @@ const ISSUE_CATEGORY_CONFIG: Record<string, { color: string; bg: string; icon: a
   safety: { color: '#EF4444', bg: '#EF4444', icon: ShieldAlert, label: 'SAFETY' },
   hours: { color: '#6366F1', bg: '#6366F1', icon: Clock, label: 'WORKING HOURS' },
   other: { color: '#6B7280', bg: '#6B7280', icon: HelpCircle, label: 'OTHER' },
-}
-
-const URGENCY_CONFIG: Record<string, { color: string; label: string }> = {
-  low: { color: '#22C55E', label: 'Low' },
-  medium: { color: '#F59E0B', label: 'Medium' },
-  high: { color: '#EF4444', label: 'High' },
-  urgent: { color: '#DC2626', label: 'Urgent' },
 }
 
 // SVG icons for each category (centered at 24, 22)
@@ -684,7 +676,6 @@ export default function EmbedMap({
           const config = mode === 'issues'
             ? (ISSUE_CATEGORY_CONFIG[pin.category] || ISSUE_CATEGORY_CONFIG.other)
             : (CATEGORY_CONFIG[pin.category] || CATEGORY_CONFIG.question)
-          const urgencyConfig = pin.urgency ? URGENCY_CONFIG[pin.urgency] : null
 
           // Get position based on shape type
           let position: { lat: number; lng: number }
@@ -731,14 +722,6 @@ export default function EmbedMap({
                     >
                       {config.label}
                     </span>
-                    {mode === 'issues' && urgencyConfig && (
-                      <span
-                        className="text-xs font-medium text-white px-2 py-0.5 rounded"
-                        style={{ backgroundColor: urgencyConfig.color }}
-                      >
-                        {urgencyConfig.label} Priority
-                      </span>
-                    )}
                     {shapeLabel && (
                       <span className="text-xs font-medium text-brand-600 bg-brand-100 px-2 py-0.5 rounded">
                         {shapeLabel}

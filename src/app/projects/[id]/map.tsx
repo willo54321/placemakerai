@@ -63,7 +63,6 @@ interface PublicPin {
   votes: number
   createdAt: string
   mode: string
-  urgency: string | null
   resolved: boolean
   resolvedAt: string | null
   resolvedNotes: string | null
@@ -137,13 +136,6 @@ const ISSUE_CATEGORY_CONFIG: Record<string, { color: string; icon: any; label: s
   safety: { color: '#EF4444', icon: ShieldAlert, label: 'Safety', bg: '#FEE2E2' },
   hours: { color: '#6366F1', icon: Clock, label: 'Working Hours', bg: '#E0E7FF' },
   other: { color: '#6B7280', icon: HelpCircle, label: 'Other', bg: '#F3F4F6' },
-}
-
-const URGENCY_CONFIG: Record<string, { color: string; label: string; bg: string }> = {
-  low: { color: '#22C55E', label: 'Low', bg: '#DCFCE7' },
-  medium: { color: '#F59E0B', label: 'Medium', bg: '#FEF3C7' },
-  high: { color: '#EF4444', label: 'High', bg: '#FEE2E2' },
-  urgent: { color: '#DC2626', label: 'Urgent', bg: '#FEE2E2' },
 }
 
 export function MapTab({ projectId, project }: { projectId: string; project: Project }) {
@@ -1770,7 +1762,6 @@ export function PublicCommentsTab({ projectId, project }: { projectId: string; p
             {filteredPins.map(pin => {
               const config = categoryConfig[pin.category] || (activeMode === 'issues' ? ISSUE_CATEGORY_CONFIG.other : CATEGORY_CONFIG.comment)
               const IconComponent = config.icon
-              const urgencyConfig = pin.urgency ? URGENCY_CONFIG[pin.urgency] : null
               return (
                 <div key={pin.id} className={`px-6 py-4 hover:bg-gray-50 ${!pin.approved ? 'bg-amber-50/50' : ''} ${pin.resolved ? 'bg-green-50/50' : ''}`}>
                   <div className="flex items-start gap-4">
@@ -1788,14 +1779,6 @@ export function PublicCommentsTab({ projectId, project }: { projectId: string; p
                         >
                           {config.label}
                         </span>
-                        {activeMode === 'issues' && urgencyConfig && (
-                          <span
-                            className="text-xs font-medium px-2 py-0.5 rounded-full"
-                            style={{ backgroundColor: urgencyConfig.bg, color: urgencyConfig.color }}
-                          >
-                            {urgencyConfig.label} Priority
-                          </span>
-                        )}
                         {pin.resolved ? (
                           <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700 flex items-center gap-1">
                             <CheckCircle size={12} />

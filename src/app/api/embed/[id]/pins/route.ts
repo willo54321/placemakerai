@@ -2,7 +2,11 @@ import { prisma } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+// Lazy initialization to avoid build errors when API key is missing
+const getResend = () => {
+  if (!process.env.RESEND_API_KEY) return null
+  return new Resend(process.env.RESEND_API_KEY)
+}
 
 // Issue categories for validation
 const ISSUE_CATEGORIES = ['noise', 'dust', 'traffic', 'damage', 'safety', 'hours', 'other']
@@ -111,9 +115,10 @@ export async function POST(
   // Send email notification for new issues
   if (mode === 'issues' && project.issueNotifyEmails) {
     const notifyEmails = project.issueNotifyEmails.split(',').map((e: string) => e.trim()).filter(Boolean)
-    if (notifyEmails.length > 0) {
+    const resend = getResend()
+    if (notifyEmails.length > 0 && resend) {
       try {
-        const urgencyLabel = urgency?.charAt(0).toUpperCase() + urgency?.slice(1) || 'Medium'
+        const urgencyLabel = urgency ? urgency.charAt(0).toUpperCase() + urgency.slice(1) : 'Medium'
         const categoryLabel = category.charAt(0).toUpperCase() + category.slice(1)
 
         await resend.emails.send({

@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/db'
 import { NextResponse } from 'next/server'
 
-// Update pin (approve/reject)
+// Update pin (approve/reject, resolve issues)
 export async function PATCH(
   request: Request,
   { params }: { params: { id: string; pinId: string } }
@@ -20,11 +20,29 @@ export async function PATCH(
     return NextResponse.json({ error: 'Pin not found' }, { status: 404 })
   }
 
+  // Build update data
+  const updateData: {
+    approved?: boolean
+    resolved?: boolean
+    resolvedAt?: Date | null
+    resolvedNotes?: string | null
+  } = {}
+
+  // Handle approval toggle
+  if (typeof body.approved === 'boolean') {
+    updateData.approved = body.approved
+  }
+
+  // Handle issue resolution (only for issues mode)
+  if (typeof body.resolved === 'boolean' && pin.mode === 'issues') {
+    updateData.resolved = body.resolved
+    updateData.resolvedAt = body.resolved ? new Date() : null
+    updateData.resolvedNotes = body.resolved ? (body.resolvedNotes || null) : null
+  }
+
   const updatedPin = await prisma.publicPin.update({
     where: { id: params.pinId },
-    data: {
-      approved: body.approved
-    }
+    data: updateData
   })
 
   return NextResponse.json(updatedPin)

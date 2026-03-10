@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { GoogleMap, useJsApiLoader, MarkerF, OverlayView, PolygonF, PolylineF, DrawingManagerF } from '@react-google-maps/api'
-import { ThumbsUp, ThumbsDown, Lightbulb, MessageCircle, X } from 'lucide-react'
+import { ThumbsUp, ThumbsDown, Lightbulb, MessageCircle, X, Volume2, Wind, Car, AlertTriangle, ShieldAlert, Clock, HelpCircle } from 'lucide-react'
 import { RotatableOverlay } from '@/components/RotatableOverlay'
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''
@@ -33,6 +33,7 @@ interface PublicPin {
   name: string | null
   votes: number
   createdAt: string
+  urgency?: string | null
 }
 
 type DrawMode = 'pin' | 'polygon' | null
@@ -52,6 +53,7 @@ interface EmbedMapProps {
   mapType: 'roadmap' | 'satellite'
   votedPins: Set<string>
   animateToCenter?: boolean
+  mode?: 'feedback' | 'issues'
 }
 
 const CATEGORY_CONFIG: Record<string, { color: string; bg: string; icon: any; label: string }> = {
@@ -59,6 +61,24 @@ const CATEGORY_CONFIG: Record<string, { color: string; bg: string; icon: any; la
   negative: { color: '#EF4444', bg: '#EF4444', icon: ThumbsDown, label: 'NEGATIVE' },
   positive: { color: '#10B981', bg: '#10B981', icon: ThumbsUp, label: 'POSITIVE' },
   comment: { color: '#6366F1', bg: '#6366F1', icon: MessageCircle, label: 'COMMENT' },
+}
+
+// Issue category config for construction issues mode
+const ISSUE_CATEGORY_CONFIG: Record<string, { color: string; bg: string; icon: any; label: string }> = {
+  noise: { color: '#EF4444', bg: '#EF4444', icon: Volume2, label: 'NOISE' },
+  dust: { color: '#F59E0B', bg: '#F59E0B', icon: Wind, label: 'DUST/POLLUTION' },
+  traffic: { color: '#8B5CF6', bg: '#8B5CF6', icon: Car, label: 'TRAFFIC/ACCESS' },
+  damage: { color: '#DC2626', bg: '#DC2626', icon: AlertTriangle, label: 'DAMAGE' },
+  safety: { color: '#EF4444', bg: '#EF4444', icon: ShieldAlert, label: 'SAFETY' },
+  hours: { color: '#6366F1', bg: '#6366F1', icon: Clock, label: 'WORKING HOURS' },
+  other: { color: '#6B7280', bg: '#6B7280', icon: HelpCircle, label: 'OTHER' },
+}
+
+const URGENCY_CONFIG: Record<string, { color: string; label: string }> = {
+  low: { color: '#22C55E', label: 'Low' },
+  medium: { color: '#F59E0B', label: 'Medium' },
+  high: { color: '#EF4444', label: 'High' },
+  urgent: { color: '#DC2626', label: 'Urgent' },
 }
 
 // SVG icons for each category (centered at 24, 22)
@@ -80,9 +100,44 @@ const CATEGORY_ICONS: Record<string, string> = {
   `,
 }
 
-function createPinIcon(category: string, isHovered: boolean = false): google.maps.Icon {
-  const config = CATEGORY_CONFIG[category] || CATEGORY_CONFIG.question
-  const iconSvg = CATEGORY_ICONS[category] || CATEGORY_ICONS.question
+// SVG icons for issue categories
+const ISSUE_ICONS: Record<string, string> = {
+  noise: `
+    <path d="M16 22 L20 18 L20 26 L16 22 Z M21 18 L21 26 M24 16 L24 28 M27 14 L27 30" stroke="#EF4444" stroke-width="2" fill="#EF4444" stroke-linecap="round"/>
+  `,
+  dust: `
+    <path d="M16 20 Q20 16 24 20 Q28 24 32 20" stroke="#F59E0B" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M18 25 Q22 21 26 25 Q30 29 34 25" stroke="#F59E0B" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.7"/>
+  `,
+  traffic: `
+    <rect x="16" y="17" width="16" height="10" rx="2" fill="#8B5CF6"/>
+    <circle cx="20" cy="27" r="2" fill="#8B5CF6"/>
+    <circle cx="28" cy="27" r="2" fill="#8B5CF6"/>
+  `,
+  damage: `
+    <path d="M24 12 L26 20 L32 22 L26 24 L24 32 L22 24 L16 22 L22 20 Z" fill="#DC2626"/>
+  `,
+  safety: `
+    <path d="M24 13 L31 17 L31 23 C31 27 28 30 24 32 C20 30 17 27 17 23 L17 17 Z" fill="none" stroke="#EF4444" stroke-width="2.5"/>
+    <path d="M21 22 L23 24 L27 20" stroke="#EF4444" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  `,
+  hours: `
+    <circle cx="24" cy="22" r="9" fill="none" stroke="#6366F1" stroke-width="2.5"/>
+    <path d="M24 16 L24 22 L28 24" stroke="#6366F1" stroke-width="2" fill="none" stroke-linecap="round"/>
+  `,
+  other: `
+    <circle cx="24" cy="28" r="2" fill="#6B7280"/>
+    <path d="M20 16 Q20 12 24 12 Q28 12 28 16 Q28 19 24 20 L24 24" stroke="#6B7280" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  `,
+}
+
+function createPinIcon(category: string, isHovered: boolean = false, mode: 'feedback' | 'issues' = 'feedback'): google.maps.Icon {
+  const config = mode === 'issues'
+    ? (ISSUE_CATEGORY_CONFIG[category] || ISSUE_CATEGORY_CONFIG.other)
+    : (CATEGORY_CONFIG[category] || CATEGORY_CONFIG.question)
+  const iconSvg = mode === 'issues'
+    ? (ISSUE_ICONS[category] || ISSUE_ICONS.other)
+    : (CATEGORY_ICONS[category] || CATEGORY_ICONS.question)
 
   const shadowBlur = isHovered ? '3' : '2'
   const shadowOpacity = isHovered ? '0.3' : '0.25'
@@ -135,14 +190,24 @@ function createPendingPinIcon(): google.maps.Icon {
 }
 
 // Get category color with opacity for shapes
-function getCategoryColor(category: string, opacity: number = 1): string {
-  const colors: Record<string, string> = {
+function getCategoryColor(category: string, opacity: number = 1, mode: 'feedback' | 'issues' = 'feedback'): string {
+  const feedbackColors: Record<string, string> = {
     question: `rgba(245, 158, 11, ${opacity})`,
     negative: `rgba(239, 68, 68, ${opacity})`,
     positive: `rgba(16, 185, 129, ${opacity})`,
     comment: `rgba(99, 102, 241, ${opacity})`,
   }
-  return colors[category] || colors.comment
+  const issueColors: Record<string, string> = {
+    noise: `rgba(239, 68, 68, ${opacity})`,
+    dust: `rgba(245, 158, 11, ${opacity})`,
+    traffic: `rgba(139, 92, 246, ${opacity})`,
+    damage: `rgba(220, 38, 38, ${opacity})`,
+    safety: `rgba(239, 68, 68, ${opacity})`,
+    hours: `rgba(99, 102, 241, ${opacity})`,
+    other: `rgba(107, 114, 128, ${opacity})`,
+  }
+  const colors = mode === 'issues' ? issueColors : feedbackColors
+  return colors[category] || (mode === 'issues' ? issueColors.other : feedbackColors.comment)
 }
 
 // Calculate centroid for shapes (for popup positioning)
@@ -177,7 +242,8 @@ export default function EmbedMap({
   onVote,
   mapType,
   votedPins,
-  animateToCenter = false
+  animateToCenter = false,
+  mode = 'feedback'
 }: EmbedMapProps) {
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script-embed',
@@ -524,9 +590,9 @@ export default function EmbedMap({
               key={pin.id}
               paths={coords}
               options={{
-                fillColor: getCategoryColor(pin.category, isSelected ? 0.5 : 0.3),
+                fillColor: getCategoryColor(pin.category, isSelected ? 0.5 : 0.3, mode),
                 fillOpacity: 1,
-                strokeColor: getCategoryColor(pin.category, 1),
+                strokeColor: getCategoryColor(pin.category, 1, mode),
                 strokeWeight: isSelected ? 4 : 3,
                 strokeOpacity: 1,
                 clickable: true,
@@ -552,7 +618,7 @@ export default function EmbedMap({
               key={pin.id}
               path={coords}
               options={{
-                strokeColor: getCategoryColor(pin.category, 1),
+                strokeColor: getCategoryColor(pin.category, 1, mode),
                 strokeWeight: isSelected ? 6 : 4,
                 strokeOpacity: isSelected ? 1 : 0.8,
                 clickable: true,
@@ -587,7 +653,7 @@ export default function EmbedMap({
           <MarkerF
             key={pin.id}
             position={{ lat: pin.latitude!, lng: pin.longitude! }}
-            icon={createPinIcon(pin.category, hoveredPin === pin.id)}
+            icon={createPinIcon(pin.category, hoveredPin === pin.id, mode)}
             onClick={() => {
               if (selectedPin === pin.id) {
                 closePopup()
@@ -615,7 +681,10 @@ export default function EmbedMap({
           const pin = pins.find(p => p.id === selectedPin)
           if (!pin) return null
 
-          const config = CATEGORY_CONFIG[pin.category] || CATEGORY_CONFIG.question
+          const config = mode === 'issues'
+            ? (ISSUE_CATEGORY_CONFIG[pin.category] || ISSUE_CATEGORY_CONFIG.other)
+            : (CATEGORY_CONFIG[pin.category] || CATEGORY_CONFIG.question)
+          const urgencyConfig = pin.urgency ? URGENCY_CONFIG[pin.urgency] : null
 
           // Get position based on shape type
           let position: { lat: number; lng: number }
@@ -662,6 +731,14 @@ export default function EmbedMap({
                     >
                       {config.label}
                     </span>
+                    {mode === 'issues' && urgencyConfig && (
+                      <span
+                        className="text-xs font-medium text-white px-2 py-0.5 rounded"
+                        style={{ backgroundColor: urgencyConfig.color }}
+                      >
+                        {urgencyConfig.label} Priority
+                      </span>
+                    )}
                     {shapeLabel && (
                       <span className="text-xs font-medium text-brand-600 bg-brand-100 px-2 py-0.5 rounded">
                         {shapeLabel}
@@ -680,7 +757,7 @@ export default function EmbedMap({
                   <div className="w-full flex items-center justify-center py-2 mb-3 border border-green-200 bg-green-50 rounded-lg">
                     <ThumbsUp size={18} className="text-green-500 mr-2" fill="currentColor" />
                     <span className="text-green-700 font-medium mr-1">{pin.votes}</span>
-                    <span className="text-green-600">Voted</span>
+                    <span className="text-green-600">{mode === 'issues' ? 'Supported' : 'Voted'}</span>
                   </div>
                 ) : (
                   <button
@@ -692,7 +769,7 @@ export default function EmbedMap({
                   >
                     <ThumbsUp size={18} className="text-brand-500 mr-2" />
                     <span className="text-gray-700 font-medium mr-1">{pin.votes}</span>
-                    <span className="text-gray-500">Vote{pin.votes !== 1 ? 's' : ''}</span>
+                    <span className="text-gray-500">{mode === 'issues' ? 'Support' : `Vote${pin.votes !== 1 ? 's' : ''}`}</span>
                   </button>
                 )}
 

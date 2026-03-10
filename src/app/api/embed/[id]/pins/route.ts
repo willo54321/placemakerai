@@ -1,7 +1,15 @@
 import { prisma } from '@/lib/db'
 import { NextResponse } from 'next/server'
+import { Resend } from 'resend'
 
-// Public API - submit feedback (pin, line, or polygon)
+const resend = new Resend(process.env.RESEND_API_KEY)
+
+// Issue categories for validation
+const ISSUE_CATEGORIES = ['noise', 'dust', 'traffic', 'damage', 'safety', 'hours', 'other']
+const FEEDBACK_CATEGORIES = ['positive', 'negative', 'question', 'comment']
+const URGENCY_LEVELS = ['low', 'medium', 'high', 'urgent']
+
+// Public API - submit feedback or issue (pin, line, or polygon)
 export async function POST(
   request: Request,
   { params }: { params: { id: string } }
@@ -9,7 +17,12 @@ export async function POST(
   // First check if project exists and has embedding enabled
   const project = await prisma.project.findUnique({
     where: { id: params.id },
-    select: { embedEnabled: true }
+    select: {
+      embedEnabled: true,
+      issuesEnabled: true,
+      issueNotifyEmails: true,
+      name: true
+    }
   })
 
   if (!project) {
@@ -21,6 +34,14 @@ export async function POST(
   }
 
   const body = await request.json()
+
+  // Validate mode
+  const mode = body.mode === 'issues' ? 'issues' : 'feedback'
+
+  // Check if issues mode is enabled for this project
+  if (mode === 'issues' && !project.issuesEnabled) {
+    return NextResponse.json({ error: 'Issue reporting not enabled for this project' }, { status: 403 })
+  }
 
   // Validate shape type
   const validShapeTypes = ['pin', 'line', 'polygon']
@@ -51,16 +72,23 @@ export async function POST(
     }
   }
 
-  // Validate category
-  const validCategories = ['positive', 'negative', 'question', 'comment']
-  const category = validCategories.includes(body.category) ? body.category : 'comment'
+  // Validate category based on mode
+  const validCategories = mode === 'issues' ? ISSUE_CATEGORIES : FEEDBACK_CATEGORIES
+  const defaultCategory = mode === 'issues' ? 'other' : 'comment'
+  const category = validCategories.includes(body.category) ? body.category : defaultCategory
+
+  // Validate urgency for issues mode
+  let urgency: string | null = null
+  if (mode === 'issues') {
+    urgency = URGENCY_LEVELS.includes(body.urgency) ? body.urgency : 'medium'
+  }
 
   // GDPR consent is required
   if (!body.gdprConsent) {
     return NextResponse.json({ error: 'GDPR consent is required' }, { status: 400 })
   }
 
-  // Create the feedback item
+  // Create the feedback/issue item
   const pin = await prisma.publicPin.create({
     data: {
       projectId: params.id,
@@ -75,8 +103,42 @@ export async function POST(
       gdprConsent: true,
       gdprConsentDate: new Date(),
       mailingConsent: body.mailingConsent || false,
+      mode,
+      urgency,
     }
   })
+
+  // Send email notification for new issues
+  if (mode === 'issues' && project.issueNotifyEmails) {
+    const notifyEmails = project.issueNotifyEmails.split(',').map((e: string) => e.trim()).filter(Boolean)
+    if (notifyEmails.length > 0) {
+      try {
+        const urgencyLabel = urgency?.charAt(0).toUpperCase() + urgency?.slice(1) || 'Medium'
+        const categoryLabel = category.charAt(0).toUpperCase() + category.slice(1)
+
+        await resend.emails.send({
+          from: 'PlaceMaker AI <notifications@placemaker.ai>',
+          to: notifyEmails,
+          subject: `[${urgencyLabel}] New ${categoryLabel} Issue Reported - ${project.name}`,
+          html: `
+            <h2>New Construction Issue Reported</h2>
+            <p><strong>Project:</strong> ${project.name}</p>
+            <p><strong>Category:</strong> ${categoryLabel}</p>
+            <p><strong>Urgency:</strong> ${urgencyLabel}</p>
+            <p><strong>Reported by:</strong> ${pin.name || 'Anonymous'}${pin.email ? ` (${pin.email})` : ''}</p>
+            <hr>
+            <p><strong>Description:</strong></p>
+            <p>${pin.comment}</p>
+            <hr>
+            <p><em>This issue requires moderation before it appears on the public map.</em></p>
+          `
+        })
+      } catch (emailError) {
+        console.error('Failed to send issue notification email:', emailError)
+        // Don't fail the request if email fails
+      }
+    }
+  }
 
   // Only add to mailing list if email provided AND user consented
   if (body.email && body.mailingConsent) {
@@ -120,6 +182,8 @@ export async function POST(
     comment: pin.comment,
     name: pin.name,
     votes: pin.votes,
-    createdAt: pin.createdAt
+    createdAt: pin.createdAt,
+    mode: pin.mode,
+    urgency: pin.urgency
   })
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2, X, Pentagon, Minus, Eye, EyeOff, Upload, Save, ChevronLeft, ChevronRight, Image, ZoomIn, Map, Code, MessageCircle, Globe, Copy, Check, ThumbsUp, ThumbsDown, HelpCircle, ExternalLink, Clock, CheckCircle, XCircle, FileUp, Layers, MapPinned } from 'lucide-react'
+import { Plus, Trash2, X, Pentagon, Minus, Eye, EyeOff, Upload, Save, ChevronLeft, ChevronRight, Image, ZoomIn, Map, Code, MessageCircle, Globe, Copy, Check, ThumbsUp, ThumbsDown, HelpCircle, ExternalLink, Clock, CheckCircle, XCircle, FileUp, Layers, MapPinned, AlertTriangle, Volume2, Wind, Car, ShieldAlert } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 
@@ -62,6 +62,11 @@ interface PublicPin {
   approved: boolean
   votes: number
   createdAt: string
+  mode: string
+  urgency: string | null
+  resolved: boolean
+  resolvedAt: string | null
+  resolvedNotes: string | null
 }
 
 interface DBImageOverlay {
@@ -107,6 +112,8 @@ interface Project {
   embedEnabled: boolean
   allowPins: boolean
   allowDrawing: boolean
+  issuesEnabled: boolean
+  issueNotifyEmails: string | null
   latitude: number | null
   longitude: number | null
   mapZoom: number | null
@@ -120,6 +127,23 @@ const CATEGORY_CONFIG: Record<string, { color: string; icon: any; label: string;
   negative: { color: '#EF4444', icon: ThumbsDown, label: 'Concern', bg: '#FEF2F2' },
   question: { color: '#F59E0B', icon: HelpCircle, label: 'Question', bg: '#FFFBEB' },
   comment: { color: '#6366F1', icon: MessageCircle, label: 'Comment', bg: '#EEF2FF' },
+}
+
+const ISSUE_CATEGORY_CONFIG: Record<string, { color: string; icon: any; label: string; bg: string }> = {
+  noise: { color: '#EF4444', icon: Volume2, label: 'Noise', bg: '#FEF2F2' },
+  dust: { color: '#F59E0B', icon: Wind, label: 'Dust/Pollution', bg: '#FFFBEB' },
+  traffic: { color: '#8B5CF6', icon: Car, label: 'Traffic/Access', bg: '#F5F3FF' },
+  damage: { color: '#DC2626', icon: AlertTriangle, label: 'Damage', bg: '#FEF2F2' },
+  safety: { color: '#EF4444', icon: ShieldAlert, label: 'Safety', bg: '#FEE2E2' },
+  hours: { color: '#6366F1', icon: Clock, label: 'Working Hours', bg: '#E0E7FF' },
+  other: { color: '#6B7280', icon: HelpCircle, label: 'Other', bg: '#F3F4F6' },
+}
+
+const URGENCY_CONFIG: Record<string, { color: string; label: string; bg: string }> = {
+  low: { color: '#22C55E', label: 'Low', bg: '#DCFCE7' },
+  medium: { color: '#F59E0B', label: 'Medium', bg: '#FEF3C7' },
+  high: { color: '#EF4444', label: 'High', bg: '#FEE2E2' },
+  urgent: { color: '#DC2626', label: 'Urgent', bg: '#FEE2E2' },
 }
 
 export function MapTab({ projectId, project }: { projectId: string; project: Project }) {
@@ -1234,6 +1258,7 @@ export function EmbedSettingsTab({ projectId, project }: { projectId: string; pr
   const queryClient = useQueryClient()
   const [copiedFeedback, setCopiedFeedback] = useState(false)
   const [copiedTour, setCopiedTour] = useState(false)
+  const [copiedIssues, setCopiedIssues] = useState(false)
   const [toggling, setToggling] = useState<string | null>(null)
 
   const toggleSetting = useMutation({
@@ -1262,6 +1287,10 @@ export function EmbedSettingsTab({ projectId, project }: { projectId: string; pr
     ? `${window.location.origin}/embed/${projectId}/tour`
     : `/embed/${projectId}/tour`
 
+  const issuesEmbedUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/embed/${projectId}/issues`
+    : `/embed/${projectId}/issues`
+
   const feedbackEmbedCode = `<iframe
   src="${feedbackEmbedUrl}"
   width="100%"
@@ -1279,6 +1308,15 @@ export function EmbedSettingsTab({ projectId, project }: { projectId: string; pr
   style="border: 1px solid #e5e7eb; border-radius: 8px;"
 ></iframe>`
 
+  const issuesEmbedCode = `<iframe
+  src="${issuesEmbedUrl}"
+  width="100%"
+  height="600"
+  frameborder="0"
+  allow="geolocation"
+  style="border: 1px solid #e5e7eb; border-radius: 8px;"
+></iframe>`
+
   const copyFeedbackCode = () => {
     navigator.clipboard.writeText(feedbackEmbedCode)
     setCopiedFeedback(true)
@@ -1289,6 +1327,12 @@ export function EmbedSettingsTab({ projectId, project }: { projectId: string; pr
     navigator.clipboard.writeText(tourEmbedCode)
     setCopiedTour(true)
     setTimeout(() => setCopiedTour(false), 2000)
+  }
+
+  const copyIssuesCode = () => {
+    navigator.clipboard.writeText(issuesEmbedCode)
+    setCopiedIssues(true)
+    setTimeout(() => setCopiedIssues(false), 2000)
   }
 
   const hasTours = (project as any).tours?.length > 0
@@ -1392,6 +1436,60 @@ export function EmbedSettingsTab({ projectId, project }: { projectId: string; pr
               )}
             </div>
 
+            {/* Construction Issues Settings */}
+            <div className="mt-6 pt-6 border-t space-y-4">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Construction Issues</p>
+
+              {/* Enable Issues Toggle */}
+              <div className="flex items-center justify-between p-4 bg-orange-50 rounded-lg border border-orange-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center">
+                    <AlertTriangle size={20} className="text-orange-600" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">Enable Issue Reporting</p>
+                    <p className="text-sm text-gray-500">Allow visitors to report construction issues</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => toggleSetting.mutate({ key: 'issuesEnabled', value: !project.issuesEnabled })}
+                  disabled={toggling === 'issuesEnabled'}
+                  className={`relative w-12 h-6 rounded-full transition-colors ${
+                    project.issuesEnabled ? 'bg-orange-500' : 'bg-gray-300'
+                  } ${toggling === 'issuesEnabled' ? 'opacity-50' : ''}`}
+                >
+                  <span
+                    className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                      project.issuesEnabled ? 'left-6' : 'left-0.5'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {project.issuesEnabled && (
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Notification Emails
+                  </label>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Comma-separated list of emails to notify when new issues are reported
+                  </p>
+                  <input
+                    type="text"
+                    placeholder="email1@example.com, email2@example.com"
+                    defaultValue={project.issueNotifyEmails || ''}
+                    onBlur={(e) => {
+                      const value = e.target.value.trim()
+                      if (value !== (project.issueNotifyEmails || '')) {
+                        toggleSetting.mutate({ key: 'issueNotifyEmails', value: value || null } as any)
+                      }
+                    }}
+                    className="w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  />
+                </div>
+              )}
+            </div>
+
             {/* Feedback Map Embed Code */}
             <div className="mt-6 pt-6 border-t">
               <div className="flex items-center justify-between mb-3">
@@ -1459,6 +1557,41 @@ export function EmbedSettingsTab({ projectId, project }: { projectId: string; pr
                   : 'Create a tour in the Tours tab to enable this embed.'}
               </p>
             </div>
+
+            {/* Issues Embed Code */}
+            {project.issuesEnabled && (
+              <div className="mt-6 pt-6 border-t">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Code size={18} className="text-orange-400" />
+                    <span className="font-medium text-sm text-gray-700">Construction Issues Embed</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <a
+                      href={issuesEmbedUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-sm text-orange-600 hover:text-orange-700"
+                    >
+                      <ExternalLink size={14} /> Preview
+                    </a>
+                    <button
+                      onClick={copyIssuesCode}
+                      className="flex items-center gap-1 text-sm text-orange-600 hover:text-orange-700"
+                    >
+                      {copiedIssues ? <Check size={14} /> : <Copy size={14} />}
+                      {copiedIssues ? 'Copied!' : 'Copy'}
+                    </button>
+                  </div>
+                </div>
+                <pre className="bg-gray-900 text-gray-100 text-sm p-4 rounded-lg overflow-x-auto">
+                  <code>{issuesEmbedCode}</code>
+                </pre>
+                <p className="text-sm text-gray-500 mt-3">
+                  Embed the construction issues reporter to collect reports from residents during construction.
+                </p>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -1478,6 +1611,9 @@ export function EmbedSettingsTab({ projectId, project }: { projectId: string; pr
 export function PublicCommentsTab({ projectId, project }: { projectId: string; project: Project }) {
   const queryClient = useQueryClient()
   const [pendingApprovalId, setPendingApprovalId] = useState<string | null>(null)
+  const [activeMode, setActiveMode] = useState<'feedback' | 'issues'>('feedback')
+  const [resolvingPinId, setResolvingPinId] = useState<string | null>(null)
+  const [resolveNotes, setResolveNotes] = useState('')
 
   const deletePin = useMutation({
     mutationFn: async (pinId: string) => {
@@ -1515,16 +1651,74 @@ export function PublicCommentsTab({ projectId, project }: { projectId: string; p
     }
   })
 
-  const categoryStats = (project.publicPins || []).reduce((acc, pin) => {
+  const resolveIssue = useMutation({
+    mutationFn: async ({ pinId, resolved, resolvedNotes }: { pinId: string; resolved: boolean; resolvedNotes?: string }) => {
+      const response = await fetch(`/api/projects/${projectId}/pins/${pinId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resolved, resolvedNotes })
+      })
+      if (!response.ok) {
+        throw new Error(`Failed to resolve issue: ${response.status}`)
+      }
+      return response.json()
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project', projectId] })
+      setResolvingPinId(null)
+      setResolveNotes('')
+    },
+    onError: (error) => {
+      console.error('Resolve issue error:', error)
+      alert('Failed to resolve issue. Please try again.')
+    }
+  })
+
+  // Filter pins by mode
+  const filteredPins = (project.publicPins || []).filter(pin =>
+    (pin.mode || 'feedback') === activeMode
+  )
+
+  // Count for each mode
+  const feedbackCount = (project.publicPins || []).filter(p => (p.mode || 'feedback') === 'feedback').length
+  const issuesCount = (project.publicPins || []).filter(p => p.mode === 'issues').length
+
+  const categoryConfig = activeMode === 'issues' ? ISSUE_CATEGORY_CONFIG : CATEGORY_CONFIG
+
+  const categoryStats = filteredPins.reduce((acc, pin) => {
     acc[pin.category] = (acc[pin.category] || 0) + 1
     return acc
   }, {} as Record<string, number>)
 
   return (
     <div className="space-y-6">
-      {(project.publicPins?.length || 0) > 0 && (
+      {/* Mode Tabs */}
+      <div className="flex gap-2 bg-gray-100 p-1 rounded-lg w-fit">
+        <button
+          onClick={() => setActiveMode('feedback')}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            activeMode === 'feedback'
+              ? 'bg-white text-gray-900 shadow-sm'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          Feedback ({feedbackCount})
+        </button>
+        <button
+          onClick={() => setActiveMode('issues')}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            activeMode === 'issues'
+              ? 'bg-white text-gray-900 shadow-sm'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          Construction Issues ({issuesCount})
+        </button>
+      </div>
+
+      {filteredPins.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {Object.entries(CATEGORY_CONFIG).map(([key, config]) => {
+          {Object.entries(categoryConfig).map(([key, config]) => {
             const count = categoryStats[key] || 0
             const IconComponent = config.icon
             return (
@@ -1549,27 +1743,36 @@ export function PublicCommentsTab({ projectId, project }: { projectId: string; p
 
       <div className="bg-white rounded-xl shadow-sm border">
         <div className="px-6 py-4 border-b">
-          <h3 className="font-semibold">Public Feedback ({project.publicPins?.length || 0})</h3>
+          <h3 className="font-semibold">
+            {activeMode === 'issues' ? 'Construction Issues' : 'Public Feedback'} ({filteredPins.length})
+          </h3>
         </div>
-        {!project.publicPins?.length ? (
+        {!filteredPins.length ? (
           <div className="px-6 py-12 text-center">
             <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <MessageCircle size={28} className="text-gray-400" />
+              {activeMode === 'issues' ? (
+                <AlertTriangle size={28} className="text-gray-400" />
+              ) : (
+                <MessageCircle size={28} className="text-gray-400" />
+              )}
             </div>
-            <p className="text-gray-500">No public feedback yet</p>
+            <p className="text-gray-500">
+              {activeMode === 'issues' ? 'No construction issues reported' : 'No public feedback yet'}
+            </p>
             <p className="text-sm text-gray-400 mt-1">
               {project.embedEnabled
-                ? 'Share the embed code to start collecting feedback'
+                ? `Share the ${activeMode === 'issues' ? 'issues' : 'embed'} code to start collecting ${activeMode === 'issues' ? 'issue reports' : 'feedback'}`
                 : 'Enable embedding in the Embed tab first'}
             </p>
           </div>
         ) : (
           <div className="divide-y">
-            {project.publicPins.map(pin => {
-              const config = CATEGORY_CONFIG[pin.category] || CATEGORY_CONFIG.comment
+            {filteredPins.map(pin => {
+              const config = categoryConfig[pin.category] || (activeMode === 'issues' ? ISSUE_CATEGORY_CONFIG.other : CATEGORY_CONFIG.comment)
               const IconComponent = config.icon
+              const urgencyConfig = pin.urgency ? URGENCY_CONFIG[pin.urgency] : null
               return (
-                <div key={pin.id} className={`px-6 py-4 hover:bg-gray-50 ${!pin.approved ? 'bg-amber-50/50' : ''}`}>
+                <div key={pin.id} className={`px-6 py-4 hover:bg-gray-50 ${!pin.approved ? 'bg-amber-50/50' : ''} ${pin.resolved ? 'bg-green-50/50' : ''}`}>
                   <div className="flex items-start gap-4">
                     <div
                       className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
@@ -1585,7 +1788,20 @@ export function PublicCommentsTab({ projectId, project }: { projectId: string; p
                         >
                           {config.label}
                         </span>
-                        {pin.approved ? (
+                        {activeMode === 'issues' && urgencyConfig && (
+                          <span
+                            className="text-xs font-medium px-2 py-0.5 rounded-full"
+                            style={{ backgroundColor: urgencyConfig.bg, color: urgencyConfig.color }}
+                          >
+                            {urgencyConfig.label} Priority
+                          </span>
+                        )}
+                        {pin.resolved ? (
+                          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700 flex items-center gap-1">
+                            <CheckCircle size={12} />
+                            Resolved
+                          </span>
+                        ) : pin.approved ? (
                           <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700 flex items-center gap-1">
                             <CheckCircle size={12} />
                             Approved
@@ -1622,6 +1838,12 @@ export function PublicCommentsTab({ projectId, project }: { projectId: string; p
                         )}
                       </div>
                       <p className="text-gray-700 whitespace-pre-wrap">{pin.comment}</p>
+                      {pin.resolvedNotes && (
+                        <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-lg">
+                          <p className="text-xs font-medium text-green-700 mb-1">Resolution Notes:</p>
+                          <p className="text-sm text-green-800">{pin.resolvedNotes}</p>
+                        </div>
+                      )}
                       <div className="flex items-center gap-4 mt-2 text-xs text-gray-400">
                         {pin.shapeType === 'pin' || !pin.shapeType ? (
                           <span>{pin.latitude?.toFixed(6)}, {pin.longitude?.toFixed(6)}</span>
@@ -1637,45 +1859,119 @@ export function PublicCommentsTab({ projectId, project }: { projectId: string; p
                             {pin.email}
                           </a>
                         )}
+                        {pin.resolvedAt && (
+                          <span className="text-green-600">
+                            Resolved {new Date(pin.resolvedAt).toLocaleDateString('en-GB')}
+                          </span>
+                        )}
                       </div>
+
+                      {/* Resolve Issue Form */}
+                      {activeMode === 'issues' && resolvingPinId === pin.id && (
+                        <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Resolution Notes (optional)</label>
+                          <textarea
+                            value={resolveNotes}
+                            onChange={(e) => setResolveNotes(e.target.value)}
+                            className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                            rows={2}
+                            placeholder="Describe how the issue was resolved..."
+                          />
+                          <div className="flex gap-2 mt-2">
+                            <button
+                              onClick={() => resolveIssue.mutate({ pinId: pin.id, resolved: true, resolvedNotes: resolveNotes || undefined })}
+                              disabled={resolveIssue.isPending}
+                              className="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50"
+                            >
+                              {resolveIssue.isPending ? 'Resolving...' : 'Mark Resolved'}
+                            </button>
+                            <button
+                              onClick={() => { setResolvingPinId(null); setResolveNotes('') }}
+                              className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-100"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center gap-1">
-                      {pin.approved ? (
+                      {/* Issue resolution button */}
+                      {activeMode === 'issues' && !pin.resolved && resolvingPinId !== pin.id && (
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            approvePin.mutate({ pinId: pin.id, approved: false })
-                          }}
-                          disabled={pendingApprovalId === pin.id}
-                          className="p-2 text-amber-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors disabled:opacity-50"
-                          title="Unapprove"
+                          onClick={() => setResolvingPinId(pin.id)}
+                          className="p-2 text-green-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                          title="Mark Resolved"
                         >
-                          {pendingApprovalId === pin.id ? (
-                            <span className="animate-spin inline-block w-[18px] h-[18px] border-2 border-amber-500 border-t-transparent rounded-full" />
-                          ) : (
-                            <XCircle size={18} />
-                          )}
+                          <CheckCircle size={18} />
                         </button>
-                      ) : (
+                      )}
+                      {activeMode === 'issues' && pin.resolved && (
+                        <button
+                          onClick={() => resolveIssue.mutate({ pinId: pin.id, resolved: false })}
+                          className="p-2 text-amber-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                          title="Reopen Issue"
+                        >
+                          <XCircle size={18} />
+                        </button>
+                      )}
+                      {/* Approval buttons (only for feedback mode) */}
+                      {activeMode === 'feedback' && (
+                        pin.approved ? (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              approvePin.mutate({ pinId: pin.id, approved: false })
+                            }}
+                            disabled={pendingApprovalId === pin.id}
+                            className="p-2 text-amber-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors disabled:opacity-50"
+                            title="Unapprove"
+                          >
+                            {pendingApprovalId === pin.id ? (
+                              <span className="animate-spin inline-block w-[18px] h-[18px] border-2 border-amber-500 border-t-transparent rounded-full" />
+                            ) : (
+                              <XCircle size={18} />
+                            )}
+                          </button>
+                        ) : (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              approvePin.mutate({ pinId: pin.id, approved: true })
+                            }}
+                            disabled={pendingApprovalId === pin.id}
+                            className="p-2 text-green-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors disabled:opacity-50"
+                            title="Approve"
+                          >
+                            {pendingApprovalId === pin.id ? (
+                              <span className="animate-spin inline-block w-[18px] h-[18px] border-2 border-green-500 border-t-transparent rounded-full" />
+                            ) : (
+                              <CheckCircle size={18} />
+                            )}
+                          </button>
+                        )
+                      )}
+                      {/* Issues mode approval - separate from resolution */}
+                      {activeMode === 'issues' && !pin.approved && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
                             approvePin.mutate({ pinId: pin.id, approved: true })
                           }}
                           disabled={pendingApprovalId === pin.id}
-                          className="p-2 text-green-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors disabled:opacity-50"
-                          title="Approve"
+                          className="p-2 text-blue-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50"
+                          title="Approve (make visible)"
                         >
                           {pendingApprovalId === pin.id ? (
-                            <span className="animate-spin inline-block w-[18px] h-[18px] border-2 border-green-500 border-t-transparent rounded-full" />
+                            <span className="animate-spin inline-block w-[18px] h-[18px] border-2 border-blue-500 border-t-transparent rounded-full" />
                           ) : (
-                            <CheckCircle size={18} />
+                            <Eye size={18} />
                           )}
                         </button>
                       )}
                       <button
                         onClick={() => {
-                          if (confirm('Delete this feedback?')) {
+                          if (confirm(`Delete this ${activeMode === 'issues' ? 'issue' : 'feedback'}?`)) {
                             deletePin.mutate(pin.id)
                           }
                         }}

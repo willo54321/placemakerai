@@ -253,6 +253,9 @@ model Project {
   autoReplyEnabled Boolean        @default(false)
   autoReplySubject String?        // e.g., "Thank you for your enquiry"
   autoReplyMessage String?        // The auto-reply email body (supports HTML)
+  // Construction issue reporting
+  issuesEnabled    Boolean        @default(false) // Enable issue reporting embed
+  issueNotifyEmails String?       // Comma-separated emails for issue notifications
   enquiries      Enquiry[]
   feedbackForms  FeedbackForm[]
   geoLayers      GeoLayer[]
@@ -281,23 +284,30 @@ model ProjectEmail {
 }
 
 model PublicPin {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   projectId       String
   latitude        Float?
   longitude       Float?
-  category        String   @default("comment")
+  category        String    @default("comment")
   comment         String
   name            String?
   email           String?
-  createdAt       DateTime @default(now())
-  votes           Int      @default(0)
-  approved        Boolean  @default(false)
+  createdAt       DateTime  @default(now())
+  votes           Int       @default(0)
+  approved        Boolean   @default(false)
   geometry        Json?
-  shapeType       String   @default("pin")
-  gdprConsent     Boolean  @default(false)
+  shapeType       String    @default("pin")
+  gdprConsent     Boolean   @default(false)
   gdprConsentDate DateTime?
-  mailingConsent  Boolean  @default(false)
-  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  mailingConsent  Boolean   @default(false)
+  // Mode: "feedback" for proposal feedback, "issues" for construction issues
+  mode            String    @default("feedback")
+  // Issue-specific fields
+  urgency         String?   // "low" | "medium" | "high" | "urgent"
+  resolved        Boolean   @default(false)
+  resolvedAt      DateTime?
+  resolvedNotes   String?
+  project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
 
 model Session {

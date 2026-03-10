@@ -7,6 +7,20 @@ export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  const { searchParams } = new URL(request.url)
+  const mode = searchParams.get('mode') || 'feedback'
+
+  // Build pin filter based on mode
+  const pinFilter: { approved: boolean; mode: string; resolved?: boolean } = {
+    approved: true,
+    mode: mode
+  }
+
+  // For issues mode, hide resolved issues from public view
+  if (mode === 'issues') {
+    pinFilter.resolved = false
+  }
+
   const project = await prisma.project.findUnique({
     where: { id: params.id },
     include: {
@@ -15,7 +29,7 @@ export async function GET(
         orderBy: { createdAt: 'asc' }
       },
       publicPins: {
-        where: { approved: true }, // Only show approved pins publicly
+        where: pinFilter,
         orderBy: { createdAt: 'desc' }
       },
       tours: {
@@ -38,6 +52,11 @@ export async function GET(
     return NextResponse.json({ error: 'Embedding not enabled for this project' }, { status: 403 })
   }
 
+  // For issues mode, check if issues are enabled
+  if (mode === 'issues' && !project.issuesEnabled) {
+    return NextResponse.json({ error: 'Issue reporting not enabled for this project' }, { status: 403 })
+  }
+
   // Return only public-safe data
   return NextResponse.json({
     id: project.id,
@@ -48,6 +67,8 @@ export async function GET(
     mapZoom: project.mapZoom,
     allowPins: project.allowPins,
     allowDrawing: project.allowDrawing,
+    issuesEnabled: project.issuesEnabled,
+    mode: mode,
     overlays: project.imageOverlays.map(o => ({
       id: o.id,
       name: o.name,
@@ -66,7 +87,9 @@ export async function GET(
       comment: p.comment,
       name: p.name,
       votes: p.votes,
-      createdAt: p.createdAt
+      createdAt: p.createdAt,
+      // Include urgency for issues mode
+      ...(mode === 'issues' && { urgency: p.urgency })
     })),
     tour: project.tours[0] ? {
       id: project.tours[0].id,

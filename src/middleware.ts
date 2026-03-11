@@ -32,11 +32,15 @@ export async function middleware(req: NextRequest) {
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })
 
   // Protected routes check
+  // Allow public feedback submissions to /api/projects/[id]/feedback
+  const isPublicProjectEndpoint = /^\/api\/projects\/[^/]+\/feedback$/.test(pathname)
+
   const isProtectedRoute =
-    pathname.startsWith('/projects') ||
+    (pathname.startsWith('/projects') ||
     pathname.startsWith('/admin') ||
     pathname.startsWith('/api/projects') ||
-    pathname.startsWith('/api/admin')
+    pathname.startsWith('/api/admin')) &&
+    !isPublicProjectEndpoint
 
   if (isProtectedRoute && !token) {
     const loginUrl = new URL('/login', req.url)

@@ -4,7 +4,7 @@
 
 Placemaker.ai is a stakeholder engagement and public consultation platform for planning projects. It enables organizations to collect feedback via interactive maps, manage stakeholders, track construction issues, and analyze public sentiment using AI.
 
-**Domain:** placemaker.io
+**Domain:** placemakerai.io
 
 ## Tech Stack
 
@@ -134,7 +134,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
 ```bash
 DATABASE_URL=          # PostgreSQL connection
 NEXTAUTH_SECRET=       # JWT signing secret
-NEXTAUTH_URL=          # Base URL (e.g., https://placemaker.io)
+NEXTAUTH_URL=          # Base URL (e.g., https://placemakerai.io)
 RESEND_API_KEY=        # Email delivery
 OPENAI_API_KEY=        # AI analysis
 EMAIL_WEBHOOK_SECRET=  # Cloudflare email worker auth
@@ -155,7 +155,7 @@ EMAIL_WEBHOOK_SECRET=  # Cloudflare email worker auth
 ### External form integration
 Projects can receive form submissions from external websites:
 ```
-POST https://placemaker.io/api/projects/{projectId}/feedback
+POST https://placemakerai.io/api/projects/{projectId}/feedback
 Body: { name, email, ...fields, gdprConsent: true }
 ```
 Requires `embedEnabled: true` on the project.

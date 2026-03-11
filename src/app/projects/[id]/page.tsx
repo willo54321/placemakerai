@@ -44,6 +44,21 @@ type Tab = 'overview' | 'stakeholders' | 'feedback' | 'tours' | 'embed' | 'analy
 // Tabs that require admin access
 const ADMIN_ONLY_TABS: Tab[] = ['stakeholders', 'tours', 'embed', 'inbox', 'mailing', 'settings']
 
+// Tab groups for organized navigation
+type TabGroup = {
+  id: string
+  label: string
+  tabs: Tab[]
+}
+
+const tabGroups: TabGroup[] = [
+  { id: 'top', label: '', tabs: ['overview'] },
+  { id: 'collect', label: 'Collect', tabs: ['feedback', 'analytics'] },
+  { id: 'engage', label: 'Engage', tabs: ['stakeholders', 'inbox', 'mailing'] },
+  { id: 'publish', label: 'Publish', tabs: ['embed', 'tours'] },
+  { id: 'configure', label: 'Configure', tabs: ['settings'] },
+]
+
 export default function ProjectPage({ params }: { params: { id: string } }) {
   const [activeTab, setActiveTab] = useState<Tab>('overview')
 
@@ -175,6 +190,9 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
   // Filter tabs based on user role - admins see all, clients see limited tabs
   const tabs = allTabs.filter(tab => isAdmin || !tab.adminOnly)
 
+  // Create a map for easy lookup
+  const tabsMap = new Map(allTabs.map(tab => [tab.id, tab]))
+
   return (
     <div className="flex min-h-screen bg-slate-50">
       {/* Skip link */}
@@ -224,40 +242,60 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 p-3" aria-label="Project sections">
-          <ul className="space-y-1" role="tablist">
-            {tabs.map(tab => (
-              <li key={tab.id}>
-                <button
-                  onClick={() => setActiveTab(tab.id)}
-                  role="tab"
-                  aria-selected={activeTab === tab.id}
-                  aria-controls={`${tab.id}-panel`}
-                  id={`${tab.id}-tab`}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                    activeTab === tab.id
-                      ? 'bg-green-50 text-green-700'
-                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                  }`}
-                >
-                  <tab.icon size={18} aria-hidden="true" className={activeTab === tab.id ? 'text-green-600' : ''} />
-                  <span className="flex-1 text-left">{tab.label}</span>
-                  {tab.count > 0 && (
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded-full ${
-                        activeTab === tab.id
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-slate-100 text-slate-600'
-                      }`}
-                      aria-label={`${tab.count} ${tab.label.toLowerCase()}`}
-                    >
-                      {tab.count}
-                    </span>
-                  )}
-                </button>
-              </li>
-            ))}
-          </ul>
+        <nav className="flex-1 p-3 overflow-y-auto" aria-label="Project sections">
+          {tabGroups.map((group, groupIndex) => {
+            // Get visible tabs for this group
+            const groupTabs = group.tabs
+              .map(tabId => tabsMap.get(tabId))
+              .filter((tab): tab is NonNullable<typeof tab> =>
+                tab !== undefined && (isAdmin || !tab.adminOnly)
+              )
+
+            if (groupTabs.length === 0) return null
+
+            return (
+              <div key={group.id} className={groupIndex > 0 ? 'mt-6' : ''}>
+                {group.label && (
+                  <p className="px-3 mb-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                    {group.label}
+                  </p>
+                )}
+                <ul className="space-y-1" role="tablist">
+                  {groupTabs.map(tab => (
+                    <li key={tab.id}>
+                      <button
+                        onClick={() => setActiveTab(tab.id)}
+                        role="tab"
+                        aria-selected={activeTab === tab.id}
+                        aria-controls={`${tab.id}-panel`}
+                        id={`${tab.id}-tab`}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                          activeTab === tab.id
+                            ? 'bg-green-50 text-green-700'
+                            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                        }`}
+                      >
+                        <tab.icon size={18} aria-hidden="true" className={activeTab === tab.id ? 'text-green-600' : ''} />
+                        <span className="flex-1 text-left">{tab.label}</span>
+                        {tab.count > 0 && (
+                          <span
+                            className={`text-xs px-2 py-0.5 rounded-full ${
+                              activeTab === tab.id
+                                ? 'bg-green-100 text-green-700'
+                                : 'bg-slate-100 text-slate-600'
+                            }`}
+                            aria-label={`${tab.count} ${tab.label.toLowerCase()}`}
+                          >
+                            {tab.count}
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )
+          })}
         </nav>
 
         {/* Footer with User Menu */}

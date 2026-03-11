@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db'
 import { NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 
 // CORS headers for cross-origin form submissions
 const corsHeaders = {
@@ -113,7 +114,7 @@ export async function POST(
   const response = await prisma.feedbackResponse.create({
     data: {
       formId: form.id,
-      data: formData,
+      data: formData as Prisma.InputJsonValue,
       gdprConsent: true,
       gdprConsentDate: new Date(),
       mailingConsent,

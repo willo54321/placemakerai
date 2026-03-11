@@ -1,7 +1,7 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, Users, MapPin, Inbox, Settings, Mail, LayoutDashboard, BarChart3, Navigation, Code, Eye } from 'lucide-react'
+import { ArrowLeft, Users, MapPin, Inbox, Settings, Mail, LayoutDashboard, BarChart3, Navigation, Globe, Eye, AlertTriangle, FileText } from 'lucide-react'
 import Link from 'next/link'
 import { useState, Suspense } from 'react'
 import dynamic from 'next/dynamic'
@@ -33,16 +33,40 @@ const EmbedSettingsTab = dynamic(() => import('./map').then(mod => ({ default: m
     <div className="h-full flex items-center justify-center">
       <div className="flex flex-col items-center gap-3">
         <div className="w-8 h-8 border-3 border-green-600 border-t-transparent rounded-full animate-spin" />
-        <span className="text-sm text-slate-500">Loading embed settings...</span>
+        <span className="text-sm text-slate-500">Loading website settings...</span>
       </div>
     </div>
   )
 })
 
-type Tab = 'overview' | 'stakeholders' | 'feedback' | 'tours' | 'embed' | 'analytics' | 'inbox' | 'mailing' | 'settings'
+const IssuesTab = dynamic(() => import('./issues').then(mod => ({ default: mod.IssuesTab })), {
+  ssr: false,
+  loading: () => (
+    <div className="h-full flex items-center justify-center">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-8 h-8 border-3 border-orange-600 border-t-transparent rounded-full animate-spin" />
+        <span className="text-sm text-slate-500">Loading issues...</span>
+      </div>
+    </div>
+  )
+})
+
+const FormsTabWrapper = dynamic(() => import('./forms-wrapper').then(mod => ({ default: mod.FormsTabWrapper })), {
+  ssr: false,
+  loading: () => (
+    <div className="h-full flex items-center justify-center">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-8 h-8 border-3 border-green-600 border-t-transparent rounded-full animate-spin" />
+        <span className="text-sm text-slate-500">Loading forms...</span>
+      </div>
+    </div>
+  )
+})
+
+type Tab = 'overview' | 'stakeholders' | 'feedback' | 'forms' | 'issues' | 'tours' | 'website' | 'analytics' | 'inbox' | 'mailing' | 'settings'
 
 // Tabs that require admin access
-const ADMIN_ONLY_TABS: Tab[] = ['stakeholders', 'tours', 'embed', 'inbox', 'mailing', 'settings']
+const ADMIN_ONLY_TABS: Tab[] = ['stakeholders', 'tours', 'website', 'inbox', 'mailing', 'settings', 'issues', 'forms']
 
 // Tab groups for organized navigation
 type TabGroup = {
@@ -53,9 +77,9 @@ type TabGroup = {
 
 const tabGroups: TabGroup[] = [
   { id: 'top', label: '', tabs: ['overview'] },
-  { id: 'collect', label: 'Collect', tabs: ['feedback', 'analytics'] },
+  { id: 'collect', label: 'Collect', tabs: ['feedback', 'forms', 'issues', 'analytics'] },
   { id: 'engage', label: 'Engage', tabs: ['stakeholders', 'inbox', 'mailing'] },
-  { id: 'publish', label: 'Publish', tabs: ['embed', 'tours'] },
+  { id: 'publish', label: 'Publish', tabs: ['website', 'tours'] },
   { id: 'configure', label: 'Configure', tabs: ['settings'] },
 ]
 
@@ -118,8 +142,11 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
     )
   }
 
-  // Calculate combined feedback count
-  const feedbackCount = (project.mapMarkers?.length || 0) + (project.publicPins?.length || 0) + (project.feedbackForms?.length || 0)
+  // Calculate counts for different feedback types
+  const pinFeedbackCount = project.publicPins?.filter((p: any) => p.mode === 'feedback').length || 0
+  const issuesCount = project.publicPins?.filter((p: any) => p.mode === 'issues').length || 0
+  const formsCount = project.feedbackForms?.length || 0
+  const formResponseCount = project.feedbackForms?.reduce((sum: number, form: any) => sum + (form.responses?.length || 0), 0) || 0
 
   const allTabs = [
     {
@@ -138,10 +165,24 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
     },
     {
       id: 'feedback' as Tab,
-      label: 'Feedback',
+      label: 'Map Feedback',
       icon: MapPin,
-      count: feedbackCount,
+      count: pinFeedbackCount,
       adminOnly: false,
+    },
+    {
+      id: 'forms' as Tab,
+      label: 'Forms',
+      icon: FileText,
+      count: formResponseCount,
+      adminOnly: true,
+    },
+    {
+      id: 'issues' as Tab,
+      label: 'Issues',
+      icon: AlertTriangle,
+      count: issuesCount,
+      adminOnly: true,
     },
     {
       id: 'tours' as Tab,
@@ -151,9 +192,9 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
       adminOnly: true,
     },
     {
-      id: 'embed' as Tab,
-      label: 'Embed',
-      icon: Code,
+      id: 'website' as Tab,
+      label: 'Website',
+      icon: Globe,
       count: 0,
       adminOnly: true,
     },
@@ -328,12 +369,18 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
           {activeTab === 'feedback' && (
             <FeedbackTab projectId={params.id} project={project} />
           )}
+          {activeTab === 'forms' && (
+            <FormsTabWrapper projectId={params.id} project={project} />
+          )}
+          {activeTab === 'issues' && (
+            <IssuesTab projectId={params.id} project={project} />
+          )}
           {activeTab === 'tours' && (
             <div className="p-6">
               <ToursTab projectId={params.id} project={project} />
             </div>
           )}
-          {activeTab === 'embed' && (
+          {activeTab === 'website' && (
             <div className="p-6">
               <EmbedSettingsTab projectId={params.id} project={project} />
             </div>

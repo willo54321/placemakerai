@@ -254,41 +254,43 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
       clientY <= mapRect.bottom
     )
 
-    if (isOverMap && mapRef.current) {
-      const map = mapRef.current.getMapInstance()
-      if (map) {
-        // Convert screen coordinates to map coordinates using Google Maps projection
-        const projection = map.getProjection()
-        const bounds = map.getBounds()
-        const topRight = projection?.fromLatLngToPoint(bounds?.getNorthEast() as google.maps.LatLng)
-        const bottomLeft = projection?.fromLatLngToPoint(bounds?.getSouthWest() as google.maps.LatLng)
+    if (isOverMap) {
+      const map = mapRef.current?.getMapInstance()
+      const bounds = map?.getBounds()
 
-        if (topRight && bottomLeft) {
-          const scale = Math.pow(2, map.getZoom() || 0)
-          const mapWidth = mapRect.width
-          const mapHeight = mapRect.height
+      if (map && bounds) {
+        // Use bounds directly for simpler coordinate calculation
+        const ne = bounds.getNorthEast()
+        const sw = bounds.getSouthWest()
 
-          // Calculate the point in world coordinates
-          const relX = (clientX - mapRect.left) / mapWidth
-          const relY = (clientY - mapRect.top) / mapHeight
+        const mapWidth = mapRect.width
+        const mapHeight = mapRect.height
 
-          const worldX = bottomLeft.x + relX * (topRight.x - bottomLeft.x)
-          const worldY = topRight.y + relY * (bottomLeft.y - topRight.y)
+        // Calculate relative position within map (0-1)
+        const relX = (clientX - mapRect.left) / mapWidth
+        const relY = (clientY - mapRect.top) / mapHeight
 
-          const worldPoint = new google.maps.Point(worldX, worldY)
-          const latLng = projection?.fromPointToLatLng(worldPoint)
+        // Interpolate lat/lng from bounds
+        const lng = sw.lng() + relX * (ne.lng() - sw.lng())
+        const lat = ne.lat() - relY * (ne.lat() - sw.lat())
 
-          if (latLng) {
-            setPendingShape({ type: 'pin', lat: latLng.lat(), lng: latLng.lng() })
-            setShowForm(true)
-          }
-        }
+        setPendingShape({ type: 'pin', lat, lng })
+        setShowForm(true)
+      } else {
+        // Fallback: use project center with slight offset based on drop position
+        const relX = (clientX - mapRect.left) / mapRect.width - 0.5
+        const relY = (clientY - mapRect.top) / mapRect.height - 0.5
+        const lat = (project?.latitude || 51.5074) + relY * -0.01
+        const lng = (project?.longitude || -0.1278) + relX * 0.01
+
+        setPendingShape({ type: 'pin', lat, lng })
+        setShowForm(true)
       }
     }
 
     setIsDragging(false)
     setDragPosition(null)
-  }, [isDragging])
+  }, [isDragging, project?.latitude, project?.longitude])
 
   // Set up global mouse/touch event listeners for dragging
   useEffect(() => {

@@ -183,6 +183,7 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
       icon: AlertTriangle,
       count: issuesCount,
       adminOnly: true,
+      hidden: !project.issuesEnabled,
     },
     {
       id: 'tours' as Tab,
@@ -229,7 +230,7 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
   ]
 
   // Filter tabs based on user role - admins see all, clients see limited tabs
-  const tabs = allTabs.filter(tab => isAdmin || !tab.adminOnly)
+  const tabs = allTabs.filter(tab => !tab.hidden && (isAdmin || !tab.adminOnly))
 
   // Create a map for easy lookup
   const tabsMap = new Map(allTabs.map(tab => [tab.id, tab]))
@@ -289,7 +290,7 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
             const groupTabs = group.tabs
               .map(tabId => tabsMap.get(tabId))
               .filter((tab): tab is NonNullable<typeof tab> =>
-                tab !== undefined && (isAdmin || !tab.adminOnly)
+                tab !== undefined && !tab.hidden && (isAdmin || !tab.adminOnly)
               )
 
             if (groupTabs.length === 0) return null

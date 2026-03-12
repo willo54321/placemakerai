@@ -1,10 +1,8 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Volume2, Wind, Car, AlertTriangle, ShieldAlert, Clock, HelpCircle, X, Send, MapPin, Pentagon } from 'lucide-react'
 import dynamic from 'next/dynamic'
-
-import type { EmbedMapHandle } from '../EmbedMap'
 
 const EmbedMap = dynamic(() => import('../EmbedMap'), {
   ssr: false,
@@ -107,12 +105,6 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
   const [mapType, setMapType] = useState<'roadmap' | 'satellite'>('roadmap')
   const [votedPins, setVotedPins] = useState<Set<string>>(new Set())
 
-  // Drag-to-drop marker state
-  const [isDragging, setIsDragging] = useState(false)
-  const [dragPosition, setDragPosition] = useState<{ x: number; y: number } | null>(null)
-  const mapContainerRef = useRef<HTMLDivElement>(null)
-  const mapRef = useRef<EmbedMapHandle>(null)
-
   // Load voted pins from localStorage on mount
   useEffect(() => {
     const storageKey = `voted_pins_${params.id}_issues`
@@ -209,105 +201,9 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
     setPendingShape(null)
     setShowForm(false)
     setDrawMode(null)
-    setIsDragging(false)
-    setDragPosition(null)
     setForm({ comment: '', name: '', email: '', gdprConsent: false, mailingConsent: false })
     setSelectedCategory('noise')
   }
-
-  // Handle drag start for the marker
-  const handleDragStart = (e: React.MouseEvent | React.TouchEvent) => {
-    e.preventDefault()
-    setIsDragging(true)
-
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
-    setDragPosition({ x: clientX, y: clientY })
-  }
-
-  // Handle drag move
-  const handleDragMove = useCallback((e: MouseEvent | TouchEvent) => {
-    if (!isDragging) return
-
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
-    setDragPosition({ x: clientX, y: clientY })
-  }, [isDragging])
-
-  // Handle drag end - convert screen position to map coordinates
-  const handleDragEnd = useCallback((e: MouseEvent | TouchEvent) => {
-    if (!isDragging || !mapContainerRef.current) {
-      setIsDragging(false)
-      setDragPosition(null)
-      return
-    }
-
-    const clientX = 'changedTouches' in e ? e.changedTouches[0].clientX : e.clientX
-    const clientY = 'changedTouches' in e ? e.changedTouches[0].clientY : e.clientY
-
-    // Check if drop is within the map container
-    const mapRect = mapContainerRef.current.getBoundingClientRect()
-    const isOverMap = (
-      clientX >= mapRect.left &&
-      clientX <= mapRect.right &&
-      clientY >= mapRect.top &&
-      clientY <= mapRect.bottom
-    )
-
-    if (isOverMap) {
-      const map = mapRef.current?.getMapInstance()
-      const bounds = map?.getBounds()
-
-      if (map && bounds) {
-        // Use bounds directly for simpler coordinate calculation
-        const ne = bounds.getNorthEast()
-        const sw = bounds.getSouthWest()
-
-        const mapWidth = mapRect.width
-        const mapHeight = mapRect.height
-
-        // Calculate relative position within map (0-1)
-        const relX = (clientX - mapRect.left) / mapWidth
-        const relY = (clientY - mapRect.top) / mapHeight
-
-        // Interpolate lat/lng from bounds
-        const lng = sw.lng() + relX * (ne.lng() - sw.lng())
-        const lat = ne.lat() - relY * (ne.lat() - sw.lat())
-
-        setPendingShape({ type: 'pin', lat, lng })
-        setShowForm(true)
-      } else {
-        // Fallback: use project center with slight offset based on drop position
-        const relX = (clientX - mapRect.left) / mapRect.width - 0.5
-        const relY = (clientY - mapRect.top) / mapRect.height - 0.5
-        const lat = (project?.latitude || 51.5074) + relY * -0.01
-        const lng = (project?.longitude || -0.1278) + relX * 0.01
-
-        setPendingShape({ type: 'pin', lat, lng })
-        setShowForm(true)
-      }
-    }
-
-    setIsDragging(false)
-    setDragPosition(null)
-  }, [isDragging, project?.latitude, project?.longitude])
-
-  // Set up global mouse/touch event listeners for dragging
-  useEffect(() => {
-    if (isDragging) {
-      window.addEventListener('mousemove', handleDragMove)
-      window.addEventListener('mouseup', handleDragEnd)
-      window.addEventListener('touchmove', handleDragMove)
-      window.addEventListener('touchend', handleDragEnd)
-
-      return () => {
-        window.removeEventListener('mousemove', handleDragMove)
-        window.removeEventListener('mouseup', handleDragEnd)
-        window.removeEventListener('touchmove', handleDragMove)
-        window.removeEventListener('touchend', handleDragEnd)
-      }
-    }
-  }, [isDragging, handleDragMove, handleDragEnd])
 
   const handleVote = async (pinId: string) => {
     if (!project) return
@@ -418,9 +314,8 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
       `}</style>
       <div className="h-screen w-screen relative overflow-hidden" style={{ fontFamily: `'${fontFamily}', sans-serif` }}>
         {/* Map fills entire screen */}
-        <div ref={mapContainerRef} className="h-full w-full">
+        <div className="h-full w-full">
         <EmbedMap
-          ref={mapRef}
           center={center}
           zoom={project.mapZoom || 15}
           overlays={project.overlays}
@@ -440,29 +335,28 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
         />
         </div>
 
-        {/* Draggable Issue Marker - Top Right */}
+        {/* Report Issue Button - Top Right */}
         {project.allowPins && !showForm && (
           <div className="absolute top-4 right-4 z-10 flex flex-col items-end gap-3">
-            {/* Draggable marker */}
-            <div
-              onMouseDown={handleDragStart}
-              onTouchStart={handleDragStart}
-              className="cursor-grab active:cursor-grabbing select-none"
-              title="Drag to map to report an issue"
+            {/* Report issue button */}
+            <button
+              onClick={() => {
+                if (drawMode === 'pin') {
+                  cancelDrawing()
+                } else {
+                  setDrawMode('pin')
+                }
+              }}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium shadow-lg transition-all ${
+                drawMode === 'pin'
+                  ? 'text-white ring-2'
+                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+              }`}
+              style={drawMode === 'pin' ? { backgroundColor: primaryColor, '--tw-ring-color': `${primaryColor}80` } as React.CSSProperties : undefined}
             >
-              <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-3 flex items-center gap-3 hover:shadow-xl transition-shadow">
-                <div
-                  className="w-10 h-10 rounded-lg flex items-center justify-center"
-                  style={{ backgroundColor: `${primaryColor}20` }}
-                >
-                  <MapPin size={24} style={{ color: primaryColor }} />
-                </div>
-                <div className="pr-2">
-                  <p className="font-semibold text-gray-900 text-sm">Report Issue</p>
-                  <p className="text-xs text-gray-500">Drag to map</p>
-                </div>
-              </div>
-            </div>
+              <MapPin size={18} />
+              <span>Report Issue</span>
+            </button>
 
             {/* Mark affected area button */}
             {project.allowDrawing && (
@@ -508,30 +402,6 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
         >
           {mapType === 'satellite' ? 'Map' : 'Satellite'}
         </button>
-
-        {/* Floating marker during drag */}
-        {isDragging && dragPosition && (
-          <div
-            className="fixed z-50 pointer-events-none"
-            style={{
-              left: dragPosition.x - 24,
-              top: dragPosition.y - 48,
-            }}
-          >
-            <svg width="48" height="58" viewBox="0 0 48 58" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <filter id="dragShadow" x="-30%" y="-20%" width="160%" height="150%">
-                  <feDropShadow dx="0" dy="4" stdDeviation="4" floodColor="#000000" floodOpacity="0.3"/>
-                </filter>
-              </defs>
-              <g filter="url(#dragShadow)">
-                <path d="M24 2C12.95 2 4 10.95 4 22c0 14.25 20 32 20 32s20-17.75 20-32c0-11.05-8.95-20-20-20z" fill={primaryColor}/>
-                <circle cx="24" cy="22" r="14" fill="white"/>
-                <circle cx="24" cy="22" r="6" fill={primaryColor}/>
-              </g>
-            </svg>
-          </div>
-        )}
 
         {/* Issue Form Modal */}
         {showForm && pendingShape && (

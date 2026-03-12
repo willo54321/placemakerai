@@ -172,7 +172,7 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
     },
     {
       id: 'forms' as Tab,
-      label: 'Forms',
+      label: 'Feedback Forms',
       icon: FileText,
       count: formResponseCount,
       adminOnly: true,

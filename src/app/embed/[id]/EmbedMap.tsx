@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react'
 import { GoogleMap, useJsApiLoader, MarkerF, OverlayView, PolygonF, PolylineF, DrawingManagerF } from '@react-google-maps/api'
 import { ThumbsUp, ThumbsDown, Lightbulb, MessageCircle, X, Volume2, Wind, Car, AlertTriangle, ShieldAlert, Clock, HelpCircle } from 'lucide-react'
 import { RotatableOverlay } from '@/components/RotatableOverlay'
@@ -223,7 +223,11 @@ function getShapeCentroid(geometry: GeoJSONGeometry): { lat: number; lng: number
   return { lat: 0, lng: 0 }
 }
 
-export default function EmbedMap({
+export interface EmbedMapHandle {
+  getMapInstance: () => google.maps.Map | null
+}
+
+const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
   center,
   zoom,
   overlays,
@@ -241,7 +245,7 @@ export default function EmbedMap({
   mode = 'feedback',
   hideStreetLabels = false,
   primaryColor
-}: EmbedMapProps) {
+}, ref) {
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script-embed',
     googleMapsApiKey: GOOGLE_MAPS_API_KEY,
@@ -253,6 +257,11 @@ export default function EmbedMap({
   const [closingPin, setClosingPin] = useState<string | null>(null)
   const [hoveredPin, setHoveredPin] = useState<string | null>(null)
   const drawingManagerRef = useRef<google.maps.drawing.DrawingManager | null>(null)
+
+  // Expose map instance via ref
+  useImperativeHandle(ref, () => ({
+    getMapInstance: () => map
+  }), [map])
 
   const closePopup = useCallback(() => {
     if (selectedPin) {
@@ -827,4 +836,6 @@ export default function EmbedMap({
       </GoogleMap>
     </>
   )
-}
+})
+
+export default EmbedMap

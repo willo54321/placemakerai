@@ -527,90 +527,184 @@ export function FormsTab({ projectId, forms }: { projectId: string; forms: Feedb
             aria-labelledby="responses-title"
             aria-modal="true"
           >
-            <div className="modal-content p-6 max-w-4xl max-h-[80vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h3 id="responses-title" className="text-lg font-semibold text-slate-900">
-                    Form Responses
-                  </h3>
-                  <p className="text-sm text-slate-500">
-                    {responsesData?.responses?.length || 0} total responses
-                  </p>
+            <div className="modal-content p-0 max-w-4xl max-h-[85vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+              {/* Header */}
+              <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
+                      <List size={20} className="text-blue-600" />
+                    </div>
+                    <div>
+                      <h3 id="responses-title" className="text-lg font-semibold text-slate-900">
+                        Form Responses
+                      </h3>
+                      <p className="text-sm text-slate-500">
+                        {responsesData?.responses?.length || 0} submissions received
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setViewingResponses(null)
+                      setExpandedResponse(null)
+                    }}
+                    className="p-2 hover:bg-white/50 rounded-lg transition-colors"
+                    aria-label="Close responses"
+                  >
+                    <X size={20} className="text-slate-500" aria-hidden="true" />
+                  </button>
                 </div>
-                <button
-                  onClick={() => {
-                    setViewingResponses(null)
-                    setExpandedResponse(null)
-                  }}
-                  className="btn-icon"
-                  aria-label="Close responses"
-                >
-                  <X size={20} aria-hidden="true" />
-                </button>
               </div>
 
-              <div className="overflow-y-auto flex-1 -mx-6 px-6">
+              <div className="overflow-y-auto flex-1 p-6 bg-slate-50">
                 {loadingResponses ? (
-                  <div className="flex items-center justify-center py-12">
-                    <span className="spinner" aria-hidden="true" />
-                    <span className="ml-2 text-slate-600">Loading responses...</span>
+                  <div className="flex flex-col items-center justify-center py-16">
+                    <div className="w-10 h-10 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mb-3" />
+                    <span className="text-slate-600">Loading responses...</span>
                   </div>
                 ) : responsesData?.responses?.length === 0 ? (
-                  <div className="text-center py-12 text-slate-500">
-                    No responses yet
+                  <div className="flex flex-col items-center justify-center py-16">
+                    <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+                      <FileText size={28} className="text-slate-400" />
+                    </div>
+                    <p className="text-slate-500 font-medium">No responses yet</p>
+                    <p className="text-sm text-slate-400 mt-1">Responses will appear here when submitted</p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    {responsesData?.responses?.map((response: FeedbackResponse, index: number) => (
-                      <div key={response.id} className="card border border-slate-200">
-                        <button
-                          onClick={() => setExpandedResponse(expandedResponse === response.id ? null : response.id)}
-                          className="w-full p-4 flex items-center justify-between text-left hover:bg-slate-50 transition-colors"
-                        >
-                          <div>
-                            <span className="font-medium text-slate-900">
-                              Response #{responsesData.responses.length - index}
-                            </span>
-                            <span className="text-sm text-slate-500 ml-3">
-                              {new Date(response.submittedAt).toLocaleDateString('en-GB', {
-                                day: 'numeric',
-                                month: 'short',
-                                year: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })}
-                            </span>
-                          </div>
-                          {expandedResponse === response.id ? (
-                            <ChevronUp size={20} className="text-slate-400" />
-                          ) : (
-                            <ChevronDown size={20} className="text-slate-400" />
-                          )}
-                        </button>
+                  <div className="space-y-4">
+                    {responsesData?.responses?.map((response: FeedbackResponse, index: number) => {
+                      const name = response.data.name || response.data.Name || response.data.fullName || response.data.full_name
+                      const email = response.data.email || response.data.Email || response.data.emailAddress
+                      const isExpanded = expandedResponse === response.id
 
-                        {expandedResponse === response.id && (
-                          <div className="px-4 pb-4 border-t border-slate-100 pt-4">
-                            <div className="space-y-3">
-                              {Object.entries(response.data).map(([key, value]) => (
-                                <div key={key}>
-                                  <dt className="text-xs font-medium text-slate-500 uppercase tracking-wide">
-                                    {key}
-                                  </dt>
-                                  <dd className="mt-1 text-sm text-slate-900">
-                                    {Array.isArray(value) ? value.join(', ') : String(value) || '-'}
-                                  </dd>
-                                </div>
-                              ))}
+                      // Get preview fields (excluding name, email, and consent fields)
+                      const previewEntries = Object.entries(response.data)
+                        .filter(([key]) => !['name', 'Name', 'fullName', 'full_name', 'email', 'Email', 'emailAddress', 'gdprConsent', 'consent'].includes(key))
+                        .slice(0, 2)
+
+                      return (
+                        <div
+                          key={response.id}
+                          className={`bg-white rounded-xl border transition-all duration-200 ${
+                            isExpanded ? 'border-blue-200 shadow-md ring-1 ring-blue-100' : 'border-slate-200 hover:border-slate-300 hover:shadow-sm'
+                          }`}
+                        >
+                          <button
+                            onClick={() => setExpandedResponse(isExpanded ? null : response.id)}
+                            className="w-full p-4 flex items-start gap-4 text-left"
+                          >
+                            {/* Avatar / Number */}
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 font-semibold text-sm ${
+                              isExpanded ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
+                            }`}>
+                              {name ? name.charAt(0).toUpperCase() : `#${responsesData.responses.length - index}`}
                             </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
+
+                            <div className="flex-1 min-w-0">
+                              {/* Name & Email row */}
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {name ? (
+                                  <span className="font-semibold text-slate-900">{name}</span>
+                                ) : (
+                                  <span className="font-medium text-slate-600">Response #{responsesData.responses.length - index}</span>
+                                )}
+                                {email && (
+                                  <a
+                                    href={`mailto:${email}`}
+                                    onClick={e => e.stopPropagation()}
+                                    className="text-sm text-blue-600 hover:underline"
+                                  >
+                                    {email}
+                                  </a>
+                                )}
+                              </div>
+
+                              {/* Date */}
+                              <p className="text-xs text-slate-400 mt-0.5">
+                                {new Date(response.submittedAt).toLocaleDateString('en-GB', {
+                                  weekday: 'short',
+                                  day: 'numeric',
+                                  month: 'short',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </p>
+
+                              {/* Preview of first fields (when collapsed) */}
+                              {!isExpanded && previewEntries.length > 0 && (
+                                <p className="text-sm text-slate-500 mt-2 line-clamp-1">
+                                  {previewEntries.map(([key, value]) => (
+                                    <span key={key}>
+                                      <span className="text-slate-400">{key}:</span>{' '}
+                                      {Array.isArray(value) ? value.join(', ') : String(value).substring(0, 50)}
+                                      {previewEntries.indexOf([key, value] as any) < previewEntries.length - 1 ? ' · ' : ''}
+                                    </span>
+                                  )).reduce((prev, curr, i) => i === 0 ? [curr] : [...prev, ' · ', curr], [] as any)}
+                                </p>
+                              )}
+                            </div>
+
+                            <div className={`p-1.5 rounded-lg transition-colors ${isExpanded ? 'bg-blue-100' : 'bg-slate-100'}`}>
+                              {isExpanded ? (
+                                <ChevronUp size={18} className="text-blue-600" />
+                              ) : (
+                                <ChevronDown size={18} className="text-slate-400" />
+                              )}
+                            </div>
+                          </button>
+
+                          {/* Expanded content */}
+                          {isExpanded && (
+                            <div className="px-4 pb-4 pt-0">
+                              <div className="border-t border-slate-100 pt-4">
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                  {Object.entries(response.data)
+                                    .filter(([key]) => !['gdprConsent', 'consent'].includes(key))
+                                    .map(([key, value]) => {
+                                      const isLongText = typeof value === 'string' && value.length > 100
+                                      return (
+                                        <div
+                                          key={key}
+                                          className={`${isLongText ? 'sm:col-span-2' : ''}`}
+                                        >
+                                          <dt className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                                            {key.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').trim()}
+                                          </dt>
+                                          <dd className={`text-sm text-slate-900 ${isLongText ? 'whitespace-pre-wrap bg-slate-50 p-3 rounded-lg border border-slate-100' : ''}`}>
+                                            {Array.isArray(value) ? (
+                                              <div className="flex flex-wrap gap-1">
+                                                {value.map((v, i) => (
+                                                  <span key={i} className="inline-flex px-2 py-0.5 bg-blue-50 text-blue-700 text-xs rounded-full">
+                                                    {v}
+                                                  </span>
+                                                ))}
+                                              </div>
+                                            ) : typeof value === 'boolean' ? (
+                                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${value ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                {value ? 'Yes' : 'No'}
+                                              </span>
+                                            ) : (
+                                              String(value) || <span className="text-slate-400 italic">Not provided</span>
+                                            )}
+                                          </dd>
+                                        </div>
+                                      )
+                                    })}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
               </div>
 
-              <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-200">
+              {/* Footer */}
+              <div className="px-6 py-4 border-t border-slate-200 bg-white flex justify-end">
                 <button
                   onClick={() => {
                     setViewingResponses(null)

@@ -42,12 +42,19 @@ export interface SentimentResult {
   }>
 }
 
+export interface ThemeSentimentBreakdown {
+  positive: number
+  negative: number
+  neutral: number
+}
+
 export interface Theme {
   name: string
   count: number
   sentiment: 'positive' | 'negative' | 'neutral' | 'mixed'
   keywords: string[]
   sampleQuotes: string[]
+  sentimentBreakdown?: ThemeSentimentBreakdown
 }
 
 export interface ThemesResult {
@@ -63,10 +70,46 @@ export interface SummaryResult {
   supportAreas: string[]
 }
 
+export interface HeadlineStat {
+  text: string
+  type: 'concern' | 'support' | 'neutral' | 'insight'
+}
+
+export interface HeadlineStatsResult {
+  stats: HeadlineStat[]
+}
+
+export interface MaterialClassification {
+  classification: 'material' | 'non-material' | 'mixed'
+  materialCategories: string[]
+  nonMaterialCategories: string[]
+  confidence: number
+}
+
+export interface MaterialAnalysisResult {
+  summary: {
+    material: number
+    nonMaterial: number
+    mixed: number
+  }
+  categories: {
+    material: Array<{ name: string; count: number; examples: string[] }>
+    nonMaterial: Array<{ name: string; count: number; examples: string[] }>
+  }
+  items: Array<{
+    id: string
+    classification: 'material' | 'non-material' | 'mixed'
+    materialCategories: string[]
+    nonMaterialCategories: string[]
+  }>
+}
+
 export interface FullAnalysisResult {
   sentiment: SentimentResult
   themes: ThemesResult
   summary: SummaryResult
+  headlineStats?: HeadlineStatsResult
+  materialAnalysis?: MaterialAnalysisResult
   geographic?: {
     clusters: Array<{
       latitude: number
@@ -183,11 +226,13 @@ Return a JSON object with:
 - themes: array of objects with:
   - name: short theme name (e.g., "Traffic Concerns", "Environmental Impact", "Design Support")
   - count: number of feedback items mentioning this theme
-  - sentiment: "positive", "negative", "neutral", or "mixed" based on how people feel about this theme
+  - sentiment: "positive", "negative", "neutral", or "mixed" based on overall sentiment for this theme
+  - sentimentBreakdown: object with { positive: number, negative: number, neutral: number } showing how many responses for this theme are supportive, concerned, or neutral
   - keywords: array of 3-5 keywords related to this theme
   - sampleQuotes: array of 1-2 short quotes (max 100 chars) from feedback exemplifying this theme
 
-Identify 5-10 main themes. Be specific to planning/development contexts (traffic, parking, design, environment, community, housing, safety, etc.)`
+Identify 5-10 main themes. Be specific to planning/development contexts (traffic, parking, design, environment, community, housing, safety, etc.).
+The sentimentBreakdown should reflect the actual split of positive/negative/neutral responses for that specific theme.`
       },
       {
         role: 'user',
@@ -205,6 +250,7 @@ Identify 5-10 main themes. Be specific to planning/development contexts (traffic
       name: theme.name,
       count: theme.count || 1,
       sentiment: theme.sentiment || 'neutral',
+      sentimentBreakdown: theme.sentimentBreakdown || { positive: 0, negative: 0, neutral: theme.count || 1 },
       keywords: theme.keywords || [],
       sampleQuotes: (theme.sampleQuotes || []).slice(0, 2),
     })),
@@ -335,13 +381,17 @@ export async function analyzeGeographic(
 
 export async function runFullAnalysis(feedbackItems: FeedbackItem[]): Promise<FullAnalysisResult> {
   // Run analyses in parallel where possible
-  const [sentiment, themes] = await Promise.all([
+  const [sentiment, themes, materialAnalysis] = await Promise.all([
     analyzeSentiment(feedbackItems),
     extractThemes(feedbackItems),
+    classifyMaterialConsiderations(feedbackItems),
   ])
 
-  // Summary depends on sentiment and themes
-  const summary = await generateSummary(feedbackItems, sentiment, themes)
+  // Summary and headline stats depend on sentiment and themes - run in parallel
+  const [summary, headlineStats] = await Promise.all([
+    generateSummary(feedbackItems, sentiment, themes),
+    generateHeadlineStats(feedbackItems, sentiment, themes),
+  ])
 
   // Geographic analysis
   const geographic = await analyzeGeographic(feedbackItems)
@@ -350,9 +400,158 @@ export async function runFullAnalysis(feedbackItems: FeedbackItem[]): Promise<Fu
     sentiment,
     themes,
     summary,
+    headlineStats,
+    materialAnalysis,
     geographic,
     analyzedAt: new Date().toISOString(),
     feedbackCount: feedbackItems.length,
+  }
+}
+
+export async function classifyMaterialConsiderations(
+  feedbackItems: FeedbackItem[]
+): Promise<MaterialAnalysisResult> {
+  if (feedbackItems.length === 0) {
+    return {
+      summary: { material: 0, nonMaterial: 0, mixed: 0 },
+      categories: { material: [], nonMaterial: [] },
+      items: [],
+    }
+  }
+
+  const feedbackText = feedbackItems.map((item, i) =>
+    `[${i + 1}] ${item.content}`
+  ).join('\n\n')
+
+  const response = await getOpenAI().chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [
+      {
+        role: 'system',
+        content: `You are a UK planning expert. Classify each consultation response based on whether it raises material planning considerations or non-material objections.
+
+MATERIAL PLANNING CONSIDERATIONS (things the planning authority CAN consider):
+- Traffic/highways impact, parking, road safety
+- Noise, air quality, light pollution
+- Design, visual impact, character of area
+- Overlooking, privacy, overshadowing
+- Ecology, wildlife, trees, biodiversity
+- Heritage, listed buildings, conservation areas
+- Flood risk, drainage, contamination
+- Infrastructure capacity (schools, healthcare, utilities)
+- Affordable housing provision
+- Economic benefits, employment
+
+NON-MATERIAL OBJECTIONS (things the planning authority CANNOT consider):
+- Property values, house prices
+- Loss of private view (not same as visual impact on area)
+- Competition between businesses
+- Construction disruption (covered by other legislation)
+- Applicant's motives or personal circumstances
+- Restrictive covenants, boundary disputes
+- Moral/political objections to developer
+- "It's not fair" or "we don't want change" without material reason
+
+Return a JSON object with:
+- summary: { material: count, nonMaterial: count, mixed: count }
+- categories: {
+    material: [{ name: "Traffic Impact", count: number, examples: ["short quote"] }],
+    nonMaterial: [{ name: "Property Values", count: number, examples: ["short quote"] }]
+  }
+- items: [{ id: "1", classification: "material"|"non-material"|"mixed", materialCategories: [], nonMaterialCategories: [] }]`
+      },
+      {
+        role: 'user',
+        content: `Classify these consultation responses:\n\n${feedbackText}`
+      }
+    ],
+    response_format: { type: 'json_object' },
+    temperature: 0.3,
+  })
+
+  const result = JSON.parse(response.choices[0].message.content || '{}')
+
+  // Map item IDs back to actual feedback item IDs
+  const items = (result.items || []).map((item: { id: string; classification: string; materialCategories: string[]; nonMaterialCategories: string[] }) => ({
+    id: feedbackItems[parseInt(item.id) - 1]?.id || item.id,
+    classification: item.classification as 'material' | 'non-material' | 'mixed',
+    materialCategories: item.materialCategories || [],
+    nonMaterialCategories: item.nonMaterialCategories || [],
+  }))
+
+  return {
+    summary: result.summary || { material: 0, nonMaterial: 0, mixed: 0 },
+    categories: result.categories || { material: [], nonMaterial: [] },
+    items,
+  }
+}
+
+export async function generateHeadlineStats(
+  feedbackItems: FeedbackItem[],
+  sentiment: SentimentResult,
+  themes: ThemesResult
+): Promise<HeadlineStatsResult> {
+  if (feedbackItems.length === 0) {
+    return { stats: [] }
+  }
+
+  const topThemes = themes.themes.slice(0, 5)
+  const themeSummary = topThemes.map(t => {
+    const breakdown = t.sentimentBreakdown || { positive: 0, negative: 0, neutral: 0 }
+    return `${t.name}: ${t.count} mentions (${breakdown.positive} positive, ${breakdown.negative} negative)`
+  }).join('\n')
+
+  const response = await getOpenAI().chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [
+      {
+        role: 'system',
+        content: `You are an expert at creating compelling, shareable statistics from consultation feedback.
+Generate 4-6 headline statistics that would be useful for:
+- Planning committee reports
+- Social media sharing
+- Press releases
+- Community updates
+
+Each stat should be:
+- Specific and data-driven (include numbers/percentages)
+- Concise (one sentence, ~10-20 words)
+- Impactful and newsworthy
+- Based on actual data provided
+
+Return a JSON object with:
+- stats: array of objects with:
+  - text: the headline statistic text
+  - type: "concern" (negative finding), "support" (positive finding), "neutral" (factual), or "insight" (interesting pattern)
+
+Example formats:
+- "62% of respondents raised traffic concerns, making it the top issue"
+- "Housing need support outweighs opposition 3:1 among local residents"
+- "38 residents specifically mentioned school-run congestion as a key worry"`
+      },
+      {
+        role: 'user',
+        content: `Generate headline statistics from this consultation data:
+
+Total responses: ${feedbackItems.length}
+Overall sentiment: ${sentiment.overall} (score: ${sentiment.score.toFixed(2)})
+Sentiment breakdown: ${sentiment.breakdown.positive} positive, ${sentiment.breakdown.negative} negative, ${sentiment.breakdown.neutral} neutral
+
+Top themes:
+${themeSummary}`
+      }
+    ],
+    response_format: { type: 'json_object' },
+    temperature: 0.5,
+  })
+
+  const result = JSON.parse(response.choices[0].message.content || '{}')
+
+  return {
+    stats: (result.stats || []).map((stat: HeadlineStat) => ({
+      text: stat.text,
+      type: stat.type || 'neutral',
+    })),
   }
 }
 

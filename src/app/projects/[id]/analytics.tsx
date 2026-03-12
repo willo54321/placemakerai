@@ -14,6 +14,12 @@ import {
   Tooltip, ResponsiveContainer, Legend
 } from 'recharts'
 import dynamic from 'next/dynamic'
+import {
+  ThemeBarChart,
+  ThemeWithSentiment,
+  HeadlineStats,
+  MaterialClassification
+} from '@/components/analytics'
 
 const SentimentHeatmap = dynamic(
   () => import('@/components/SentimentHeatmap').then(mod => mod.SentimentHeatmap),
@@ -37,12 +43,42 @@ interface SentimentBreakdown {
   neutral: number
 }
 
+interface ThemeSentimentBreakdown {
+  positive: number
+  negative: number
+  neutral: number
+}
+
 interface Theme {
   name: string
   count: number
   sentiment: 'positive' | 'negative' | 'neutral' | 'mixed'
   keywords: string[]
   sampleQuotes: string[]
+  sentimentBreakdown?: ThemeSentimentBreakdown
+}
+
+interface HeadlineStat {
+  text: string
+  type: 'concern' | 'support' | 'neutral' | 'insight'
+}
+
+interface MaterialCategory {
+  name: string
+  count: number
+  examples: string[]
+}
+
+interface MaterialAnalysis {
+  summary: {
+    material: number
+    nonMaterial: number
+    mixed: number
+  }
+  categories: {
+    material: MaterialCategory[]
+    nonMaterial: MaterialCategory[]
+  }
 }
 
 interface AnalysisData {
@@ -67,6 +103,10 @@ interface AnalysisData {
     concernAreas: string[]
     supportAreas: string[]
   }
+  headlineStats?: {
+    stats: HeadlineStat[]
+  }
+  materialAnalysis?: MaterialAnalysis
   geographic?: {
     clusters: Array<{
       latitude: number
@@ -521,42 +561,14 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
         </div>
       </div>
 
-      {/* Key Themes - Interactive Grid */}
+      {/* Interactive Theme Bar Chart */}
       <div className="card p-6">
-        <h3 className="font-semibold text-slate-900 mb-2">Key Themes</h3>
-        <p className="text-sm text-slate-500 mb-6">Click on a theme to see sample quotes from the feedback</p>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {analysis.themes.themes.map((theme, i) => (
-            <button
-              key={i}
-              onClick={() => setSelectedTheme(selectedTheme?.name === theme.name ? null : theme)}
-              className={`text-left p-5 rounded-xl border-2 transition-all duration-200 hover:shadow-md ${
-                selectedTheme?.name === theme.name
-                  ? 'border-brand-500 bg-brand-50 shadow-md'
-                  : 'border-slate-200 hover:border-brand-200 bg-white'
-              }`}
-            >
-              <div className="flex items-start justify-between gap-3 mb-3">
-                <span className="font-semibold text-slate-900">{theme.name}</span>
-                <span
-                  className={`text-xs px-2.5 py-1 rounded-full border font-medium ${THEME_SENTIMENT_STYLES[theme.sentiment]}`}
-                >
-                  {theme.sentiment}
-                </span>
-              </div>
-              <p className="text-2xl font-semibold text-slate-900 mb-1">{theme.count}</p>
-              <p className="text-sm text-slate-500 mb-3">mentions</p>
-              <div className="flex flex-wrap gap-1.5">
-                {theme.keywords.slice(0, 4).map((keyword, j) => (
-                  <span key={j} className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-md">
-                    {keyword}
-                  </span>
-                ))}
-              </div>
-            </button>
-          ))}
-        </div>
+        <ThemeBarChart
+          themes={analysis.themes.themes as ThemeWithSentiment[]}
+          totalFeedback={analysis.themes.totalFeedback}
+          onThemeSelect={(theme) => setSelectedTheme(theme as Theme | null)}
+          selectedTheme={selectedTheme as ThemeWithSentiment | null}
+        />
 
         {/* Selected Theme Details - Progressive Disclosure */}
         {selectedTheme && (
@@ -572,9 +584,38 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
                 </blockquote>
               ))}
             </div>
+            {selectedTheme.keywords.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-slate-200">
+                <p className="text-sm text-slate-500 mb-2">Related keywords:</p>
+                <div className="flex flex-wrap gap-2">
+                  {selectedTheme.keywords.map((keyword, j) => (
+                    <span key={j} className="text-sm bg-white text-slate-600 px-3 py-1 rounded-full border border-slate-200">
+                      {keyword}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
+
+      {/* Material vs Non-Material Classification */}
+      {analysis.materialAnalysis && (
+        <div className="card p-6">
+          <MaterialClassification analysis={analysis.materialAnalysis} />
+        </div>
+      )}
+
+      {/* Headline Stats */}
+      {analysis.headlineStats && analysis.headlineStats.stats.length > 0 && (
+        <div className="card p-6">
+          <HeadlineStats
+            stats={analysis.headlineStats.stats}
+            projectName={undefined}
+          />
+        </div>
+      )}
 
       {/* Concerns & Support - Side by Side */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -578,9 +578,38 @@ export function FormsTab({ projectId, forms }: { projectId: string; forms: Feedb
                       const email = response.data.email || response.data.Email || response.data.emailAddress
                       const isExpanded = expandedResponse === response.id
 
+                      // Build a map of data keys to form field labels
+                      const formFields = responsesData?.fields || []
+                      const fieldLabelMap: Record<string, string> = {}
+                      formFields.forEach((field: any) => {
+                        if (field.label) {
+                          // Map the label itself (for forms created in Placemaker)
+                          fieldLabelMap[field.label] = field.label
+                          // Also map common key formats that external forms might use
+                          const camelCase = field.label.replace(/[^a-zA-Z0-9]+(.)/g, (_: any, chr: string) => chr.toUpperCase()).replace(/^(.)/, (chr: string) => chr.toLowerCase())
+                          const snakeCase = field.label.toLowerCase().replace(/[^a-z0-9]+/g, '_')
+                          const pascalCase = field.label.replace(/[^a-zA-Z0-9]+(.)/g, (_: any, chr: string) => chr.toUpperCase()).replace(/^(.)/, (chr: string) => chr.toUpperCase())
+                          fieldLabelMap[camelCase] = field.label
+                          fieldLabelMap[snakeCase] = field.label
+                          fieldLabelMap[pascalCase] = field.label
+                        }
+                      })
+
+                      // Helper to get display label for a key
+                      const getDisplayLabel = (key: string): string => {
+                        if (fieldLabelMap[key]) return fieldLabelMap[key]
+                        // Fallback: format the key nicely
+                        return key
+                          .replace(/([A-Z])/g, ' $1')
+                          .replace(/_/g, ' ')
+                          .replace(/\b\w/g, l => l.toUpperCase())
+                          .trim()
+                      }
+
                       // Get preview fields (excluding name, email, and consent fields)
+                      const excludeKeys = ['name', 'Name', 'fullName', 'full_name', 'email', 'Email', 'emailAddress', 'gdprConsent', 'consent', 'dataConsent']
                       const previewEntries = Object.entries(response.data)
-                        .filter(([key]) => !['name', 'Name', 'fullName', 'full_name', 'email', 'Email', 'emailAddress', 'gdprConsent', 'consent'].includes(key))
+                        .filter(([key]) => !excludeKeys.includes(key))
                         .slice(0, 2)
 
                       return (
@@ -635,13 +664,13 @@ export function FormsTab({ projectId, forms }: { projectId: string; forms: Feedb
                               {/* Preview of first fields (when collapsed) */}
                               {!isExpanded && previewEntries.length > 0 && (
                                 <p className="text-sm text-slate-500 mt-2 line-clamp-1">
-                                  {previewEntries.map(([key, value]) => (
+                                  {previewEntries.map(([key, value], i) => (
                                     <span key={key}>
-                                      <span className="text-slate-400">{key}:</span>{' '}
+                                      {i > 0 && ' · '}
+                                      <span className="text-slate-400">{getDisplayLabel(key)}:</span>{' '}
                                       {Array.isArray(value) ? value.join(', ') : String(value).substring(0, 50)}
-                                      {previewEntries.indexOf([key, value] as any) < previewEntries.length - 1 ? ' · ' : ''}
                                     </span>
-                                  )).reduce((prev, curr, i) => i === 0 ? [curr] : [...prev, ' · ', curr], [] as any)}
+                                  ))}
                                 </p>
                               )}
                             </div>
@@ -661,16 +690,17 @@ export function FormsTab({ projectId, forms }: { projectId: string; forms: Feedb
                               <div className="border-t border-slate-100 pt-4">
                                 <div className="grid gap-4 sm:grid-cols-2">
                                   {Object.entries(response.data)
-                                    .filter(([key]) => !['gdprConsent', 'consent'].includes(key))
+                                    .filter(([key]) => !['gdprConsent', 'consent', 'dataConsent'].includes(key))
                                     .map(([key, value]) => {
                                       const isLongText = typeof value === 'string' && value.length > 100
+                                      const displayLabel = getDisplayLabel(key)
                                       return (
                                         <div
                                           key={key}
                                           className={`${isLongText ? 'sm:col-span-2' : ''}`}
                                         >
-                                          <dt className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                                            {key.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').trim()}
+                                          <dt className="text-sm font-medium text-slate-600 mb-1">
+                                            {displayLabel}
                                           </dt>
                                           <dd className={`text-sm text-slate-900 ${isLongText ? 'whitespace-pre-wrap bg-slate-50 p-3 rounded-lg border border-slate-100' : ''}`}>
                                             {Array.isArray(value) ? (

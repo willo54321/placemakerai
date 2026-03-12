@@ -110,6 +110,40 @@ export async function POST(
     })
   }
 
+  // Auto-detect and update form fields from submission keys
+  const existingFields = (form.fields as any[]) || []
+  const existingLabels = new Set(existingFields.map((f: any) => f.label))
+  const newFields = [...existingFields]
+
+  for (const key of Object.keys(formData)) {
+    // Skip common meta fields
+    if (['gdprConsent', 'consent', 'mailingConsent'].includes(key)) continue
+
+    // Create a human-readable label from the key
+    const label = key
+      .replace(/([A-Z])/g, ' $1')
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, l => l.toUpperCase())
+      .trim()
+
+    if (!existingLabels.has(label)) {
+      newFields.push({
+        label,
+        type: 'text',
+        required: false,
+      })
+      existingLabels.add(label)
+    }
+  }
+
+  // Update form fields if new ones were added
+  if (newFields.length > existingFields.length) {
+    await prisma.feedbackForm.update({
+      where: { id: form.id },
+      data: { fields: newFields },
+    })
+  }
+
   // Create the feedback response
   const response = await prisma.feedbackResponse.create({
     data: {

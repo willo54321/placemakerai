@@ -260,6 +260,8 @@ model Project {
   embedPrimaryColor String?       // Primary color for buttons/accents (hex)
   embedFontFamily   String?       // Font family (google fonts name)
   embedHideStreetLabels Boolean   @default(false) // Hide street labels on map
+  embedReferenceOnly Boolean      @default(false) // Reference mode - no interactions, view only
+  embedDefaultSatellite Boolean   @default(false) // Default to satellite view instead of roadmap
   enquiries      Enquiry[]
   feedbackForms  FeedbackForm[]
   geoLayers      GeoLayer[]

@@ -83,6 +83,8 @@ interface ProjectData {
   embedPrimaryColor: string | null
   embedFontFamily: string | null
   embedHideStreetLabels: boolean
+  embedReferenceOnly: boolean
+  embedDefaultSatellite: boolean
 }
 
 // Shape types for drawing
@@ -134,8 +136,8 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
     positive: true,
     comment: true,
   })
-  // Default to roadmap (map view) so labels are visible
-  const [mapType, setMapType] = useState<'roadmap' | 'satellite'>('roadmap')
+  // Map type - will be set when project loads based on embedDefaultSatellite setting
+  const [mapType, setMapType] = useState<'roadmap' | 'satellite' | null>(null)
   const [votedPins, setVotedPins] = useState<Set<string>>(new Set())
 
   // Tour state
@@ -165,6 +167,8 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
       })
       .then(data => {
         setProject(data)
+        // Set default map type based on project setting
+        setMapType(data.embedDefaultSatellite ? 'satellite' : 'roadmap')
         setLoading(false)
       })
       .catch(err => {
@@ -401,15 +405,15 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
           onMapClick={handleMapClick}
           onShapeComplete={handleShapeComplete}
           onVote={handleVote}
-          mapType={mapType}
+          mapType={mapType || 'satellite'}
           votedPins={votedPins}
           animateToCenter={mapCenter !== null}
           hideStreetLabels={project.embedHideStreetLabels || false}
           primaryColor={project.embedPrimaryColor || undefined}
         />
 
-        {/* Feedback Buttons - Top Right (only if pins or drawing allowed) */}
-        {(project.allowPins || project.allowDrawing) && (
+        {/* Feedback Buttons - Top Right (only if pins or drawing allowed and not reference mode) */}
+        {!project.embedReferenceOnly && (project.allowPins || project.allowDrawing) && (
           <div className="absolute top-4 right-4 z-10 flex flex-col gap-2">
             {/* Add Pin Button */}
             {project.allowPins && (
@@ -462,7 +466,8 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
           </div>
         )}
 
-        {/* Left Sidebar */}
+        {/* Left Sidebar (hidden in reference mode) */}
+        {!project.embedReferenceOnly && (
         <div className={`absolute top-4 left-4 z-10 transition-all duration-300 ${sidebarCollapsed ? 'w-auto' : 'w-80'}`}>
           {/* Sidebar Header */}
           <div className={`bg-brand-600 p-4 flex items-start justify-between ${sidebarCollapsed ? 'rounded-xl' : 'rounded-t-xl'}`}>
@@ -531,14 +536,17 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
             </div>
           )}
         </div>
+        )}
 
         {/* Map Type Button - Bottom Right */}
-        <button
-          onClick={() => setMapType(mapType === 'satellite' ? 'roadmap' : 'satellite')}
-          className="absolute bottom-4 right-4 z-10 bg-brand-600 text-white px-5 py-2.5 rounded-lg font-medium shadow-lg hover:bg-brand-700 transition-colors"
-        >
-          {mapType === 'satellite' ? 'Map' : 'Satellite'}
-        </button>
+        {mapType && (
+          <button
+            onClick={() => setMapType(mapType === 'satellite' ? 'roadmap' : 'satellite')}
+            className="absolute bottom-4 right-4 z-10 bg-brand-600 text-white px-5 py-2.5 rounded-lg font-medium shadow-lg hover:bg-brand-700 transition-colors"
+          >
+            {mapType === 'satellite' ? 'Map' : 'Satellite'}
+          </button>
+        )}
 
         {/* Tour Button - Bottom Left (only if tour exists and has stops) */}
         {project.tour && project.tour.stops.length > 0 && !isTourActive && !showForm && !drawMode && (

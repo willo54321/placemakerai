@@ -73,6 +73,8 @@ export async function GET(
     embedPrimaryColor: project.embedPrimaryColor,
     embedFontFamily: project.embedFontFamily,
     embedHideStreetLabels: project.embedHideStreetLabels,
+    embedReferenceOnly: project.embedReferenceOnly,
+    embedDefaultSatellite: project.embedDefaultSatellite,
     overlays: project.imageOverlays.map(o => ({
       id: o.id,
       name: o.name,

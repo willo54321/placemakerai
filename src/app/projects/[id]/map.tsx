@@ -123,6 +123,8 @@ interface Project {
   embedPrimaryColor: string | null
   embedFontFamily: string | null
   embedHideStreetLabels: boolean
+  embedReferenceOnly: boolean
+  embedDefaultSatellite: boolean
 }
 
 const CATEGORY_CONFIG: Record<string, { color: string; icon: any; label: string; bg: string }> = {
@@ -1430,6 +1432,53 @@ export function EmbedSettingsTab({ projectId, project }: { projectId: string; pr
                   Both interactions are disabled. The map will be view-only (reference mode).
                 </p>
               )}
+            </div>
+
+            {/* Display Settings */}
+            <div className="mt-6 pt-6 border-t space-y-4">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Display Settings</p>
+
+              {/* Reference Only Mode Toggle */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-gray-900">Reference Only Mode</p>
+                  <p className="text-sm text-gray-500">Hide all UI elements - view-only map</p>
+                </div>
+                <button
+                  onClick={() => toggleSetting.mutate({ key: 'embedReferenceOnly', value: !project.embedReferenceOnly })}
+                  disabled={toggling === 'embedReferenceOnly'}
+                  className={`relative w-12 h-6 rounded-full transition-colors ${
+                    project.embedReferenceOnly ? 'bg-brand-500' : 'bg-gray-300'
+                  } ${toggling === 'embedReferenceOnly' ? 'opacity-50' : ''}`}
+                >
+                  <span
+                    className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                      project.embedReferenceOnly ? 'left-6' : 'left-0.5'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Default to Satellite Toggle */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-gray-900">Default to Satellite View</p>
+                  <p className="text-sm text-gray-500">Show satellite imagery instead of map view</p>
+                </div>
+                <button
+                  onClick={() => toggleSetting.mutate({ key: 'embedDefaultSatellite', value: !project.embedDefaultSatellite })}
+                  disabled={toggling === 'embedDefaultSatellite'}
+                  className={`relative w-12 h-6 rounded-full transition-colors ${
+                    project.embedDefaultSatellite ? 'bg-brand-500' : 'bg-gray-300'
+                  } ${toggling === 'embedDefaultSatellite' ? 'opacity-50' : ''}`}
+                >
+                  <span
+                    className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                      project.embedDefaultSatellite ? 'left-6' : 'left-0.5'
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
 
             {/* Construction Issues Settings */}

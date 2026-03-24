@@ -122,9 +122,8 @@ export class RotatableOverlay implements IRotatableOverlay {
         this.image.style.height = height + 'px'
 
         // Set transform-origin to center in pixels for Safari compatibility
-        // Use translateZ(0) to force GPU layer in Safari
         this.div.style.transformOrigin = `${width / 2}px ${height / 2}px`
-        this.div.style.transform = `translateZ(0) rotate(${self._rotation}deg)`
+        this.div.style.transform = `rotate(${self._rotation}deg)`
       }
 
       onRemove(): void {
@@ -143,7 +142,7 @@ export class RotatableOverlay implements IRotatableOverlay {
 
       updateRotation(rotation: number): void {
         if (this.div) {
-          this.div.style.transform = `translateZ(0) rotate(${rotation}deg)`
+          this.div.style.transform = `rotate(${rotation}deg)`
         }
       }
 

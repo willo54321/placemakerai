@@ -104,11 +104,17 @@ export class RotatableOverlay implements IRotatableOverlay {
         const width = ne.x - sw.x
         const height = sw.y - ne.y
 
-        this.div.style.left = sw.x + 'px'
-        this.div.style.top = ne.y + 'px'
+        // Calculate center position for Safari-compatible rotation
+        const centerX = sw.x + width / 2
+        const centerY = ne.y + height / 2
+
+        // Position from center and use translate to offset back
+        // This ensures rotation works correctly in Safari
+        this.div.style.left = centerX + 'px'
+        this.div.style.top = centerY + 'px'
         this.div.style.width = width + 'px'
         this.div.style.height = height + 'px'
-        this.div.style.transform = `rotate(${self._rotation}deg)`
+        this.div.style.transform = `translate(-50%, -50%) rotate(${self._rotation}deg)`
       }
 
       onRemove(): void {
@@ -127,7 +133,7 @@ export class RotatableOverlay implements IRotatableOverlay {
 
       updateRotation(rotation: number): void {
         if (this.div) {
-          this.div.style.transform = `rotate(${rotation}deg)`
+          this.div.style.transform = `translate(-50%, -50%) rotate(${rotation}deg)`
         }
       }
 

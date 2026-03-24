@@ -58,9 +58,12 @@ export class RotatableOverlay implements IRotatableOverlay {
       onAdd(): void {
         this.div = document.createElement('div')
         this.div.style.position = 'absolute'
-        this.div.style.transformOrigin = 'center center'
         this.div.style.pointerEvents = (options.clickable ?? true) ? 'auto' : 'none'
         this.div.style.cursor = (options.clickable ?? true) ? 'pointer' : 'default'
+        // Safari fix: force GPU layer and prevent 3D distortion
+        this.div.style.webkitBackfaceVisibility = 'hidden'
+        this.div.style.backfaceVisibility = 'hidden'
+        this.div.style.willChange = 'transform'
 
         this.image = document.createElement('img')
         this.image.src = self._imageUrl
@@ -70,6 +73,9 @@ export class RotatableOverlay implements IRotatableOverlay {
         this.image.style.opacity = String(self._opacity)
         this.image.draggable = false
         this.image.style.userSelect = 'none'
+        // Safari fix: prevent image distortion
+        this.image.style.webkitBackfaceVisibility = 'hidden'
+        this.image.style.backfaceVisibility = 'hidden'
 
         this.div.appendChild(this.image)
 
@@ -104,17 +110,14 @@ export class RotatableOverlay implements IRotatableOverlay {
         const width = ne.x - sw.x
         const height = sw.y - ne.y
 
-        // Calculate center position for Safari-compatible rotation
-        const centerX = sw.x + width / 2
-        const centerY = ne.y + height / 2
-
-        // Position from center and use translate to offset back
-        // This ensures rotation works correctly in Safari
-        this.div.style.left = centerX + 'px'
-        this.div.style.top = centerY + 'px'
+        // Position from top-left corner
+        this.div.style.left = sw.x + 'px'
+        this.div.style.top = ne.y + 'px'
         this.div.style.width = width + 'px'
         this.div.style.height = height + 'px'
-        this.div.style.transform = `translate(-50%, -50%) rotate(${self._rotation}deg)`
+        // Set transform-origin to center in pixels for Safari compatibility
+        this.div.style.transformOrigin = `${width / 2}px ${height / 2}px`
+        this.div.style.transform = `rotate(${self._rotation}deg)`
       }
 
       onRemove(): void {
@@ -133,7 +136,7 @@ export class RotatableOverlay implements IRotatableOverlay {
 
       updateRotation(rotation: number): void {
         if (this.div) {
-          this.div.style.transform = `translate(-50%, -50%) rotate(${rotation}deg)`
+          this.div.style.transform = `rotate(${rotation}deg)`
         }
       }
 

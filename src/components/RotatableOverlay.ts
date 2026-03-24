@@ -60,20 +60,21 @@ export class RotatableOverlay implements IRotatableOverlay {
         this.div.style.position = 'absolute'
         this.div.style.pointerEvents = (options.clickable ?? true) ? 'auto' : 'none'
         this.div.style.cursor = (options.clickable ?? true) ? 'pointer' : 'default'
-        // Safari fix: force GPU layer and prevent 3D distortion
+        // Safari fixes for transform rendering
+        this.div.style.isolation = 'isolate'
+        ;(this.div.style as any).webkitTransformStyle = 'flat'
+        this.div.style.transformStyle = 'flat'
         this.div.style.webkitBackfaceVisibility = 'hidden'
         this.div.style.backfaceVisibility = 'hidden'
         this.div.style.willChange = 'transform'
 
         this.image = document.createElement('img')
         this.image.src = self._imageUrl
-        this.image.style.width = '100%'
-        this.image.style.height = '100%'
+        // Use explicit dimensions set in draw() instead of percentages for Safari
         this.image.style.display = 'block'
         this.image.style.opacity = String(self._opacity)
         this.image.draggable = false
         this.image.style.userSelect = 'none'
-        // Safari fix: prevent image distortion
         this.image.style.webkitBackfaceVisibility = 'hidden'
         this.image.style.backfaceVisibility = 'hidden'
 
@@ -93,7 +94,7 @@ export class RotatableOverlay implements IRotatableOverlay {
       }
 
       draw(): void {
-        if (!this.div) return
+        if (!this.div || !this.image) return
 
         const overlayProjection = this.getProjection()
         if (!overlayProjection) return
@@ -110,14 +111,20 @@ export class RotatableOverlay implements IRotatableOverlay {
         const width = ne.x - sw.x
         const height = sw.y - ne.y
 
-        // Position from top-left corner
+        // Position container from top-left corner
         this.div.style.left = sw.x + 'px'
         this.div.style.top = ne.y + 'px'
         this.div.style.width = width + 'px'
         this.div.style.height = height + 'px'
+
+        // Set explicit pixel dimensions on image (fixes Safari distortion)
+        this.image.style.width = width + 'px'
+        this.image.style.height = height + 'px'
+
         // Set transform-origin to center in pixels for Safari compatibility
+        // Use translateZ(0) to force GPU layer in Safari
         this.div.style.transformOrigin = `${width / 2}px ${height / 2}px`
-        this.div.style.transform = `rotate(${self._rotation}deg)`
+        this.div.style.transform = `translateZ(0) rotate(${self._rotation}deg)`
       }
 
       onRemove(): void {
@@ -136,7 +143,7 @@ export class RotatableOverlay implements IRotatableOverlay {
 
       updateRotation(rotation: number): void {
         if (this.div) {
-          this.div.style.transform = `rotate(${rotation}deg)`
+          this.div.style.transform = `translateZ(0) rotate(${rotation}deg)`
         }
       }
 

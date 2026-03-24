@@ -118,6 +118,8 @@ export async function PATCH(
     if ('embedPrimaryColor' in body) updateData.embedPrimaryColor = body.embedPrimaryColor || null
     if ('embedFontFamily' in body) updateData.embedFontFamily = body.embedFontFamily || null
     if (body.embedHideStreetLabels !== undefined) updateData.embedHideStreetLabels = body.embedHideStreetLabels
+    if (body.embedReferenceOnly !== undefined) updateData.embedReferenceOnly = body.embedReferenceOnly
+    if (body.embedDefaultSatellite !== undefined) updateData.embedDefaultSatellite = body.embedDefaultSatellite
 
     const project = await prisma.project.update({
       where: { id: params.id },

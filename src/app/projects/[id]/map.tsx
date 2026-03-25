@@ -1267,10 +1267,15 @@ export function EmbedSettingsTab({ projectId, project }: { projectId: string; pr
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ [setting.key]: setting.value })
       })
+      if (!response.ok) throw new Error('Failed to update setting')
       return response.json()
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['project', projectId] })
+    onSuccess: (updatedProject) => {
+      // Directly update the cache with the response data
+      queryClient.setQueryData(['project', projectId], (old: any) => ({
+        ...old,
+        ...updatedProject
+      }))
     },
     onSettled: () => {
       setToggling(null)

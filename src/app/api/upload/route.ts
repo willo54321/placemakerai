@@ -1,13 +1,10 @@
 import { NextResponse } from 'next/server'
-import { put } from '@vercel/blob'
 
-// Use Node.js runtime for larger file uploads (Edge has 4MB limit)
-export const runtime = 'nodejs'
-
-// Allow larger request bodies for panorama images
-export const maxDuration = 60
+// Use Edge runtime for smaller uploads (overlays, etc)
+export const runtime = 'edge'
 
 // POST - upload image to Vercel Blob storage (or fallback to base64 for small files)
+// Note: Large panorama uploads use client-side upload via /api/upload/token
 export async function POST(request: Request) {
   try {
     const formData = await request.formData()
@@ -25,25 +22,30 @@ export async function POST(request: Request) {
       )
     }
 
-    // Check if Blob storage is configured
-    if (process.env.BLOB_READ_WRITE_TOKEN) {
-      if (file.size > 50 * 1024 * 1024) {
-        return NextResponse.json(
-          { error: 'File too large. Maximum size is 50MB.' },
-          { status: 400 }
-        )
-      }
+    const blobToken = process.env.BLOB_READ_WRITE_TOKEN
 
-      const filename = `panoramas/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
+    // Check if Blob storage is configured - use fetch API for small files
+    if (blobToken && file.size <= 4 * 1024 * 1024) {
+      const filename = `overlays/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
 
       try {
-        const blob = await put(filename, file, {
-          access: 'public',
-          contentType: file.type,
+        const response = await fetch(`https://blob.vercel-storage.com/${filename}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${blobToken}`,
+            'Content-Type': file.type,
+            'x-api-version': '7',
+          },
+          body: file,
         })
 
+        if (!response.ok) {
+          throw new Error('Blob upload failed')
+        }
+
+        const result = await response.json()
         return NextResponse.json({
-          url: blob.url,
+          url: result.url,
           size: file.size,
           type: file.type,
         })
@@ -54,6 +56,14 @@ export async function POST(request: Request) {
           { status: 500 }
         )
       }
+    }
+
+    // For files > 4MB, return error - use client-side upload instead
+    if (file.size > 4 * 1024 * 1024) {
+      return NextResponse.json(
+        { error: 'File too large for server upload. Use client-side upload for panoramas.' },
+        { status: 400 }
+      )
     }
 
     // Fallback: convert to base64 data URL (for files under 3MB)

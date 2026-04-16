@@ -1257,6 +1257,7 @@ export function EmbedSettingsTab({ projectId, project }: { projectId: string; pr
   const [copiedFeedback, setCopiedFeedback] = useState(false)
   const [copiedTour, setCopiedTour] = useState(false)
   const [copiedIssues, setCopiedIssues] = useState(false)
+  const [copiedPanorama, setCopiedPanorama] = useState(false)
   const [toggling, setToggling] = useState<string | null>(null)
 
   const toggleSetting = useMutation({
@@ -1294,6 +1295,10 @@ export function EmbedSettingsTab({ projectId, project }: { projectId: string; pr
     ? `${window.location.origin}/embed/${projectId}/issues`
     : `/embed/${projectId}/issues`
 
+  const panoramaEmbedUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/embed/${projectId}/panorama`
+    : `/embed/${projectId}/panorama`
+
   const feedbackEmbedCode = `<iframe
   src="${feedbackEmbedUrl}"
   width="100%"
@@ -1320,6 +1325,15 @@ export function EmbedSettingsTab({ projectId, project }: { projectId: string; pr
   style="border: 1px solid #e5e7eb; border-radius: 8px;"
 ></iframe>`
 
+  const panoramaEmbedCode = `<iframe
+  src="${panoramaEmbedUrl}"
+  width="100%"
+  height="600"
+  frameborder="0"
+  allowfullscreen
+  style="border: 1px solid #e5e7eb; border-radius: 8px;"
+></iframe>`
+
   const copyFeedbackCode = () => {
     navigator.clipboard.writeText(feedbackEmbedCode)
     setCopiedFeedback(true)
@@ -1338,7 +1352,14 @@ export function EmbedSettingsTab({ projectId, project }: { projectId: string; pr
     setTimeout(() => setCopiedIssues(false), 2000)
   }
 
+  const copyPanoramaCode = () => {
+    navigator.clipboard.writeText(panoramaEmbedCode)
+    setCopiedPanorama(true)
+    setTimeout(() => setCopiedPanorama(false), 2000)
+  }
+
   const hasTours = (project as any).tours?.length > 0
+  const hasPanoramas = (project as any).panoramas?.length > 0
 
   return (
     <div className="space-y-6">
@@ -1540,6 +1561,49 @@ export function EmbedSettingsTab({ projectId, project }: { projectId: string; pr
               )}
             </div>
 
+            {/* 360 Panorama Settings */}
+            <div className="mt-6 pt-6 border-t space-y-4">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">360° Panorama</p>
+
+              {/* Enable Panorama Toggle */}
+              <div className="flex items-center justify-between p-4 bg-purple-50 rounded-lg border border-purple-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-purple-600">
+                      <circle cx="12" cy="12" r="10"/>
+                      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                      <line x1="2" y1="12" x2="22" y2="12"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">Enable 360° Panorama</p>
+                    <p className="text-sm text-gray-500">Allow visitors to explore immersive panorama views</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => toggleSetting.mutate({ key: 'panoramaEnabled', value: !(project as any).panoramaEnabled })}
+                  disabled={toggling === 'panoramaEnabled'}
+                  className={`relative w-12 h-6 rounded-full transition-colors ${
+                    (project as any).panoramaEnabled ? 'bg-purple-500' : 'bg-gray-300'
+                  } ${toggling === 'panoramaEnabled' ? 'opacity-50' : ''}`}
+                >
+                  <span
+                    className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                      (project as any).panoramaEnabled ? 'left-6' : 'left-0.5'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {(project as any).panoramaEnabled && !hasPanoramas && (
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                  <p className="text-sm text-amber-800">
+                    Go to the Panoramas tab to create your first 360° panorama.
+                  </p>
+                </div>
+              )}
+            </div>
+
             {/* Styling Customization */}
             <div className="mt-6 pt-6 border-t space-y-4">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Styling</p>
@@ -1722,6 +1786,43 @@ export function EmbedSettingsTab({ projectId, project }: { projectId: string; pr
                 </pre>
                 <p className="text-sm text-gray-500 mt-3">
                   Embed the construction issues reporter to collect reports from residents during construction.
+                </p>
+              </div>
+            )}
+
+            {/* Panorama Embed Code */}
+            {(project as any).panoramaEnabled && (
+              <div className="mt-6 pt-6 border-t">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Code size={18} className="text-purple-400" />
+                    <span className="font-medium text-sm text-gray-700">360° Panorama Embed</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <a
+                      href={panoramaEmbedUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-sm text-purple-600 hover:text-purple-700"
+                    >
+                      <ExternalLink size={14} /> Preview
+                    </a>
+                    <button
+                      onClick={copyPanoramaCode}
+                      className="flex items-center gap-1 text-sm text-purple-600 hover:text-purple-700"
+                    >
+                      {copiedPanorama ? <Check size={14} /> : <Copy size={14} />}
+                      {copiedPanorama ? 'Copied!' : 'Copy'}
+                    </button>
+                  </div>
+                </div>
+                <pre className="bg-gray-900 text-gray-100 text-sm p-4 rounded-lg overflow-x-auto">
+                  <code>{panoramaEmbedCode}</code>
+                </pre>
+                <p className="text-sm text-gray-500 mt-3">
+                  {hasPanoramas
+                    ? 'Embed the 360° panorama viewer for an immersive virtual experience.'
+                    : 'Create panoramas in the Panoramas tab to enable this embed.'}
                 </p>
               </div>
             )}

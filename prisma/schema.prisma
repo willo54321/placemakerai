@@ -256,6 +256,8 @@ model Project {
   // Construction issue reporting
   issuesEnabled    Boolean        @default(false) // Enable issue reporting embed
   issueNotifyEmails String?       // Comma-separated emails for issue notifications
+  // Panorama embed settings
+  panoramaEnabled  Boolean        @default(false) // Enable 360° panorama embed
   // Embed styling customization
   embedPrimaryColor String?       // Primary color for buttons/accents (hex)
   embedFontFamily   String?       // Font family (google fonts name)
@@ -275,6 +277,7 @@ model Project {
   teamMembers    TeamMember[]
   analysisResults AnalysisResult[]
   tours          Tour[]
+  panoramas      Panorama[]
   userAccess     ProjectAccess[]
 }
 
@@ -485,4 +488,42 @@ model TourStop {
   tour        Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
 
   @@index([tourId])
+}
+
+model Panorama {
+  id           String            @id @default(cuid())
+  projectId    String
+  name         String
+  description  String?
+  imageUrl     String            // Equirectangular image URL
+  initialYaw   Float             @default(0)    // Initial view direction (degrees)
+  initialPitch Float             @default(0)    // Initial vertical angle (degrees)
+  initialFov   Float             @default(100)  // Initial field of view (degrees)
+  order        Int               @default(0)    // For multi-scene ordering
+  active       Boolean           @default(true)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  project      Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  hotspots     PanoramaHotspot[]
+
+  @@index([projectId])
+}
+
+model PanoramaHotspot {
+  id         String   @id @default(cuid())
+  panoramaId String
+  type       String   // "info" | "link" | "video" | "image"
+  yaw        Float    // Horizontal position (degrees, -180 to 180)
+  pitch      Float    // Vertical position (degrees, -90 to 90)
+  title      String?
+  content    String?  // Text content or URL depending on type
+  icon       String?  // Icon identifier
+  targetId   String?  // For "link" type - target panorama ID
+  videoUrl   String?  // For "video" type
+  imageUrl   String?  // For "image" type
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  panorama   Panorama @relation(fields: [panoramaId], references: [id], onDelete: Cascade)
+
+  @@index([panoramaId])
 }

@@ -18,7 +18,9 @@ import {
   ArrowRight,
   Play,
   Image as ImageIcon,
-  Move
+  Move,
+  Upload,
+  Loader2
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
@@ -96,6 +98,39 @@ export function PanoramasTab({ projectId }: { projectId: string }) {
     imageUrl: ''
   })
 
+  // Upload state
+  const [isUploading, setIsUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Handle file upload
+  const handleFileUpload = async (file: File) => {
+    setIsUploading(true)
+    setUploadError(null)
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Upload failed')
+      }
+
+      const result = await response.json()
+      setNewPanorama(prev => ({ ...prev, imageUrl: result.url }))
+    } catch (error) {
+      setUploadError(error instanceof Error ? error.message : 'Upload failed')
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
   // Fetch panoramas
   const { data: panoramas = [], isLoading } = useQuery<Panorama[]>({
     queryKey: ['panoramas', projectId],
@@ -120,6 +155,7 @@ export function PanoramasTab({ projectId }: { projectId: string }) {
     onSuccess: (panorama) => {
       queryClient.invalidateQueries({ queryKey: ['panoramas', projectId] })
       setIsCreatingPanorama(false)
+      setUploadError(null)
       setNewPanorama({
         name: '',
         description: '',
@@ -276,15 +312,91 @@ export function PanoramasTab({ projectId }: { projectId: string }) {
             </div>
             <div className="col-span-2 sm:col-span-1">
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Image URL *
+                Panorama Image *
               </label>
-              <input
-                type="url"
-                value={newPanorama.imageUrl}
-                onChange={(e) => setNewPanorama(prev => ({ ...prev, imageUrl: e.target.value }))}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                placeholder="https://example.com/panorama.jpg"
-              />
+
+              {/* File upload area */}
+              <div
+                className={`relative border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
+                  isUploading ? 'border-emerald-300 bg-emerald-50' : 'border-gray-300 hover:border-emerald-400'
+                }`}
+                onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  const file = e.dataTransfer.files[0]
+                  if (file && file.type.startsWith('image/')) {
+                    handleFileUpload(file)
+                  }
+                }}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) handleFileUpload(file)
+                  }}
+                />
+
+                {isUploading ? (
+                  <div className="flex items-center justify-center gap-2 text-emerald-600">
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>Uploading...</span>
+                  </div>
+                ) : newPanorama.imageUrl ? (
+                  <div className="space-y-2">
+                    <img
+                      src={newPanorama.imageUrl}
+                      alt="Preview"
+                      className="h-20 mx-auto rounded object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="text-sm text-emerald-600 hover:text-emerald-700"
+                    >
+                      Change image
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full"
+                  >
+                    <Upload className="w-8 h-8 mx-auto text-gray-400 mb-2" />
+                    <p className="text-sm text-gray-600">
+                      Click to upload or drag & drop
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Equirectangular panorama image (up to 50MB)
+                    </p>
+                  </button>
+                )}
+              </div>
+
+              {uploadError && (
+                <p className="mt-1 text-sm text-red-600">{uploadError}</p>
+              )}
+
+              {/* Or enter URL manually */}
+              <div className="mt-2">
+                <details className="text-sm">
+                  <summary className="text-gray-500 cursor-pointer hover:text-gray-700">
+                    Or enter image URL manually
+                  </summary>
+                  <input
+                    type="url"
+                    value={newPanorama.imageUrl}
+                    onChange={(e) => setNewPanorama(prev => ({ ...prev, imageUrl: e.target.value }))}
+                    className="w-full mt-2 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm"
+                    placeholder="https://example.com/panorama.jpg"
+                  />
+                </details>
+              </div>
             </div>
             <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -342,6 +454,7 @@ export function PanoramasTab({ projectId }: { projectId: string }) {
             <button
               onClick={() => {
                 setIsCreatingPanorama(false)
+                setUploadError(null)
                 setNewPanorama({
                   name: '',
                   description: '',

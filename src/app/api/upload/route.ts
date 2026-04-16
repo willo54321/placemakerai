@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server'
+import { put } from '@vercel/blob'
 
-export const runtime = 'edge'
+// Use Node.js runtime for larger file uploads (Edge has 4MB limit)
+export const runtime = 'nodejs'
+
+// Allow larger request bodies for panorama images
+export const maxDuration = 60
 
 // POST - upload image to Vercel Blob storage (or fallback to base64 for small files)
 export async function POST(request: Request) {
@@ -20,10 +25,8 @@ export async function POST(request: Request) {
       )
     }
 
-    const blobToken = process.env.BLOB_READ_WRITE_TOKEN
-
-    // If Blob is configured, use it for any size up to 50MB
-    if (blobToken) {
+    // Check if Blob storage is configured
+    if (process.env.BLOB_READ_WRITE_TOKEN) {
       if (file.size > 50 * 1024 * 1024) {
         return NextResponse.json(
           { error: 'File too large. Maximum size is 50MB.' },
@@ -31,33 +34,26 @@ export async function POST(request: Request) {
         )
       }
 
-      const filename = `overlays/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
+      const filename = `panoramas/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
 
-      const response = await fetch(`https://blob.vercel-storage.com/${filename}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${blobToken}`,
-          'Content-Type': file.type,
-          'x-api-version': '7',
-        },
-        body: file,
-      })
+      try {
+        const blob = await put(filename, file, {
+          access: 'public',
+          contentType: file.type,
+        })
 
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('Blob upload error:', response.status, errorText)
+        return NextResponse.json({
+          url: blob.url,
+          size: file.size,
+          type: file.type,
+        })
+      } catch (blobError) {
+        console.error('Blob upload error:', blobError)
         return NextResponse.json(
           { error: 'Failed to upload to storage' },
           { status: 500 }
         )
       }
-
-      const result = await response.json()
-      return NextResponse.json({
-        url: result.url,
-        size: file.size,
-        type: file.type,
-      })
     }
 
     // Fallback: convert to base64 data URL (for files under 3MB)

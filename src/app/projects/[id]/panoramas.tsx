@@ -103,23 +103,40 @@ export function PanoramasTab({ projectId }: { projectId: string }) {
   const [uploadError, setUploadError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Handle file upload
+  // Handle file upload - direct to Vercel Blob to bypass serverless body limits
   const handleFileUpload = async (file: File) => {
     setIsUploading(true)
     setUploadError(null)
 
     try {
-      const formData = new FormData()
-      formData.append('file', file)
+      // Check file size
+      if (file.size > 50 * 1024 * 1024) {
+        throw new Error('File too large. Maximum size is 50MB.')
+      }
 
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData
+      // Get upload token
+      const tokenRes = await fetch('/api/upload/token')
+      if (!tokenRes.ok) {
+        const error = await tokenRes.json()
+        throw new Error(error.error || 'Failed to get upload token')
+      }
+      const { token } = await tokenRes.json()
+
+      // Upload directly to Vercel Blob
+      const filename = `panoramas/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
+
+      const response = await fetch(`https://blob.vercel-storage.com/${filename}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': file.type,
+          'x-api-version': '7',
+        },
+        body: file,
       })
 
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Upload failed')
+        throw new Error('Failed to upload to storage')
       }
 
       const result = await response.json()

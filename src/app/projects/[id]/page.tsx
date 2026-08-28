@@ -9,7 +9,7 @@ import dynamic from 'next/dynamic'
 import { OverviewTab } from './overview'
 import { SettingsTab } from './settings'
 import { AnalyticsTab } from './analytics'
-import { HowToTab } from './how-to'
+import { HowToTab, type GuideStep } from './how-to'
 import UserMenu from '@/components/UserMenu'
 import { ProductTour, type TourStep } from '@/components/ProductTour'
 
@@ -120,6 +120,22 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
   // the How To page replay it on demand.
   const [tourDismissed, setTourDismissed] = useState(false)
   const [forceTour, setForceTour] = useState(false)
+
+  // Interactive guide walkthrough (started from the How To tab)
+  const [guideSteps, setGuideSteps] = useState<GuideStep[] | null>(null)
+  const [guideSubTab, setGuideSubTab] = useState<'map' | 'responses' | null>(null)
+
+  const startGuide = (steps: GuideStep[]) => {
+    setGuideSteps(steps)
+    setActiveTab(steps[0].tab as Tab)
+    setGuideSubTab(steps[0].subTab ?? null)
+  }
+
+  const endGuide = () => {
+    setGuideSteps(null)
+    setGuideSubTab(null)
+    setActiveTab('howto')
+  }
   const { data: tourStatus } = useQuery({
     queryKey: ['tour-status'],
     queryFn: () => fetch('/api/me/tour').then(r => r.json()),
@@ -257,14 +273,14 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
   const firstName = session?.user?.name?.split(' ')[0]
   const tourSteps: TourStep[] = [
     {
-      targetId: null,
+      target: null,
       title: firstName ? `Welcome to Placemaker, ${firstName}` : 'Welcome to Placemaker',
       body: `A 30-second tour of your ${project.name} dashboard. You can close it any time, or tick "don’t show again".`,
     },
     ...allTabs
       .filter(tab => isAdmin || !tab.adminOnly)
       .map(tab => ({
-        targetId: `${tab.id}-tab`,
+        target: `#${tab.id}-tab`,
         title: TOUR_COPY[tab.id].title,
         body: TOUR_COPY[tab.id].body,
       })),
@@ -273,14 +289,28 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
 
   return (
     <div className="flex min-h-screen bg-slate-50">
-      {showTour && (
+      {showTour && !guideSteps && (
         <ProductTour
           steps={tourSteps}
           onFinish={finishTour}
           onStepChange={(i) => {
             // Show each feature as the tour narrates it (step 0 is the welcome card)
-            const target = tourSteps[i]?.targetId
-            if (target) setActiveTab(target.replace('-tab', '') as Tab)
+            const target = tourSteps[i]?.target
+            if (target) setActiveTab(target.replace('#', '').replace('-tab', '') as Tab)
+          }}
+        />
+      )}
+      {guideSteps && (
+        <ProductTour
+          steps={guideSteps.map(s => ({ target: s.target, title: s.title, body: s.body }))}
+          hideOptOut
+          onFinish={endGuide}
+          onStepChange={(i) => {
+            const s = guideSteps[i]
+            if (s) {
+              setActiveTab(s.tab as Tab)
+              setGuideSubTab(s.subTab ?? null)
+            }
           }}
         />
       )}
@@ -415,6 +445,7 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
               project={project}
               focusPinId={focusItem?.kind === 'pin' ? focusItem.id : null}
               onFocusHandled={() => setFocusItem(null)}
+              subTabOverride={guideSubTab}
             />
           )}
           {activeTab === 'forms' && (
@@ -445,6 +476,7 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
               <HowToTab
                 isAdmin={Boolean(isAdmin)}
                 isSuperAdmin={session?.user?.systemRole === 'SUPER_ADMIN'}
+                onStartGuide={startGuide}
                 onReplayTour={() => {
                   setTourDismissed(false)
                   setForceTour(true)

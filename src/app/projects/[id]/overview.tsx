@@ -175,7 +175,7 @@ export function OverviewTab({ project, onNavigate }: OverviewTabProps) {
       </div>
 
       {/* Activity Feed */}
-      <div className="bg-white rounded-xl border border-slate-200">
+      <div className="bg-white rounded-xl border border-slate-200" data-tour="activity-feed">
         <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
           <div>
             <h3 className="font-medium text-slate-900">Activity</h3>

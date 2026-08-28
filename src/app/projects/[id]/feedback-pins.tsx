@@ -171,7 +171,7 @@ export function FeedbackPinsTab({
 
       {/* Pins list */}
       <div className="bg-white rounded-xl shadow-sm border">
-        <div className="px-6 py-4 border-b flex items-center justify-between">
+        <div className="px-6 py-4 border-b flex items-center justify-between" data-tour="pins-list">
           <div>
             <h3 className="font-semibold">Map Feedback ({feedbackPins.length})</h3>
             <p className="text-xs text-gray-400 mt-0.5">
@@ -287,6 +287,7 @@ export function FeedbackPinsTab({
                         <button
                           onClick={() => approvePin.mutate({ pinId: pin.id, approved: true })}
                           disabled={pendingApprovalId === pin.id}
+                          data-tour="pin-approve"
                           className="p-2 text-green-600 hover:bg-green-50 rounded-lg disabled:opacity-50"
                           title="Approve"
                         >
@@ -296,6 +297,7 @@ export function FeedbackPinsTab({
                         <button
                           onClick={() => approvePin.mutate({ pinId: pin.id, approved: false })}
                           disabled={pendingApprovalId === pin.id}
+                          data-tour="pin-unapprove"
                           className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg disabled:opacity-50"
                           title="Unapprove"
                         >
@@ -305,6 +307,7 @@ export function FeedbackPinsTab({
                       <button
                         onClick={() => confirmDelete(pin)}
                         disabled={pendingDeleteId === pin.id}
+                        data-tour="pin-delete"
                         className="p-2 text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-50"
                         title="Delete permanently"
                       >

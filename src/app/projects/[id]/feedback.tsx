@@ -42,11 +42,14 @@ export function FeedbackTab({
   project,
   focusPinId,
   onFocusHandled,
+  subTabOverride,
 }: {
   projectId: string
   project: any
   focusPinId?: string | null
   onFocusHandled?: () => void
+  /** Driven by guide walkthroughs to show a specific sub-tab */
+  subTabOverride?: SubTab | null
 }) {
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('map')
   const [copiedCode, setCopiedCode] = useState(false)
@@ -55,6 +58,10 @@ export function FeedbackTab({
   useEffect(() => {
     if (focusPinId) setActiveSubTab('responses')
   }, [focusPinId])
+
+  useEffect(() => {
+    if (subTabOverride) setActiveSubTab(subTabOverride)
+  }, [subTabOverride])
 
   const feedbackPinCount = project.publicPins?.length || 0
 
@@ -107,6 +114,7 @@ export function FeedbackTab({
                 href={embedUrl}
                 target="_blank"
                 rel="noopener noreferrer"
+                data-tour="preview-public"
                 className="flex items-center gap-1 text-xs text-green-600 hover:text-green-700 px-2 py-1 bg-white rounded border border-green-200"
               >
                 <ExternalLink size={12} /> Preview
@@ -130,6 +138,7 @@ export function FeedbackTab({
             <button
               key={tab.id}
               onClick={() => setActiveSubTab(tab.id)}
+              data-tour={`subtab-${tab.id}`}
               className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
                 activeSubTab === tab.id
                   ? 'border-green-600 text-green-700'

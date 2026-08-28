@@ -1496,7 +1496,7 @@ export function EmbedSettingsTab({ projectId, project }: { projectId: string; pr
             </div>
 
             {/* Styling Customization */}
-            <div className="mt-6 pt-6 border-t space-y-4">
+            <div className="mt-6 pt-6 border-t space-y-4" data-tour="embed-styling">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Styling</p>
 
               {/* Primary Color */}
@@ -1596,6 +1596,7 @@ export function EmbedSettingsTab({ projectId, project }: { projectId: string; pr
                   </a>
                   <button
                     onClick={copyFeedbackCode}
+                    data-tour="embed-copy"
                     className="flex items-center gap-1 text-sm text-brand-600 hover:text-brand-700"
                   >
                     {copiedFeedback ? <Check size={14} /> : <Copy size={14} />}

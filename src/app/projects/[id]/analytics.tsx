@@ -263,6 +263,7 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
         <button
           onClick={() => runAnalysis.mutate({})}
           disabled={runAnalysis.isPending}
+          data-tour="run-analysis"
           className="btn-primary px-8 py-3"
         >
           {runAnalysis.isPending ? (
@@ -338,6 +339,7 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
           <button
             onClick={() => runAnalysis.mutate({ force: true })}
             disabled={runAnalysis.isPending}
+            data-tour="run-analysis"
             className="btn-secondary"
           >
             {runAnalysis.isPending ? (

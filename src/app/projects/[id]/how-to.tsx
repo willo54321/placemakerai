@@ -5,12 +5,148 @@ import { ChevronDown, ChevronRight, PlayCircle, Mail, HelpCircle } from 'lucide-
 
 type Role = 'CLIENT' | 'ADMIN' | 'SUPER_ADMIN'
 
+/** One step of an interactive guide: which tab/sub-tab to show, what to spotlight. */
+export interface GuideStep {
+  tab: 'overview' | 'feedback' | 'forms' | 'website' | 'analytics' | 'settings' | 'howto'
+  subTab?: 'map' | 'responses'
+  target: string | null
+  title: string
+  body: string
+}
+
 interface Guide {
   id: string
   title: string
   minRole: Role
   steps: string[]
   tip?: string
+}
+
+// Interactive spotlight versions of the guides (where the target UI lives on
+// this dashboard — the /admin ones stay text-only).
+export const WALKTHROUGHS: Record<string, GuideStep[]> = {
+  approve: [
+    {
+      tab: 'feedback',
+      subTab: 'responses',
+      target: '[data-tour="subtab-responses"]',
+      title: 'Open the Responses tab',
+      body: 'Map Feedback has two views — the map itself, and this Responses list where every public comment arrives.',
+    },
+    {
+      tab: 'feedback',
+      subTab: 'responses',
+      target: '[data-tour="pins-list"]',
+      title: 'The moderation queue',
+      body: 'Each comment has an amber "Pending" or green "Approved" label. Pending comments are invisible to the public until you approve them.',
+    },
+    {
+      tab: 'feedback',
+      subTab: 'responses',
+      target: '[data-tour="pin-approve"]',
+      title: 'The green tick publishes',
+      body: 'Click it on a pending comment and it appears on the public map straight away.',
+    },
+    {
+      tab: 'feedback',
+      subTab: 'responses',
+      target: '[data-tour="pin-unapprove"]',
+      title: 'The amber clock un-publishes',
+      body: 'Changed your mind? This takes an approved comment off the public map — nothing is deleted, it just goes back to Pending.',
+    },
+  ],
+  delete: [
+    {
+      tab: 'feedback',
+      subTab: 'responses',
+      target: '[data-tour="subtab-responses"]',
+      title: 'Find the comment under Responses',
+      body: 'All comments live in this list, whatever their status.',
+    },
+    {
+      tab: 'feedback',
+      subTab: 'responses',
+      target: '[data-tour="pin-delete"]',
+      title: 'The red bin deletes permanently',
+      body: 'You will be asked to confirm, and the comment is read back to you first. This cannot be undone — if you only want it off the public map, use the amber clock instead.',
+    },
+  ],
+  'find-new': [
+    {
+      tab: 'overview',
+      target: '[data-tour="activity-feed"]',
+      title: 'Everything new lands here',
+      body: 'The Activity list shows every map comment, form response, and enquiry, newest first. Click "Review" or "View" on any item to jump straight to it. When comments are waiting, an "awaiting review" link appears at the top.',
+    },
+  ],
+  analysis: [
+    {
+      tab: 'analytics',
+      target: '[data-tour="run-analysis"]',
+      title: 'One click runs the analysis',
+      body: 'Click this button and wait about a minute — stay on the page. It re-uses saved results, so it only costs time when there is new feedback to analyse.',
+    },
+    {
+      tab: 'analytics',
+      target: null,
+      title: 'What you get',
+      body: 'Overall sentiment, the main themes people raise, material planning considerations, headline statistics, and a written summary you can lift into reports.',
+    },
+  ],
+  preview: [
+    {
+      tab: 'feedback',
+      target: '[data-tour="preview-public"]',
+      title: 'Preview opens the public page',
+      body: 'This opens the live consultation map in a new tab — exactly what residents see. Only approved comments are visible there.',
+    },
+  ],
+  markers: [
+    {
+      tab: 'feedback',
+      subTab: 'map',
+      target: '[data-tour="subtab-map"]',
+      title: 'Open the Map Editor',
+      body: 'This view is where you set up the map residents will see.',
+    },
+    {
+      tab: 'feedback',
+      subTab: 'map',
+      target: null,
+      title: 'Markers, areas, and routes',
+      body: 'Use "Add Marker" to place labelled points (like the site entrance), and the drawing tools to outline areas or routes. Everything you add appears on the public map.',
+    },
+  ],
+  forms: [
+    {
+      tab: 'forms',
+      target: '[data-tour="create-form"]',
+      title: 'Create a form',
+      body: 'This opens a window where you name the form and click "Add Field" for each question — text answers, multiple choice, ratings, and more.',
+    },
+    {
+      tab: 'forms',
+      target: null,
+      title: 'Share it and watch responses arrive',
+      body: 'Once saved, copy the form’s public link and share it anywhere — email, social media, your website. Responses appear under the form and feed the AI analysis automatically.',
+    },
+  ],
+  embed: [
+    {
+      tab: 'website',
+      target: '[data-tour="embed-copy"]',
+      title: 'Copy the embed code',
+      body: 'One small block of code. Paste it into your website — or just email it to whoever manages the site; nothing else is needed.',
+    },
+  ],
+  styling: [
+    {
+      tab: 'website',
+      target: '[data-tour="embed-styling"]',
+      title: 'Make it match your brand',
+      body: 'Set your accent colour and font, hide street labels, or default to satellite view. Changes apply to the live public map.',
+    },
+  ],
 }
 
 interface GuideSection {
@@ -161,10 +297,12 @@ export function HowToTab({
   isAdmin,
   isSuperAdmin,
   onReplayTour,
+  onStartGuide,
 }: {
   isAdmin: boolean
   isSuperAdmin: boolean
   onReplayTour: () => void
+  onStartGuide: (steps: GuideStep[]) => void
 }) {
   const [openGuide, setOpenGuide] = useState<string | null>(null)
 
@@ -217,6 +355,15 @@ export function HowToTab({
                   </button>
                   {isOpen && (
                     <div className="px-4 pb-4">
+                      {WALKTHROUGHS[guide.id] && (
+                        <button
+                          onClick={() => onStartGuide(WALKTHROUGHS[guide.id])}
+                          className="mb-3 flex items-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg"
+                        >
+                          <PlayCircle size={16} />
+                          Show me — walk through it on screen
+                        </button>
+                      )}
                       <ol className="space-y-2 list-none">
                         {guide.steps.map((step, i) => (
                           <li key={i} className="flex gap-3 text-sm text-slate-700">

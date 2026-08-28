@@ -157,6 +157,7 @@ export function FormsTab({
             onClick={() => setShowForm(true)}
             className="btn-primary"
             aria-haspopup="dialog"
+            data-tour="create-form"
           >
             <Plus size={18} aria-hidden="true" />
             Create Form

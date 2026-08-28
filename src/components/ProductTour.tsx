@@ -4,8 +4,8 @@ import { useEffect, useLayoutEffect, useState } from 'react'
 import { X, ArrowRight, ArrowLeft } from 'lucide-react'
 
 export interface TourStep {
-  /** DOM id of the element to spotlight; null = centered welcome card */
-  targetId: string | null
+  /** CSS selector of the element to spotlight; null = centered card */
+  target: string | null
   title: string
   body: string
 }
@@ -16,6 +16,8 @@ interface ProductTourProps {
   onFinish: (dontShowAgain: boolean) => void
   /** Called before each step renders, e.g. to switch the visible tab. */
   onStepChange?: (index: number) => void
+  /** Hide the "don't show again" checkbox (guide walkthroughs). */
+  hideOptOut?: boolean
 }
 
 /**
@@ -25,7 +27,7 @@ interface ProductTourProps {
  */
 type SpotRect = { top: number; left: number; width: number; height: number }
 
-export function ProductTour({ steps, onFinish, onStepChange }: ProductTourProps) {
+export function ProductTour({ steps, onFinish, onStepChange, hideOptOut }: ProductTourProps) {
   const [index, setIndex] = useState(0)
   const [dontShowAgain, setDontShowAgain] = useState(false)
   const [rect, setRect] = useState<SpotRect | null>(null)
@@ -37,26 +39,49 @@ export function ProductTour({ steps, onFinish, onStepChange }: ProductTourProps)
   }, [index, onStepChange])
 
   useLayoutEffect(() => {
+    let cancelled = false
+    let attempts = 0
+
+    const centerRect = () =>
+      ({ top: window.innerHeight / 2, left: window.innerWidth / 2, width: 0, height: 0 })
+
     const measure = () => {
-      if (!step?.targetId) {
-        // Welcome/untargeted step: a zero-size spotlight at screen centre —
-        // the surrounding box-shadow dims everything, and being a real rect
-        // means the SAME element animates smoothly into the first highlight.
-        setRect({ top: window.innerHeight / 2, left: window.innerWidth / 2, width: 0, height: 0 })
+      if (cancelled) return
+      if (!step?.target) {
+        // Untargeted step: a zero-size spotlight at screen centre — the
+        // surrounding box-shadow dims everything, and being a real rect means
+        // the SAME element animates smoothly into the next highlight.
+        setRect(centerRect())
         return
       }
-      const el = document.getElementById(step.targetId)
+      const el = document.querySelector(step.target)
       if (el) {
         const r = el.getBoundingClientRect()
+        el.scrollIntoView?.({ block: 'nearest' })
         setRect({ top: r.top, left: r.left, width: r.width, height: r.height })
+        return
+      }
+      // Target not rendered yet (lazy-loaded tab, list still fetching) —
+      // keep trying briefly, then fall back to a centred card so the step's
+      // text still teaches even if there's nothing to point at.
+      attempts++
+      if (attempts < 20) {
+        setTimeout(measure, 150)
+      } else {
+        setRect(centerRect())
       }
     }
-    // Measure after the step's tab has had a frame to render
+
     const timer = setTimeout(measure, 60)
-    window.addEventListener('resize', measure)
+    const onResize = () => {
+      attempts = 0
+      measure()
+    }
+    window.addEventListener('resize', onResize)
     return () => {
+      cancelled = true
       clearTimeout(timer)
-      window.removeEventListener('resize', measure)
+      window.removeEventListener('resize', onResize)
     }
   }, [step])
 
@@ -72,7 +97,7 @@ export function ProductTour({ steps, onFinish, onStepChange }: ProductTourProps)
   const vh = typeof window !== 'undefined' ? window.innerHeight : 800
   let cardTop: number
   let cardLeft: number
-  if (!step.targetId || !rect) {
+  if (!step.target || !rect) {
     cardLeft = vw / 2 - cardWidth / 2
     cardTop = Math.max(vh / 2 - 150, 16)
   } else {
@@ -118,15 +143,19 @@ export function ProductTour({ steps, onFinish, onStepChange }: ProductTourProps)
         <p className="text-sm text-slate-600 mb-4">{step.body}</p>
 
         <div className="flex items-center justify-between gap-3">
-          <label className="flex items-center gap-2 text-xs text-slate-500 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={dontShowAgain}
-              onChange={(e) => setDontShowAgain(e.target.checked)}
-              className="w-3.5 h-3.5 rounded border-slate-300 text-green-600 focus:ring-green-500"
-            />
-            Don&apos;t show again
-          </label>
+          {hideOptOut ? (
+            <span />
+          ) : (
+            <label className="flex items-center gap-2 text-xs text-slate-500 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={dontShowAgain}
+                onChange={(e) => setDontShowAgain(e.target.checked)}
+                className="w-3.5 h-3.5 rounded border-slate-300 text-green-600 focus:ring-green-500"
+              />
+              Don&apos;t show again
+            </label>
+          )}
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-400 mr-1">
               {index + 1}/{steps.length}

@@ -12,6 +12,11 @@ function getAnthropic(): Anthropic {
   if (!anthropicClient) {
     anthropicClient = new Anthropic({
       apiKey: process.env.ANTHROPIC_API_KEY,
+      // Identity-linked API keys must declare which workspace each request
+      // acts in; workspace-scoped keys don't need this and can leave it unset.
+      defaultHeaders: process.env.ANTHROPIC_WORKSPACE_ID
+        ? { 'anthropic-workspace-id': process.env.ANTHROPIC_WORKSPACE_ID }
+        : undefined,
     })
   }
   return anthropicClient

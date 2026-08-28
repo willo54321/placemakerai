@@ -138,10 +138,16 @@ export default function UsersPage() {
               <p className="text-sm text-slate-500">Manage users and their project access</p>
             </div>
           </div>
-          <button onClick={() => setShowAddModal(true)} className="btn-primary">
-            <Plus size={18} />
-            Add User
-          </button>
+          <div className="flex items-center gap-3">
+            <Link href="/admin/gdpr" className="btn-secondary">
+              <Shield size={18} />
+              GDPR Requests
+            </Link>
+            <button onClick={() => setShowAddModal(true)} className="btn-primary">
+              <Plus size={18} />
+              Add User
+            </button>
+          </div>
         </div>
       </header>
 

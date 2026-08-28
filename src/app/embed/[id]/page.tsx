@@ -99,7 +99,6 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
   const [form, setForm] = useState({
     comment: '',
     name: '',
-    email: '',
     gdprConsent: false,
   })
 
@@ -198,7 +197,6 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
         category: selectedCategory,
         comment: form.comment,
         name: form.name || null,
-        email: form.email || null,
         gdprConsent: form.gdprConsent,
       }
 
@@ -240,7 +238,7 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
     setDrawMode(null)
     setSubmitError(null)
     setSubmitSuccess(false)
-    setForm({ comment: '', name: '', email: '', gdprConsent: false })
+    setForm({ comment: '', name: '', gdprConsent: false })
     setSelectedCategory('question')
   }
 
@@ -634,33 +632,18 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
                 </div>
 
                 {/* Optional Fields */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Name (optional)
-                    </label>
-                    <input
-                      type="text"
-                      value={form.name}
-                      onChange={(e) => setForm({ ...form, name: e.target.value })}
-                      placeholder="Your name"
-                      className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
-                      maxLength={100}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Email (optional)
-                    </label>
-                    <input
-                      type="email"
-                      value={form.email}
-                      onChange={(e) => setForm({ ...form, email: e.target.value })}
-                      placeholder="your@email.com"
-                      className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
-                      maxLength={255}
-                    />
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Name (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    placeholder="Your name"
+                    className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+                    maxLength={100}
+                  />
                 </div>
 
                 {/* Moderation Notice */}

@@ -34,7 +34,7 @@ export default function PrivacyPolicy() {
               We only collect personal data you actively choose to submit:
             </p>
             <ul className="list-disc pl-6 text-slate-600 space-y-2 mb-4">
-              <li><strong>Map feedback:</strong> Comments you attach to map pins or drawn shapes, the map location you choose, and — optionally — your name and email address</li>
+              <li><strong>Map feedback:</strong> Comments you attach to map pins or drawn shapes, the map location you choose, and — optionally — your name</li>
               <li><strong>Form responses:</strong> Answers you submit through consultation feedback forms, which may include your name and contact details where a form asks for them</li>
               <li><strong>Enquiries:</strong> Your name, email address, and message when you submit an enquiry, plus phone number and organisation if you provide them</li>
               <li><strong>Account data:</strong> For consultation teams using the dashboard — name, email address, and a securely hashed password</li>
@@ -96,6 +96,9 @@ export default function PrivacyPolicy() {
             </ul>
             <p className="text-slate-600 mb-4">
               We never sell personal data. We use a small number of service providers to operate the platform: our database is hosted with Supabase in the European Union (Frankfurt, Germany), the application is hosted by Vercel, and AI analysis is provided by Anthropic in the United States. Where data is processed outside the UK, transfers are protected by appropriate safeguards, including standard contractual clauses.
+            </p>
+            <p className="text-slate-600 mb-4">
+              The interactive maps are provided by Google Maps. When you view a consultation map, your browser connects directly to Google, which processes your IP address in order to deliver the map. See Google's own privacy policy for how it handles this data.
             </p>
           </section>
 

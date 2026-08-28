@@ -77,7 +77,8 @@ export async function POST(
       category,
       comment: body.comment.slice(0, 2000), // Limit comment length
       name: body.name?.slice(0, 100) || null,
-      email: body.email?.slice(0, 255) || null,
+      // Email is deliberately not collected on map feedback (data minimization) —
+      // it served no purpose: no reply workflow, no notifications, no mailing list.
       gdprConsent: true,
       gdprConsentDate: new Date(),
     }

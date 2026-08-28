@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { getAuth } from '@/lib/auth'
 import { sendSetPasswordEmail } from '@/lib/email'
 import { issuePasswordToken, appBaseUrl, INVITE_TOKEN_TTL_HOURS } from '@/lib/password-reset'
+import bcrypt from 'bcryptjs'
 
 // Get all users (super admin only)
 export async function GET() {
@@ -66,10 +67,17 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { email, name, systemRole, projectAccess } = body
+    const { email, name, systemRole, projectAccess, password } = body
 
     if (!email) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 })
+    }
+
+    if (password !== undefined && (typeof password !== 'string' || password.length < 8)) {
+      return NextResponse.json(
+        { error: 'Password must be at least 8 characters' },
+        { status: 400 }
+      )
     }
 
     // Check if user already exists
@@ -89,6 +97,7 @@ export async function POST(request: Request) {
       data: {
         email,
         name: name || null,
+        password: password ? await bcrypt.hash(password, 10) : null,
         systemRole: systemRole || 'USER',
         projectAccess: projectAccess?.length
           ? {
@@ -110,22 +119,26 @@ export async function POST(request: Request) {
       },
     })
 
-    // Email the new user a set-password link so they can actually sign in.
+    // If the admin set a password directly, the user can sign in immediately —
+    // no invite email needed. Otherwise email a set-password link.
     let inviteEmailSent = false
-    try {
-      const token = await issuePasswordToken(user.id, INVITE_TOKEN_TTL_HOURS)
-      const result = await sendSetPasswordEmail({
-        to: user.email,
-        name: user.name,
-        url: `${appBaseUrl()}/set-password?token=${token}`,
-        mode: 'invite',
-      })
-      inviteEmailSent = Boolean(result)
-    } catch (inviteError) {
-      console.error('Failed to send invite email:', inviteError)
+    if (!password) {
+      try {
+        const token = await issuePasswordToken(user.id, INVITE_TOKEN_TTL_HOURS)
+        const result = await sendSetPasswordEmail({
+          to: user.email,
+          name: user.name,
+          url: `${appBaseUrl()}/set-password?token=${token}`,
+          mode: 'invite',
+        })
+        inviteEmailSent = Boolean(result)
+      } catch (inviteError) {
+        console.error('Failed to send invite email:', inviteError)
+      }
     }
 
-    return NextResponse.json({ ...user, inviteEmailSent })
+    const { password: _pw, passwordResetToken: _prt, ...safeUser } = user
+    return NextResponse.json({ ...safeUser, inviteEmailSent })
   } catch (error) {
     console.error('Failed to create user:', error)
     return NextResponse.json({ error: 'Failed to create user' }, { status: 500 })

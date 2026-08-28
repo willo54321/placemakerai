@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { getAuth } from '@/lib/auth'
+import bcrypt from 'bcryptjs'
 
 // Get a single user
 export async function GET(
@@ -24,7 +25,12 @@ export async function GET(
 
     const user = await prisma.user.findUnique({
       where: { id: params.id },
-      include: {
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        systemRole: true,
+        createdAt: true,
         projectAccess: {
           include: {
             project: {
@@ -67,14 +73,33 @@ export async function PATCH(
     }
 
     const body = await request.json()
-    const { name, systemRole, projectAccess } = body
+    const { name, systemRole, projectAccess, password } = body
+
+    if (password !== undefined && (typeof password !== 'string' || password.length < 8)) {
+      return NextResponse.json(
+        { error: 'Password must be at least 8 characters' },
+        { status: 400 }
+      )
+    }
 
     // Update user basic info
-    const updateData: { name?: string; systemRole?: 'SUPER_ADMIN' | 'USER' } = {}
+    const updateData: {
+      name?: string
+      systemRole?: 'SUPER_ADMIN' | 'USER'
+      password?: string
+      passwordResetToken?: null
+      passwordResetExpires?: null
+    } = {}
     if (name !== undefined) updateData.name = name
     if (systemRole !== undefined) updateData.systemRole = systemRole
+    if (password) {
+      updateData.password = await bcrypt.hash(password, 10)
+      // A directly-set password supersedes any outstanding reset/invite link.
+      updateData.passwordResetToken = null
+      updateData.passwordResetExpires = null
+    }
 
-    const user = await prisma.user.update({
+    await prisma.user.update({
       where: { id: params.id },
       data: updateData,
     })
@@ -101,7 +126,12 @@ export async function PATCH(
     // Fetch updated user with project access
     const updatedUser = await prisma.user.findUnique({
       where: { id: params.id },
-      include: {
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        systemRole: true,
+        createdAt: true,
         projectAccess: {
           include: {
             project: {

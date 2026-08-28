@@ -267,6 +267,7 @@ function UserModal({ user, projects, onClose }: UserModalProps) {
 
   const [email, setEmail] = useState(user?.email || '')
   const [name, setName] = useState(user?.name || '')
+  const [password, setPassword] = useState('')
   const [systemRole, setSystemRole] = useState<'SUPER_ADMIN' | 'USER'>(
     user?.systemRole || 'USER'
   )
@@ -280,6 +281,7 @@ function UserModal({ user, projects, onClose }: UserModalProps) {
       name: string
       systemRole: string
       projectAccess: { projectId: string; role: string }[]
+      password?: string
     }) => {
       const url = isEditing ? `/api/admin/users/${user.id}` : '/api/admin/users'
       const method = isEditing ? 'PATCH' : 'POST'
@@ -304,7 +306,13 @@ function UserModal({ user, projects, onClose }: UserModalProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    mutation.mutate({ email, name, systemRole, projectAccess })
+    mutation.mutate({
+      email,
+      name,
+      systemRole,
+      projectAccess,
+      ...(password ? { password } : {}),
+    })
   }
 
   const toggleProjectAccess = (projectId: string, role: 'ADMIN' | 'CLIENT') => {
@@ -368,6 +376,27 @@ function UserModal({ user, projects, onClose }: UserModalProps) {
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
               placeholder="John Doe"
             />
+          </div>
+
+          {/* Password */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              {isEditing ? 'Set New Password' : 'Password'}
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              minLength={8}
+              autoComplete="new-password"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+              placeholder={isEditing ? 'Leave blank to keep current password' : 'Min 8 characters'}
+            />
+            <p className="text-xs text-slate-500 mt-1">
+              {isEditing
+                ? 'Only fill this in to change the password. Share it with the user securely.'
+                : 'Set a password so they can log in straight away. Share it with them securely.'}
+            </p>
           </div>
 
           {/* System Role */}

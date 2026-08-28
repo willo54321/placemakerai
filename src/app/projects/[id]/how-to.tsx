@@ -117,6 +117,36 @@ export const WALKTHROUGHS: Record<string, GuideStep[]> = {
       body: 'Use "Add Marker" to place labelled points (like the site entrance), and the drawing tools to outline areas or routes. Everything you add appears on the public map.',
     },
   ],
+  overlay: [
+    {
+      tab: 'feedback',
+      subTab: 'map',
+      target: '[data-tour="subtab-map"]',
+      title: 'Open the Map Editor',
+      body: 'Overlays are set up here, alongside markers and drawing.',
+    },
+    {
+      tab: 'feedback',
+      subTab: 'map',
+      target: '[data-tour="overlay-images-tab"]',
+      title: 'Open the Images panel',
+      body: 'This panel lists every image overlay on your map.',
+    },
+    {
+      tab: 'feedback',
+      subTab: 'map',
+      target: '[data-tour="overlay-upload"]',
+      title: 'Upload your plan',
+      body: 'Click "Add Overlay" and choose the image — site plans and masterplans up to 50MB. PNGs with transparency look best.',
+    },
+    {
+      tab: 'feedback',
+      subTab: 'map',
+      target: null,
+      title: 'Position it and set the opacity',
+      body: 'Drag the image on the map until it lines up with the streets, then use the Opacity slider so the map shows through. Residents will see it on the public map.',
+    },
+  ],
   forms: [
     {
       tab: 'forms',
@@ -227,6 +257,19 @@ const SECTIONS: GuideSection[] = [
           'Use the drawing tools to outline areas (e.g. the site boundary) or routes, and give each one a label.',
           'Everything you add here appears on the public map for residents.',
         ],
+      },
+      {
+        id: 'overlay',
+        title: 'Add a site plan or masterplan over the map',
+        minRole: 'ADMIN',
+        steps: [
+          'Click "Map Feedback" → the "Map Editor" tab.',
+          'In the side panel, click "Images", then "Add Overlay" and choose your image — a site plan or masterplan works best (up to 50MB).',
+          'The image appears on the map. Drag and adjust it until it lines up with the streets underneath.',
+          'Use the Opacity slider so the map shows through the image — around half-transparent usually reads well.',
+          'Residents see the overlay on the public map, so they can comment directly on your proposals.',
+        ],
+        tip: 'PNG images with transparent backgrounds look best. If your plan is a PDF, take a screenshot or export it as an image first.',
       },
       {
         id: 'forms',

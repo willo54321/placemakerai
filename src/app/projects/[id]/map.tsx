@@ -952,6 +952,7 @@ export function MapTab({ projectId, project }: { projectId: string; project: Pro
                   <div className="flex border-b border-gray-200">
                     <button
                       onClick={() => setSidebarMode('overlays')}
+                      data-tour="overlay-images-tab"
                       className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium transition-colors ${
                         sidebarMode === 'overlays'
                           ? 'text-brand-600 border-b-2 border-brand-600 bg-brand-50'
@@ -980,7 +981,7 @@ export function MapTab({ projectId, project }: { projectId: string; project: Pro
                   {sidebarMode === 'overlays' && (
                     <>
                       <div className="p-3 border-b border-gray-100">
-                        <label className={`flex items-center justify-center gap-2 p-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-brand-400 hover:bg-brand-50 transition-colors ${(isUploading || createOverlay.isPending) ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <label data-tour="overlay-upload" className={`flex items-center justify-center gap-2 p-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-brand-400 hover:bg-brand-50 transition-colors ${(isUploading || createOverlay.isPending) ? 'opacity-50 pointer-events-none' : ''}`}>
                           {isUploading ? (
                             <>
                               <span className="animate-spin w-4 h-4 border-2 border-brand-500 border-t-transparent rounded-full" />

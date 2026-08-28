@@ -25,9 +25,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
         {children}
         <Toaster
           position="bottom-right"
+          // Always auto-dismiss — stale toasts otherwise sit over the UI.
+          // Must be the top-level prop; duration inside toastOptions is not
+          // applied by our sonner version.
+          duration={5000}
           toastOptions={{
-            // Always auto-dismiss — stale toasts otherwise sit over the UI
-            duration: 5000,
             style: {
               background: 'white',
               border: '1px solid #e2e8f0',

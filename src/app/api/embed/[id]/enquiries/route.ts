@@ -42,20 +42,21 @@ export async function POST(
 
   // Name every problem in one response so submitters don't discover the
   // contract one error at a time.
-  const missing = (
-    [
-      ['submitterName', 'name'],
-      ['submitterEmail', 'email'],
-      ['subject', 'subject'],
-      ['message', 'message'],
-    ] as const
+  // Error messages must use the ACTUAL field names of the API contract, so
+  // integrators can fix their payload from the message alone.
+  const missing = (['submitterName', 'submitterEmail', 'subject', 'message'] as const).filter(
+    field => !body[field]
   )
-    .filter(([field]) => !body[field])
-    .map(([, label]) => label)
   const errors: string[] = missing.length ? [`missing required field${missing.length > 1 ? 's' : ''}: ${missing.join(', ')}`] : []
 
+  const KNOWN_FIELDS = ['submitterName', 'submitterEmail', 'submitterPhone', 'submitterOrg', 'subject', 'message', 'category', 'gdprConsent', 'mailingConsent']
+  const unknownFields = Object.keys(body).filter(k => !KNOWN_FIELDS.includes(k))
+  if (unknownFields.length > 0) {
+    errors.push(`unknown field${unknownFields.length > 1 ? 's' : ''}: ${unknownFields.join(', ')} (accepted fields: ${KNOWN_FIELDS.slice(0, -1).join(', ')})`)
+  }
+
   if (body.submitterEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.submitterEmail)) {
-    errors.push('email must be a valid email address')
+    errors.push('submitterEmail must be a valid email address')
   }
   if (!body.gdprConsent) {
     errors.push('GDPR consent is required')

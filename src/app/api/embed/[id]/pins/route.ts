@@ -39,6 +39,15 @@ export async function POST(
   // one round trip instead of fixing errors one at a time.
   const errors: string[] = []
 
+  // Reject unknown fields so integrator typos (e.g. `type` instead of
+  // `category`) fail loudly instead of being silently ignored. `email` and
+  // `mailingConsent` are tolerated as no-ops for legacy embeds.
+  const KNOWN_FIELDS = ['shapeType', 'latitude', 'longitude', 'geometry', 'category', 'comment', 'name', 'gdprConsent', 'email', 'mailingConsent']
+  const unknownFields = Object.keys(body).filter(k => !KNOWN_FIELDS.includes(k))
+  if (unknownFields.length > 0) {
+    errors.push(`unknown field${unknownFields.length > 1 ? 's' : ''}: ${unknownFields.join(', ')} (accepted fields: shapeType, latitude, longitude, geometry, category, comment, name, gdprConsent)`)
+  }
+
   const lat = shapeType === 'pin' ? parseFloat(body.latitude) : null
   const lng = shapeType === 'pin' ? parseFloat(body.longitude) : null
 

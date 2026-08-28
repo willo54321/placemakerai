@@ -601,12 +601,8 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
         }
         .animate-popup-out { animation: popupSlideOut 0.2s ease-in forwards; }
         .gm-style a[href^="https://maps.google.com/maps"],
-        .gm-style .gmnoprint a,
         .gm-style .gm-style-cc,
-        .gm-style .gm-bundled-control,
-        .gm-style .gmnoprint,
         .gm-style .gm-fullscreen-control,
-        .gm-style [class*="gm-control"],
         .gm-style .gm-svpc,
         .gm-style .gm-style-mtc,
         .gm-style [aria-label="Map Type"],
@@ -615,6 +611,8 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
         .gm-style button[title="Change map style"] {
           display: none !important;
         }
+        /* Note: .gm-bundled-control / [class*="gm-control"] / bare .gmnoprint
+           must NOT be hidden — that's the zoom control (accessibility). */
       `}</style>
       <GoogleMap
         mapContainerStyle={{

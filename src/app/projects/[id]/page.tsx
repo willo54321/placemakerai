@@ -1,17 +1,13 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, Users, MapPin, Inbox, Settings, Mail, LayoutDashboard, BarChart3, Navigation, Globe, Eye, AlertTriangle, FileText } from 'lucide-react'
+import { ArrowLeft, Users, MapPin, Settings, LayoutDashboard, BarChart3, Globe, Eye, FileText } from 'lucide-react'
 import Link from 'next/link'
 import { useState, Suspense } from 'react'
 import dynamic from 'next/dynamic'
 import { OverviewTab } from './overview'
-import { StakeholderTab } from './stakeholders'
-import { EnquiriesTab } from './enquiries'
 import { SettingsTab } from './settings'
-import { MailingListTab } from './mailing-list'
 import { AnalyticsTab } from './analytics'
-import { ToursTab } from './tours'
 import UserMenu from '@/components/UserMenu'
 
 // Dynamic imports for components that use Google Maps to avoid SSR/chunk issues
@@ -39,18 +35,6 @@ const EmbedSettingsTab = dynamic(() => import('./map').then(mod => ({ default: m
   )
 })
 
-const IssuesTab = dynamic(() => import('./issues').then(mod => ({ default: mod.IssuesTab })), {
-  ssr: false,
-  loading: () => (
-    <div className="h-full flex items-center justify-center">
-      <div className="flex flex-col items-center gap-3">
-        <div className="w-8 h-8 border-3 border-orange-600 border-t-transparent rounded-full animate-spin" />
-        <span className="text-sm text-slate-500">Loading issues...</span>
-      </div>
-    </div>
-  )
-})
-
 const FormsTabWrapper = dynamic(() => import('./forms-wrapper').then(mod => ({ default: mod.FormsTabWrapper })), {
   ssr: false,
   loading: () => (
@@ -63,10 +47,7 @@ const FormsTabWrapper = dynamic(() => import('./forms-wrapper').then(mod => ({ d
   )
 })
 
-type Tab = 'overview' | 'stakeholders' | 'feedback' | 'forms' | 'issues' | 'tours' | 'website' | 'analytics' | 'inbox' | 'mailing' | 'settings'
-
-// Tabs that require admin access
-const ADMIN_ONLY_TABS: Tab[] = ['stakeholders', 'tours', 'website', 'inbox', 'mailing', 'settings', 'issues', 'forms']
+type Tab = 'overview' | 'feedback' | 'forms' | 'website' | 'analytics' | 'settings'
 
 // Tab groups for organized navigation
 type TabGroup = {
@@ -77,9 +58,8 @@ type TabGroup = {
 
 const tabGroups: TabGroup[] = [
   { id: 'top', label: '', tabs: ['overview'] },
-  { id: 'collect', label: 'Collect', tabs: ['feedback', 'forms', 'issues', 'analytics'] },
-  { id: 'engage', label: 'Engage', tabs: ['stakeholders', 'inbox', 'mailing'] },
-  { id: 'publish', label: 'Publish', tabs: ['website', 'tours'] },
+  { id: 'collect', label: 'Collect', tabs: ['feedback', 'forms', 'analytics'] },
+  { id: 'publish', label: 'Publish', tabs: ['website'] },
   { id: 'configure', label: 'Configure', tabs: ['settings'] },
 ]
 
@@ -143,10 +123,8 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
   }
 
   // Calculate counts for different feedback types
-  const pinFeedbackCount = project.publicPins?.filter((p: any) => p.mode === 'feedback').length || 0
-  const issuesCount = project.publicPins?.filter((p: any) => p.mode === 'issues').length || 0
-  const formsCount = project.feedbackForms?.length || 0
-  const formResponseCount = project.feedbackForms?.reduce((sum: number, form: any) => sum + (form.responses?.length || 0), 0) || 0
+  const pinFeedbackCount = project.publicPins?.length || 0
+  const formResponseCount = project.feedbackForms?.reduce((sum: number, form: any) => sum + (form._count?.responses || form.responses?.length || 0), 0) || 0
 
   const allTabs = [
     {
@@ -155,13 +133,6 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
       icon: LayoutDashboard,
       count: 0,
       adminOnly: false,
-    },
-    {
-      id: 'stakeholders' as Tab,
-      label: 'Stakeholders',
-      icon: Users,
-      count: project.stakeholders?.length || 0,
-      adminOnly: true,
     },
     {
       id: 'feedback' as Tab,
@@ -175,21 +146,6 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
       label: 'Feedback Forms',
       icon: FileText,
       count: formResponseCount,
-      adminOnly: true,
-    },
-    {
-      id: 'issues' as Tab,
-      label: 'Issues',
-      icon: AlertTriangle,
-      count: issuesCount,
-      adminOnly: true,
-      hidden: !project.issuesEnabled,
-    },
-    {
-      id: 'tours' as Tab,
-      label: 'Tours',
-      icon: Navigation,
-      count: project.tours?.length || 0,
       adminOnly: true,
     },
     {
@@ -207,20 +163,6 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
       adminOnly: false,
     },
     {
-      id: 'inbox' as Tab,
-      label: 'Inbox',
-      icon: Inbox,
-      count: project.enquiries?.length || 0,
-      adminOnly: true,
-    },
-    {
-      id: 'mailing' as Tab,
-      label: 'Mailing List',
-      icon: Mail,
-      count: project.subscribers?.length || 0,
-      adminOnly: true,
-    },
-    {
       id: 'settings' as Tab,
       label: 'Settings',
       icon: Settings,
@@ -228,9 +170,6 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
       adminOnly: true,
     },
   ]
-
-  // Filter tabs based on user role - admins see all, clients see limited tabs
-  const tabs = allTabs.filter(tab => !tab.hidden && (isAdmin || !tab.adminOnly))
 
   // Create a map for easy lookup
   const tabsMap = new Map(allTabs.map(tab => [tab.id, tab]))
@@ -290,7 +229,7 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
             const groupTabs = group.tabs
               .map(tabId => tabsMap.get(tabId))
               .filter((tab): tab is NonNullable<typeof tab> =>
-                tab !== undefined && !tab.hidden && (isAdmin || !tab.adminOnly)
+                tab !== undefined && (isAdmin || !tab.adminOnly)
               )
 
             if (groupTabs.length === 0) return null
@@ -362,24 +301,11 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
               <OverviewTab project={project} onNavigate={setActiveTab} />
             </div>
           )}
-          {activeTab === 'stakeholders' && (
-            <div className="p-6">
-              <StakeholderTab projectId={params.id} stakeholders={project.stakeholders} />
-            </div>
-          )}
           {activeTab === 'feedback' && (
             <FeedbackTab projectId={params.id} project={project} />
           )}
           {activeTab === 'forms' && (
             <FormsTabWrapper projectId={params.id} project={project} />
-          )}
-          {activeTab === 'issues' && (
-            <IssuesTab projectId={params.id} project={project} />
-          )}
-          {activeTab === 'tours' && (
-            <div className="p-6">
-              <ToursTab projectId={params.id} project={project} />
-            </div>
           )}
           {activeTab === 'website' && (
             <div className="p-6">
@@ -389,16 +315,6 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
           {activeTab === 'analytics' && (
             <div className="p-6">
               <AnalyticsTab projectId={params.id} />
-            </div>
-          )}
-          {activeTab === 'inbox' && (
-            <div className="p-6">
-              <EnquiriesTab projectId={params.id} project={project} />
-            </div>
-          )}
-          {activeTab === 'mailing' && (
-            <div className="p-6">
-              <MailingListTab projectId={params.id} />
             </div>
           )}
           {activeTab === 'settings' && (

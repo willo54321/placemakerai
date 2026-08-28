@@ -1,8 +1,8 @@
 'use client'
 
-import { Users, MapPin, Inbox, Mail, Globe, Clock, CheckCircle, ArrowRight, MessageCircle, FileText } from 'lucide-react'
+import { MapPin, Globe, Clock, CheckCircle, ArrowRight, MessageCircle, FileText, BarChart3 } from 'lucide-react'
 
-type Tab = 'overview' | 'stakeholders' | 'feedback' | 'inbox' | 'mailing' | 'settings'
+type Tab = 'overview' | 'feedback' | 'forms' | 'website' | 'analytics' | 'settings'
 
 interface OverviewTabProps {
   project: any
@@ -10,36 +10,19 @@ interface OverviewTabProps {
 }
 
 export function OverviewTab({ project, onNavigate }: OverviewTabProps) {
-  const stakeholderCount = project.stakeholders?.length || 0
   const mapMarkerCount = project.mapMarkers?.length || 0
   const publicPinCount = project.publicPins?.length || 0
   const formCount = project.feedbackForms?.length || 0
-  const enquiryCount = project.enquiries?.length || 0
-  const subscriberCount = project.subscribers?.length || 0
 
   // Calculate pending items
   const pendingComments = project.publicPins?.filter((p: any) => !p.approved)?.length || 0
-  const newEnquiries = project.enquiries?.filter((e: any) => e.status === 'new')?.length || 0
 
   // Get recent activity
-  const recentStakeholders = (project.stakeholders || [])
-    .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 3)
-
   const recentComments = (project.publicPins || [])
     .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 3)
 
   const metrics = [
-    {
-      label: 'Stakeholders',
-      value: stakeholderCount,
-      icon: Users,
-      color: 'bg-blue-500',
-      bgColor: 'bg-blue-50',
-      textColor: 'text-blue-700',
-      onClick: () => onNavigate('stakeholders'),
-    },
     {
       label: 'Map Markers',
       value: mapMarkerCount,
@@ -60,32 +43,13 @@ export function OverviewTab({ project, onNavigate }: OverviewTabProps) {
       badge: pendingComments > 0 ? `${pendingComments} pending` : undefined,
     },
     {
-      label: 'Enquiries',
-      value: enquiryCount,
-      icon: Inbox,
-      color: 'bg-amber-500',
-      bgColor: 'bg-amber-50',
-      textColor: 'text-amber-700',
-      onClick: () => onNavigate('inbox'),
-      badge: newEnquiries > 0 ? `${newEnquiries} new` : undefined,
-    },
-    {
       label: 'Forms',
       value: formCount,
       icon: FileText,
       color: 'bg-slate-500',
       bgColor: 'bg-slate-50',
       textColor: 'text-slate-700',
-      onClick: () => onNavigate('feedback'),
-    },
-    {
-      label: 'Subscribers',
-      value: subscriberCount,
-      icon: Mail,
-      color: 'bg-pink-500',
-      bgColor: 'bg-pink-50',
-      textColor: 'text-pink-700',
-      onClick: () => onNavigate('mailing'),
+      onClick: () => onNavigate('forms'),
     },
   ]
 
@@ -119,7 +83,7 @@ export function OverviewTab({ project, onNavigate }: OverviewTabProps) {
           </div>
         </div>
         <button
-          onClick={() => onNavigate('feedback')}
+          onClick={() => onNavigate('website')}
           className={`text-sm font-medium flex items-center gap-1 ${
             project.embedEnabled ? 'text-green-700 hover:text-green-800' : 'text-amber-700 hover:text-amber-800'
           }`}
@@ -130,7 +94,7 @@ export function OverviewTab({ project, onNavigate }: OverviewTabProps) {
       </div>
 
       {/* Metrics Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         {metrics.map((metric) => {
           const Icon = metric.icon
           return (
@@ -158,104 +122,57 @@ export function OverviewTab({ project, onNavigate }: OverviewTabProps) {
         })}
       </div>
 
-      {/* Two Column Layout */}
-      <div className="grid md:grid-cols-2 gap-6">
-        {/* Recent Stakeholders */}
-        <div className="bg-white rounded-xl border border-slate-200">
-          <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
-            <h3 className="font-medium text-slate-900">Recent Stakeholders</h3>
-            <button
-              onClick={() => onNavigate('stakeholders')}
-              className="text-sm text-brand-600 hover:text-brand-700 flex items-center gap-1"
-            >
-              View all <ArrowRight size={14} />
-            </button>
-          </div>
-          {recentStakeholders.length > 0 ? (
-            <div className="divide-y divide-slate-100">
-              {recentStakeholders.map((stakeholder: any) => (
-                <div key={stakeholder.id} className="px-4 py-3 flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-sm font-medium text-slate-600">
-                    {stakeholder.name.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-900 truncate">{stakeholder.name}</p>
-                    {stakeholder.organization && (
-                      <p className="text-xs text-slate-500 truncate">{stakeholder.organization}</p>
-                    )}
-                  </div>
-                  <span className="text-xs text-slate-400">
-                    {new Date(stakeholder.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+      {/* Recent Comments */}
+      <div className="bg-white rounded-xl border border-slate-200">
+        <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+          <h3 className="font-medium text-slate-900">Recent Public Comments</h3>
+          <button
+            onClick={() => onNavigate('feedback')}
+            className="text-sm text-brand-600 hover:text-brand-700 flex items-center gap-1"
+          >
+            View all <ArrowRight size={14} />
+          </button>
+        </div>
+        {recentComments.length > 0 ? (
+          <div className="divide-y divide-slate-100">
+            {recentComments.map((comment: any) => (
+              <div key={comment.id} className="px-4 py-3">
+                <div className="flex items-center gap-2 mb-1">
+                  {comment.approved ? (
+                    <CheckCircle size={14} className="text-green-500" />
+                  ) : (
+                    <Clock size={14} className="text-amber-500" />
+                  )}
+                  <span className="text-xs text-slate-500">
+                    {new Date(comment.createdAt).toLocaleDateString('en-GB', {
+                      day: 'numeric',
+                      month: 'short',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
                   </span>
+                  {comment.name && (
+                    <span className="text-xs font-medium text-slate-700">{comment.name}</span>
+                  )}
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="px-4 py-8 text-center">
-              <Users className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-              <p className="text-sm text-slate-500">No stakeholders yet</p>
+                <p className="text-sm text-slate-700 line-clamp-2">{comment.comment}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="px-4 py-8 text-center">
+            <MessageCircle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+            <p className="text-sm text-slate-500">No public comments yet</p>
+            {!project.embedEnabled && (
               <button
-                onClick={() => onNavigate('stakeholders')}
+                onClick={() => onNavigate('website')}
                 className="mt-2 text-sm text-brand-600 hover:text-brand-700"
               >
-                Add your first stakeholder
+                Enable embedding to collect feedback
               </button>
-            </div>
-          )}
-        </div>
-
-        {/* Recent Comments */}
-        <div className="bg-white rounded-xl border border-slate-200">
-          <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
-            <h3 className="font-medium text-slate-900">Recent Public Comments</h3>
-            <button
-              onClick={() => onNavigate('feedback')}
-              className="text-sm text-brand-600 hover:text-brand-700 flex items-center gap-1"
-            >
-              View all <ArrowRight size={14} />
-            </button>
+            )}
           </div>
-          {recentComments.length > 0 ? (
-            <div className="divide-y divide-slate-100">
-              {recentComments.map((comment: any) => (
-                <div key={comment.id} className="px-4 py-3">
-                  <div className="flex items-center gap-2 mb-1">
-                    {comment.approved ? (
-                      <CheckCircle size={14} className="text-green-500" />
-                    ) : (
-                      <Clock size={14} className="text-amber-500" />
-                    )}
-                    <span className="text-xs text-slate-500">
-                      {new Date(comment.createdAt).toLocaleDateString('en-GB', {
-                        day: 'numeric',
-                        month: 'short',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
-                    </span>
-                    {comment.name && (
-                      <span className="text-xs font-medium text-slate-700">{comment.name}</span>
-                    )}
-                  </div>
-                  <p className="text-sm text-slate-700 line-clamp-2">{comment.comment}</p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="px-4 py-8 text-center">
-              <MessageCircle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-              <p className="text-sm text-slate-500">No public comments yet</p>
-              {!project.embedEnabled && (
-                <button
-                  onClick={() => onNavigate('feedback')}
-                  className="mt-2 text-sm text-brand-600 hover:text-brand-700"
-                >
-                  Enable embedding to collect feedback
-                </button>
-              )}
-            </div>
-          )}
-        </div>
+        )}
       </div>
 
       {/* Quick Actions */}
@@ -263,22 +180,25 @@ export function OverviewTab({ project, onNavigate }: OverviewTabProps) {
         <h3 className="font-medium text-slate-900 mb-3">Quick Actions</h3>
         <div className="flex flex-wrap gap-2">
           <button
-            onClick={() => onNavigate('stakeholders')}
-            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium text-slate-700 transition-colors"
-          >
-            Add Stakeholder
-          </button>
-          <button
             onClick={() => onNavigate('feedback')}
             className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium text-slate-700 transition-colors"
           >
             Add Map Marker
           </button>
           <button
-            onClick={() => onNavigate('mailing')}
+            onClick={() => onNavigate('forms')}
             className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium text-slate-700 transition-colors"
           >
-            Send Email Update
+            Create Feedback Form
+          </button>
+          <button
+            onClick={() => onNavigate('analytics')}
+            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium text-slate-700 transition-colors"
+          >
+            <span className="inline-flex items-center gap-1.5">
+              <BarChart3 size={14} />
+              View AI Analytics
+            </span>
           </button>
           {pendingComments > 0 && (
             <button

@@ -31,7 +31,6 @@ export function usePermissions() {
     isViewer: false,
     canEdit: isSuperAdmin,
     canManageForms: isSuperAdmin,
-    canManageStakeholders: isSuperAdmin,
     canManageSettings: isSuperAdmin,
     canViewAnalytics: true,
     canViewFeedback: true,
@@ -52,7 +51,6 @@ export function useProjectPermissions(projectRole?: 'ADMIN' | 'CLIENT' | null, i
 
     // Project-specific permission checks
     canEditProject: isAdmin,
-    canManageStakeholders: isAdmin,
     canManageForms: isAdmin,
     canManageSettings: isAdmin,
     canViewAnalytics: true, // Both admin and client can view

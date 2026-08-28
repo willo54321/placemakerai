@@ -9,7 +9,6 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
   const [submitted, setSubmitted] = useState(false)
   const [formData, setFormData] = useState<Record<string, any>>({})
   const [gdprConsent, setGdprConsent] = useState(false)
-  const [mailingConsent, setMailingConsent] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
 
@@ -20,7 +19,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
   })
 
   const submitResponse = useMutation({
-    mutationFn: (payload: { data: Record<string, any>; gdprConsent: boolean; mailingConsent: boolean }) =>
+    mutationFn: (payload: { data: Record<string, any>; gdprConsent: boolean }) =>
       fetchJson(`/api/forms/${params.id}/responses`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -96,7 +95,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
 
     setValidationErrors({})
     setSubmitError(null)
-    submitResponse.mutate({ data: formData, gdprConsent, mailingConsent })
+    submitResponse.mutate({ data: formData, gdprConsent })
   }
 
   return (
@@ -213,19 +212,6 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                 <a href="/privacy" target="_blank" className="text-blue-600 hover:underline">
                   Privacy Policy
                 </a>
-              </label>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <input
-                id="mailingConsent"
-                type="checkbox"
-                checked={mailingConsent}
-                onChange={e => setMailingConsent(e.target.checked)}
-                className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-600"
-              />
-              <label htmlFor="mailingConsent" className="text-sm text-gray-600">
-                I would like to receive updates about this consultation (optional)
               </label>
             </div>
           </div>

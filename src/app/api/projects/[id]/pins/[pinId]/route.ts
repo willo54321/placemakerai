@@ -2,7 +2,7 @@ import { prisma } from '@/lib/db'
 import { authorizeProject } from '@/lib/api-auth'
 import { NextResponse } from 'next/server'
 
-// Update pin (approve/reject, resolve issues)
+// Update pin (approve/reject)
 export async function PATCH(
   request: Request,
   { params }: { params: { id: string; pinId: string } }
@@ -25,23 +25,11 @@ export async function PATCH(
   }
 
   // Build update data
-  const updateData: {
-    approved?: boolean
-    resolved?: boolean
-    resolvedAt?: Date | null
-    resolvedNotes?: string | null
-  } = {}
+  const updateData: { approved?: boolean } = {}
 
   // Handle approval toggle
   if (typeof body.approved === 'boolean') {
     updateData.approved = body.approved
-  }
-
-  // Handle issue resolution (only for issues mode)
-  if (typeof body.resolved === 'boolean' && pin.mode === 'issues') {
-    updateData.resolved = body.resolved
-    updateData.resolvedAt = body.resolved ? new Date() : null
-    updateData.resolvedNotes = body.resolved ? (body.resolvedNotes || null) : null
   }
 
   const updatedPin = await prisma.publicPin.update({

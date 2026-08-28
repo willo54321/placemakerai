@@ -22,7 +22,6 @@ export async function GET(
     const project = await prisma.project.findUnique({
       where: { id: params.id },
       include: {
-        stakeholders: true,
         mapMarkers: true,
         feedbackForms: {
           include: {
@@ -33,25 +32,6 @@ export async function GET(
           orderBy: { createdAt: 'asc' }
         },
         publicPins: {
-          orderBy: { createdAt: 'desc' }
-        },
-        teamMembers: {
-          orderBy: { createdAt: 'asc' }
-        },
-        enquiries: {
-          include: { assignedTo: true },
-          orderBy: { createdAt: 'desc' }
-        },
-        subscribers: {
-          where: { subscribed: true },
-          orderBy: { createdAt: 'desc' }
-        },
-        tours: {
-          include: {
-            stops: {
-              orderBy: { order: 'asc' }
-            }
-          },
           orderBy: { createdAt: 'desc' }
         },
         userAccess: {
@@ -108,13 +88,6 @@ export async function PATCH(
     if (body.embedEnabled !== undefined) updateData.embedEnabled = body.embedEnabled
     if (body.allowPins !== undefined) updateData.allowPins = body.allowPins
     if (body.allowDrawing !== undefined) updateData.allowDrawing = body.allowDrawing
-    if ('emailFromName' in body) updateData.emailFromName = body.emailFromName || null
-    if ('emailFromAddress' in body) updateData.emailFromAddress = body.emailFromAddress || null
-    if (body.autoReplyEnabled !== undefined) updateData.autoReplyEnabled = body.autoReplyEnabled
-    if ('autoReplySubject' in body) updateData.autoReplySubject = body.autoReplySubject || null
-    if ('autoReplyMessage' in body) updateData.autoReplyMessage = body.autoReplyMessage || null
-    if (body.issuesEnabled !== undefined) updateData.issuesEnabled = body.issuesEnabled
-    if ('issueNotifyEmails' in body) updateData.issueNotifyEmails = body.issueNotifyEmails || null
     if ('embedPrimaryColor' in body) updateData.embedPrimaryColor = body.embedPrimaryColor || null
     if ('embedFontFamily' in body) updateData.embedFontFamily = body.embedFontFamily || null
     if (body.embedHideStreetLabels !== undefined) updateData.embedHideStreetLabels = body.embedHideStreetLabels

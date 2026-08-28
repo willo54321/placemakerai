@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import {
   X, ChevronLeft, ChevronRight, Check, MapPin, Users, FileUp,
-  Sparkles, Building2, Search, AlertCircle, Upload, Mail, Info
+  Building2, Search, AlertCircle, Upload
 } from 'lucide-react'
 import { toast } from 'sonner'
 import dynamic from 'next/dynamic'
@@ -27,9 +27,6 @@ interface ProjectData {
   longitude: number | null
   address: string
   geoLayers: GeoLayerData[]
-  stakeholders: DetectedStakeholder[]
-  emailFromName: string
-  emailFromAddress: string
 }
 
 interface GeoLayerData {
@@ -37,15 +34,6 @@ interface GeoLayerData {
   type: string
   featureCount: number
   geojson: object
-}
-
-interface DetectedStakeholder {
-  name: string
-  organization: string | null
-  role: string | null
-  type: string
-  source: string
-  selected: boolean
 }
 
 interface ProjectOnboardingWizardProps {
@@ -65,9 +53,7 @@ const STEPS = [
   { id: 1, name: 'Basics', description: 'Project details' },
   { id: 2, name: 'Location', description: 'Set map center' },
   { id: 3, name: 'Boundary', description: 'Site boundary (optional)' },
-  { id: 4, name: 'Stakeholders', description: 'Auto-detect' },
-  { id: 5, name: 'Email', description: 'Sender settings (optional)' },
-  { id: 6, name: 'Review', description: 'Create project' },
+  { id: 4, name: 'Review', description: 'Create project' },
 ]
 
 export default function ProjectOnboardingWizard({
@@ -88,9 +74,6 @@ export default function ProjectOnboardingWizard({
     longitude: null,
     address: '',
     geoLayers: [],
-    stakeholders: [],
-    emailFromName: '',
-    emailFromAddress: '',
   })
 
   // Address search state
@@ -101,10 +84,6 @@ export default function ProjectOnboardingWizard({
     lat: string
     lon: string
   }>>([])
-
-  // Stakeholder detection state
-  const [isDetecting, setIsDetecting] = useState(false)
-  const [detectionRan, setDetectionRan] = useState(false)
 
   // File upload state
   const [isUploading, setIsUploading] = useState(false)
@@ -129,12 +108,8 @@ export default function ProjectOnboardingWizard({
         longitude: null,
         address: '',
         geoLayers: [],
-        stakeholders: [],
-        emailFromName: '',
-        emailFromAddress: '',
       })
       setError(null)
-      setDetectionRan(false)
     }
   }, [isOpen])
 
@@ -147,10 +122,6 @@ export default function ProjectOnboardingWizard({
       case 3:
         return true // Optional step
       case 4:
-        return true // Can skip if no stakeholders
-      case 5:
-        return true // Email is optional
-      case 6:
         return true
       default:
         return false
@@ -158,12 +129,8 @@ export default function ProjectOnboardingWizard({
   }
 
   const handleNext = () => {
-    if (currentStep < 6) {
+    if (currentStep < 4) {
       setCurrentStep(currentStep + 1)
-      // Auto-run stakeholder detection when entering step 4
-      if (currentStep === 3 && projectData.latitude && !detectionRan) {
-        runStakeholderDetection()
-      }
     }
   }
 
@@ -268,49 +235,6 @@ export default function ProjectOnboardingWizard({
     })
   }
 
-  // Stakeholder detection
-  const runStakeholderDetection = async () => {
-    if (!projectData.latitude || !projectData.longitude) return
-
-    setIsDetecting(true)
-    setError(null)
-
-    try {
-      // Create a temporary project to run detection
-      const response = await fetch('/api/stakeholders/preview-detect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          latitude: projectData.latitude,
-          longitude: projectData.longitude,
-        }),
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setProjectData({
-          ...projectData,
-          stakeholders: (data.stakeholders || []).map((s: DetectedStakeholder) => ({
-            ...s,
-            selected: true,
-          })),
-        })
-      }
-    } catch (err) {
-      console.error('Stakeholder detection failed:', err)
-      setError('Could not detect stakeholders. You can add them manually later.')
-    } finally {
-      setIsDetecting(false)
-      setDetectionRan(true)
-    }
-  }
-
-  const toggleStakeholder = (index: number) => {
-    const updated = [...projectData.stakeholders]
-    updated[index] = { ...updated[index], selected: !updated[index].selected }
-    setProjectData({ ...projectData, stakeholders: updated })
-  }
-
   // Create project
   const handleCreate = async () => {
     setIsCreating(true)
@@ -326,8 +250,6 @@ export default function ProjectOnboardingWizard({
           description: projectData.description,
           latitude: projectData.latitude,
           longitude: projectData.longitude,
-          emailFromName: projectData.emailFromName || null,
-          emailFromAddress: projectData.emailFromAddress || null,
         }),
       })
 
@@ -346,22 +268,6 @@ export default function ProjectOnboardingWizard({
             name: layer.name,
             type: layer.type,
             geojson: layer.geojson,
-          }),
-        })
-      }
-
-      // 3. Add selected stakeholders
-      const selectedStakeholders = projectData.stakeholders.filter(s => s.selected)
-      for (const stakeholder of selectedStakeholders) {
-        await fetch(`/api/projects/${project.id}/stakeholders`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: stakeholder.name,
-            organization: stakeholder.organization,
-            role: stakeholder.role,
-            type: stakeholder.type,
-            notes: `Auto-detected from ${stakeholder.source}`,
           }),
         })
       }
@@ -395,7 +301,7 @@ export default function ProjectOnboardingWizard({
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
           <div>
             <h2 className="text-xl font-semibold text-slate-900">Create New Project</h2>
-            <p className="text-sm text-slate-500">Step {currentStep} of 6: {STEPS[currentStep - 1].name}</p>
+            <p className="text-sm text-slate-500">Step {currentStep} of 4: {STEPS[currentStep - 1].name}</p>
           </div>
           <button
             onClick={onClose}
@@ -645,164 +551,8 @@ export default function ProjectOnboardingWizard({
               </div>
             )}
 
-            {/* Step 4: Stakeholders */}
+            {/* Step 4: Review */}
             {currentStep === 4 && (
-              <div className="space-y-6">
-                <div className="text-center py-4">
-                  <div className="w-16 h-16 bg-brand-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Sparkles size={32} className="text-brand-600" />
-                  </div>
-                  <h3 className="text-lg font-medium text-slate-900 mb-2">Auto-Detect Stakeholders</h3>
-                  <p className="text-slate-600 mb-4">
-                    Based on your project location, we can automatically identify relevant political stakeholders.
-                  </p>
-
-                  {!detectionRan && (
-                    <button
-                      onClick={runStakeholderDetection}
-                      disabled={isDetecting || !projectData.latitude}
-                      className="btn-primary px-6 py-3"
-                    >
-                      {isDetecting ? (
-                        <>
-                          <Spinner size="sm" />
-                          Detecting...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles size={18} />
-                          Detect Stakeholders
-                        </>
-                      )}
-                    </button>
-                  )}
-                </div>
-
-                {/* Detected Stakeholders */}
-                {projectData.stakeholders.length > 0 && (
-                  <div className="border border-slate-200 rounded-lg">
-                    <div className="px-4 py-3 bg-slate-50 border-b border-slate-200">
-                      <p className="text-sm font-medium text-slate-700">
-                        {projectData.stakeholders.filter(s => s.selected).length} of {projectData.stakeholders.length} selected
-                      </p>
-                    </div>
-                    <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
-                      {projectData.stakeholders.map((stakeholder, index) => (
-                        <label
-                          key={index}
-                          className="flex items-start gap-3 px-4 py-3 hover:bg-slate-50 cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={stakeholder.selected}
-                            onChange={() => toggleStakeholder(index)}
-                            className="mt-1 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-slate-900">{stakeholder.name}</p>
-                            <p className="text-sm text-slate-600">{stakeholder.role}</p>
-                            {stakeholder.organization && (
-                              <p className="text-xs text-slate-500">{stakeholder.organization}</p>
-                            )}
-                          </div>
-                          <span className="text-xs px-2 py-1 bg-slate-100 text-slate-600 rounded">
-                            {stakeholder.type}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {detectionRan && projectData.stakeholders.length === 0 && (
-                  <div className="text-center py-6 text-slate-500">
-                    <Users size={32} className="mx-auto mb-2 text-slate-300" />
-                    <p>No stakeholders detected for this location.</p>
-                    <p className="text-sm">You can add them manually after creating the project.</p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Step 5: Email Settings */}
-            {currentStep === 5 && (
-              <div className="space-y-6">
-                <div className="text-center py-4">
-                  <div className="w-16 h-16 bg-brand-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Mail size={32} className="text-brand-600" />
-                  </div>
-                  <h3 className="text-lg font-medium text-slate-900 mb-2">Email Sender Settings</h3>
-                  <p className="text-slate-600 mb-4">
-                    Configure a custom email address for this project to send notifications from your own domain.
-                    <br />
-                    <span className="text-sm text-slate-500">This step is optional - you can configure this later in Settings.</span>
-                  </p>
-                </div>
-
-                <div className="bg-brand-50 border border-brand-200 rounded-lg p-4">
-                  <div className="flex gap-3">
-                    <Info size={18} className="text-brand-600 flex-shrink-0 mt-0.5" />
-                    <div className="text-sm text-brand-800">
-                      <p className="font-medium mb-1">Setting up project-specific email</p>
-                      <p>To send emails from your own domain:</p>
-                      <ol className="list-decimal list-inside mt-2 space-y-1">
-                        <li>Add your domain in <a href="https://resend.com/domains" target="_blank" rel="noopener noreferrer" className="underline">Resend Dashboard</a></li>
-                        <li>Add the DNS records Resend provides (SPF, DKIM)</li>
-                        <li>Wait for verification (usually a few minutes)</li>
-                      </ol>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <label htmlFor="email-from-name" className="label">
-                      Sender Name
-                    </label>
-                    <input
-                      id="email-from-name"
-                      type="text"
-                      value={projectData.emailFromName}
-                      onChange={e => setProjectData({ ...projectData, emailFromName: e.target.value })}
-                      className="input w-full"
-                      placeholder="e.g., Project ABC Team"
-                    />
-                    <p className="text-xs text-slate-500 mt-1">
-                      The name that appears in the "From" field of sent emails
-                    </p>
-                  </div>
-
-                  <div>
-                    <label htmlFor="email-from-address" className="label">
-                      Sender Email Address
-                    </label>
-                    <input
-                      id="email-from-address"
-                      type="email"
-                      value={projectData.emailFromAddress}
-                      onChange={e => setProjectData({ ...projectData, emailFromAddress: e.target.value })}
-                      className="input w-full"
-                      placeholder="e.g., noreply@yourproject.com"
-                    />
-                    <p className="text-xs text-slate-500 mt-1">
-                      Must be from a verified domain in Resend. Leave blank to use the default.
-                    </p>
-                  </div>
-
-                  {(projectData.emailFromName || projectData.emailFromAddress) && (
-                    <div className="bg-slate-50 rounded-lg p-3 text-sm">
-                      <span className="text-slate-500">Preview: </span>
-                      <span className="text-slate-900 font-medium">
-                        {projectData.emailFromName || 'Project Team'} &lt;{projectData.emailFromAddress || 'default@example.com'}&gt;
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Step 6: Review */}
-            {currentStep === 6 && (
               <div className="space-y-6">
                 <h3 className="text-lg font-medium text-slate-900">Review Your Project</h3>
 
@@ -846,30 +596,6 @@ export default function ProjectOnboardingWizard({
                       <p className="text-slate-400">No boundaries uploaded</p>
                     )}
                   </div>
-
-                  {/* Stakeholders */}
-                  <div className="bg-slate-50 rounded-lg p-4">
-                    <h4 className="text-sm font-medium text-slate-500 mb-2">Stakeholders</h4>
-                    {projectData.stakeholders.filter(s => s.selected).length > 0 ? (
-                      <p className="text-slate-700">
-                        {projectData.stakeholders.filter(s => s.selected).length} stakeholder(s) will be added
-                      </p>
-                    ) : (
-                      <p className="text-slate-400">No stakeholders selected</p>
-                    )}
-                  </div>
-
-                  {/* Email Settings */}
-                  <div className="bg-slate-50 rounded-lg p-4">
-                    <h4 className="text-sm font-medium text-slate-500 mb-2">Email Settings</h4>
-                    {projectData.emailFromAddress ? (
-                      <p className="text-slate-700">
-                        {projectData.emailFromName || 'Project Team'} &lt;{projectData.emailFromAddress}&gt;
-                      </p>
-                    ) : (
-                      <p className="text-slate-400">Using default sender (can configure later)</p>
-                    )}
-                  </div>
                 </div>
               </div>
             )}
@@ -886,14 +612,13 @@ export default function ProjectOnboardingWizard({
             {currentStep === 1 ? 'Cancel' : 'Back'}
           </button>
 
-          {currentStep < 6 ? (
+          {currentStep < 4 ? (
             <button
               onClick={handleNext}
               disabled={!canProceed()}
               className="btn-primary"
             >
-              {(currentStep === 3 && projectData.geoLayers.length === 0) ||
-               (currentStep === 5 && !projectData.emailFromAddress) ? 'Skip' : 'Next'}
+              {currentStep === 3 && projectData.geoLayers.length === 0 ? 'Skip' : 'Next'}
               <ChevronRight size={18} />
             </button>
           ) : (

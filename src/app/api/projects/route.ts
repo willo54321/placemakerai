@@ -30,7 +30,6 @@ export async function GET() {
         include: {
           _count: {
             select: {
-              stakeholders: true,
               feedbackForms: true,
               mapMarkers: true,
             },
@@ -57,7 +56,6 @@ export async function GET() {
         include: {
           _count: {
             select: {
-              stakeholders: true,
               feedbackForms: true,
               mapMarkers: true,
             },
@@ -105,8 +103,6 @@ export async function POST(request: Request) {
         description: body.description || null,
         latitude: body.latitude || null,
         longitude: body.longitude || null,
-        emailFromName: body.emailFromName || null,
-        emailFromAddress: body.emailFromAddress || null,
       },
     })
     return NextResponse.json(project)

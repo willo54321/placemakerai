@@ -1,9 +1,8 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
-import { MessageCircle, ThumbsUp, ThumbsDown, X, Send, MapPin, ChevronLeft, ChevronRight, Lightbulb, Pentagon, Play, CheckCircle, AlertCircle } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { MessageCircle, ThumbsUp, ThumbsDown, X, Send, MapPin, ChevronLeft, ChevronRight, Lightbulb, Pentagon, CheckCircle, AlertCircle } from 'lucide-react'
 import dynamic from 'next/dynamic'
-import { TourPlayer, StartTourButton } from './TourPlayer'
 
 const EmbedMap = dynamic(() => import('./EmbedMap'), {
   ssr: false,
@@ -18,11 +17,6 @@ const EmbedMap = dynamic(() => import('./EmbedMap'), {
 interface GeoJSONGeometry {
   type: 'LineString' | 'Polygon'
   coordinates: number[][] | number[][][]
-}
-
-interface HighlightGeometry {
-  type: 'Polygon'
-  coordinates: number[][][]
 }
 
 interface PublicPin {
@@ -47,26 +41,6 @@ interface Overlay {
   rotation: number
 }
 
-interface TourStop {
-  id: string
-  order: number
-  title: string
-  description: string
-  imageUrl: string | null
-  latitude: number
-  longitude: number
-  zoom: number
-  highlight: HighlightGeometry | null
-  showOverlay: string | null
-}
-
-interface Tour {
-  id: string
-  name: string
-  description: string | null
-  stops: TourStop[]
-}
-
 interface ProjectData {
   id: string
   name: string
@@ -78,7 +52,6 @@ interface ProjectData {
   allowDrawing: boolean
   overlays: Overlay[]
   pins: PublicPin[]
-  tour: Tour | null
   // Styling customization
   embedPrimaryColor: string | null
   embedFontFamily: string | null
@@ -128,7 +101,6 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
     name: '',
     email: '',
     gdprConsent: false,
-    mailingConsent: false,
   })
 
   // UI state - start collapsed on small screens so the sidebar doesn't cover
@@ -143,12 +115,6 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
   // Map type - will be set when project loads based on embedDefaultSatellite setting
   const [mapType, setMapType] = useState<'roadmap' | 'satellite' | null>(null)
   const [votedPins, setVotedPins] = useState<Set<string>>(new Set())
-
-  // Tour state
-  const [isTourActive, setIsTourActive] = useState(false)
-  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null)
-  const [mapZoom, setMapZoom] = useState<number | null>(null)
-  const [tourHighlight, setTourHighlight] = useState<HighlightGeometry | null>(null)
 
   // Coarse (touch) pointer detection for touch-appropriate draw copy
   const [isCoarsePointer, setIsCoarsePointer] = useState(false)
@@ -234,7 +200,6 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
         name: form.name || null,
         email: form.email || null,
         gdprConsent: form.gdprConsent,
-        mailingConsent: form.mailingConsent,
       }
 
       if (pendingShape.type === 'pin') {
@@ -275,7 +240,7 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
     setDrawMode(null)
     setSubmitError(null)
     setSubmitSuccess(false)
-    setForm({ comment: '', name: '', email: '', gdprConsent: false, mailingConsent: false })
+    setForm({ comment: '', name: '', email: '', gdprConsent: false })
     setSelectedCategory('question')
   }
 
@@ -324,28 +289,6 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
       ...prev,
       [categoryId]: !prev[categoryId]
     }))
-  }
-
-  // Tour navigation handler - threads the stop's highlight geometry through
-  // to the map so tour stops show their authored spotlight on the main embed.
-  const handleTourNavigate = useCallback((lat: number, lng: number, zoom: number, highlight?: HighlightGeometry | null) => {
-    setMapCenter({ lat, lng })
-    setMapZoom(zoom)
-    setTourHighlight(highlight ?? null)
-  }, [])
-
-  const handleTourClose = () => {
-    setIsTourActive(false)
-    // Reset map to original position
-    setMapCenter(null)
-    setMapZoom(null)
-    setTourHighlight(null)
-  }
-
-  const handleStartTour = () => {
-    setIsTourActive(true)
-    // Collapse sidebar when tour starts
-    setSidebarCollapsed(true)
   }
 
   const getCategoryCount = (categoryId: string) => {
@@ -435,8 +378,8 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
       <div className="h-screen w-screen relative overflow-hidden" style={{ fontFamily: `'${fontFamily}', sans-serif` }}>
         {/* Map fills entire screen */}
         <EmbedMap
-          center={mapCenter ? [mapCenter.lat, mapCenter.lng] : center}
-          zoom={mapZoom || project.mapZoom || 15}
+          center={center}
+          zoom={project.mapZoom || 15}
           overlays={project.overlays}
           pins={filteredPins}
           pendingPin={pendingShape?.type === 'pin' ? { lat: pendingShape.lat!, lng: pendingShape.lng! } : null}
@@ -448,10 +391,8 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
           onVote={handleVote}
           mapType={mapType || 'satellite'}
           votedPins={votedPins}
-          animateToCenter={mapCenter !== null}
           hideStreetLabels={project.embedHideStreetLabels || false}
           primaryColor={project.embedPrimaryColor || undefined}
-          highlight={tourHighlight}
         />
 
         {/* Feedback Buttons - Top Right (only if pins or drawing allowed and not reference mode) */}
@@ -604,23 +545,6 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
           </button>
         )}
 
-        {/* Tour Button - Bottom Left (only if tour exists and has stops) */}
-        {project.tour && project.tour.stops.length > 0 && !isTourActive && !showForm && !drawMode && (
-          <div className="absolute bottom-4 left-4 z-10">
-            <StartTourButton onClick={handleStartTour} primaryColor={primaryColor} />
-          </div>
-        )}
-
-        {/* Tour Player */}
-        {project.tour && isTourActive && (
-          <TourPlayer
-            tour={project.tour}
-            onNavigate={handleTourNavigate}
-            onClose={handleTourClose}
-            primaryColor={primaryColor}
-          />
-        )}
-
         {/* Success Confirmation Panel */}
         {showForm && submitSuccess && (
           <div className="absolute inset-0 z-20 bg-black/30 flex items-end sm:items-center justify-center p-4">
@@ -763,21 +687,6 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
                       </a>
                     </label>
                   </div>
-
-                  {form.email && (
-                    <div className="flex items-start gap-3">
-                      <input
-                        id="mailingConsent"
-                        type="checkbox"
-                        checked={form.mailingConsent}
-                        onChange={e => setForm({ ...form, mailingConsent: e.target.checked })}
-                        className="mt-1 w-4 h-4 text-brand-600 border-gray-300 rounded focus:ring-brand-600"
-                      />
-                      <label htmlFor="mailingConsent" className="text-xs text-gray-600">
-                        I would like to receive updates about this consultation (optional)
-                      </label>
-                    </div>
-                  )}
                 </div>
 
                 {/* Inline submit error (window.alert is blocked in iframes) */}

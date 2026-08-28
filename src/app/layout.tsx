@@ -8,7 +8,7 @@ const dmSans = DM_Sans({ subsets: ['latin'], weight: ['400', '500', '600', '700'
 
 export const metadata: Metadata = {
   title: 'Placemaker.ai',
-  description: 'Stakeholder engagement, mapping, and public consultation for planning projects',
+  description: 'Interactive maps, feedback forms, and AI-powered analysis for public consultation on planning projects',
 }
 
 export default function RootLayout({

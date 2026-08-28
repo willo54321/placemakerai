@@ -41,8 +41,7 @@ export function FeedbackTab({ projectId, project }: { projectId: string; project
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('map')
   const [copiedCode, setCopiedCode] = useState(false)
 
-  // Count only feedback pins (not issues)
-  const feedbackPinCount = project.publicPins?.filter((p: any) => (p.mode || 'feedback') === 'feedback').length || 0
+  const feedbackPinCount = project.publicPins?.length || 0
 
   const subTabs = [
     {

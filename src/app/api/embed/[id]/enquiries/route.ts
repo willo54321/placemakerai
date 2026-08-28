@@ -1,7 +1,5 @@
 import { prisma } from '@/lib/db'
-import { sendNewEnquiryNotification, sendAutoReplyEmail } from '@/lib/email'
 import { NextResponse } from 'next/server'
-import { headers } from 'next/headers'
 import { rateLimitResponse } from '@/lib/rate-limit'
 
 // CORS headers for cross-origin form submissions
@@ -23,21 +21,12 @@ export async function POST(
   const limited = rateLimitResponse(request, 'embed-enquiry', 5, 60_000)
   if (limited) return limited
 
-  // Verify project exists and has embed enabled, also get team members
+  // Verify project exists and has embed enabled
   const project = await prisma.project.findUnique({
     where: { id: params.id },
     select: {
       id: true,
       embedEnabled: true,
-      name: true,
-      emailFromName: true,
-      emailFromAddress: true,
-      autoReplyEnabled: true,
-      autoReplySubject: true,
-      autoReplyMessage: true,
-      teamMembers: {
-        select: { email: true },
-      },
     },
   })
 
@@ -73,101 +62,8 @@ export async function POST(
       category: body.category || 'general',
       gdprConsent: true,
       gdprConsentDate: new Date(),
-      mailingConsent: body.mailingConsent || false,
     },
   })
-
-  // Auto-log engagement if submitter email matches a stakeholder
-  const matchingStakeholder = await prisma.stakeholder.findFirst({
-    where: {
-      projectId: params.id,
-      email: {
-        equals: body.submitterEmail,
-        mode: 'insensitive',
-      },
-    },
-  })
-
-  if (matchingStakeholder) {
-    await prisma.stakeholderEngagement.create({
-      data: {
-        stakeholderId: matchingStakeholder.id,
-        type: 'inbound_email',
-        title: `Enquiry received: ${body.subject}`,
-        description: body.message.substring(0, 500) + (body.message.length > 500 ? '...' : ''),
-        date: new Date(),
-        outcome: 'Enquiry submitted via public form',
-      },
-    })
-  }
-
-  // Only add to mailing list if user consented
-  if (body.mailingConsent) {
-    try {
-      await prisma.subscriber.upsert({
-        where: {
-          projectId_email: {
-            projectId: params.id,
-            email: body.submitterEmail.toLowerCase(),
-          },
-        },
-        create: {
-          projectId: params.id,
-          email: body.submitterEmail.toLowerCase(),
-          name: body.submitterName || null,
-          source: 'enquiry',
-          sourceId: enquiry.id,
-          gdprConsent: true,
-          gdprConsentDate: new Date(),
-        },
-        update: {
-          name: body.submitterName || undefined,
-          subscribed: true,
-          unsubscribedAt: null,
-          gdprConsent: true,
-          gdprConsentDate: new Date(),
-        },
-      })
-    } catch (error) {
-      console.error('Failed to add subscriber from enquiry:', error)
-    }
-  }
-
-  // Send notification to team members
-  const teamEmails = project.teamMembers.map(m => m.email).filter(Boolean)
-  if (teamEmails.length > 0) {
-    const headersList = headers()
-    const host = headersList.get('host') || 'localhost:3000'
-    const protocol = host.includes('localhost') ? 'http' : 'https'
-    const enquiryUrl = `${protocol}://${host}/projects/${params.id}?tab=enquiries&enquiry=${enquiry.id}`
-
-    await sendNewEnquiryNotification({
-      to: teamEmails,
-      projectName: project.name,
-      submitterName: body.submitterName,
-      submitterEmail: body.submitterEmail,
-      subject: body.subject,
-      message: body.message,
-      category: body.category || 'general',
-      enquiryUrl,
-      projectEmailFromName: project.emailFromName,
-      projectEmailFromAddress: project.emailFromAddress,
-    })
-  }
-
-  // Send the configured auto-reply acknowledgement to the submitter
-  if (project.autoReplyEnabled && project.autoReplySubject && project.autoReplyMessage) {
-    await sendAutoReplyEmail({
-      to: body.submitterEmail,
-      submitterName: body.submitterName,
-      originalSubject: body.subject,
-      autoReplySubject: project.autoReplySubject,
-      autoReplyMessage: project.autoReplyMessage,
-      projectName: project.name,
-      projectEmailFromName: project.emailFromName,
-      projectEmailFromAddress: project.emailFromAddress,
-    })
-  }
 
   return NextResponse.json({
     success: true,

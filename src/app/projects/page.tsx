@@ -1,7 +1,7 @@
 'use client'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, MapPin, Users, FileText, Trash2, FolderOpen } from 'lucide-react'
+import { Plus, MapPin, FileText, Trash2, FolderOpen } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
@@ -14,7 +14,6 @@ interface Project {
   name: string
   description: string | null
   _count: {
-    stakeholders: number
     feedbackForms: number
     mapMarkers: number
   }
@@ -135,7 +134,7 @@ export default function ProjectsPage() {
               <h3 className="text-lg font-medium text-slate-900 mb-2">No projects yet</h3>
               <p className="text-slate-600 mb-6 max-w-sm mx-auto">
                 {canCreateProject
-                  ? 'Get started by creating your first consultation project to track stakeholders and collect feedback.'
+                  ? 'Get started by creating your first consultation project to collect map feedback, build feedback forms, and analyse responses with AI.'
                   : 'You don\'t have access to any projects yet. Contact an admin to get access.'}
               </p>
               {canCreateProject && (
@@ -202,11 +201,6 @@ export default function ProjectsPage() {
                   )}
 
                   <div className="flex gap-4 text-sm text-slate-500">
-                    <span className="flex items-center gap-1.5" title="Stakeholders">
-                      <Users size={16} aria-hidden="true" />
-                      <span>{project._count.stakeholders}</span>
-                      <span className="sr-only">stakeholders</span>
-                    </span>
                     <span className="flex items-center gap-1.5" title="Map markers">
                       <MapPin size={16} aria-hidden="true" />
                       <span>{project._count.mapMarkers}</span>

@@ -2,9 +2,11 @@
 
 ## Overview
 
-Placemaker.ai is a stakeholder engagement and public consultation platform for planning projects. It enables organizations to collect feedback via interactive maps, manage stakeholders, track construction issues, and analyze public sentiment using AI.
+Placemaker.ai is a public consultation platform for planning projects. It focuses on three core products: collecting feedback via interactive maps, custom feedback forms, and AI-powered analysis of all collected feedback (including public enquiries).
 
 **Domain:** placemakerai.io
+
+**Scope note (2026-08-28):** The product was deliberately descoped to the three core features above. Stakeholder CRM, guided tours, construction issues mode, email campaigns, mailing lists/subscribers, panoramas, and the enquiry inbox/messaging workflow were all removed (recoverable from git history if ever needed). Public enquiry *submission* remains as a data-collection channel feeding AI analysis — there is no inbox UI or reply workflow.
 
 ## Tech Stack
 
@@ -15,7 +17,7 @@ Placemaker.ai is a stakeholder engagement and public consultation platform for p
 - **UI:** Tailwind CSS, Lucide icons
 - **Maps:** Leaflet, react-leaflet, Turf.js
 - **Data Fetching:** TanStack React Query
-- **Email:** Resend
+- **Email:** Resend (account emails only: invite / password reset)
 - **AI:** OpenAI (GPT-4o-mini)
 
 ## Quick Commands
@@ -38,7 +40,7 @@ npm run db:studio    # Open Prisma Studio
 │   │   ├── /forms        # Public form submission
 │   │   └── /admin        # Super-admin endpoints
 │   ├── /projects/[id]    # Project dashboard (tabs)
-│   ├── /embed/[id]       # Public embed pages
+│   ├── /embed/[id]       # Public embed pages (map + enquiry form)
 │   └── /forms/[id]       # Public form pages
 ├── /components           # React components
 │   └── InteractiveMap.tsx  # Main map component
@@ -46,7 +48,7 @@ npm run db:studio    # Open Prisma Studio
 │   ├── auth.ts           # NextAuth config
 │   ├── db.ts             # Prisma client
 │   ├── permissions.ts    # Role-based access
-│   ├── email.ts          # Email utilities
+│   ├── email.ts          # Account emails (invite/reset)
 │   └── openai.ts         # AI analysis
 └── /hooks
     └── usePermissions.ts
@@ -59,15 +61,14 @@ npm run db:studio    # Open Prisma Studio
 | User | System users (systemRole: SUPER_ADMIN, USER) |
 | Project | Main entity - consultation projects |
 | ProjectAccess | User-project role (ADMIN, CLIENT) |
-| PublicPin | Map feedback/issues (pins, lines, polygons) |
+| PublicPin | Map feedback (pins, lines, polygons) |
 | FeedbackForm | Custom forms with JSON field config |
 | FeedbackResponse | Form submissions (data as JSON) |
-| Enquiry | Stakeholder enquiries with message threads |
-| Stakeholder | Key stakeholders with influence/interest |
-| Subscriber | Mailing list per project |
-| Tour/TourStop | Guided map tours |
+| Enquiry | Public enquiry submissions (analyzed by AI; no reply workflow) |
 | GeoLayer | GeoJSON boundaries |
 | ImageOverlay | Custom map image overlays |
+| MapMarker | Admin-authored map markers |
+| AnalysisResult | Cached AI analysis per project |
 
 ## Authentication & Permissions
 
@@ -97,37 +98,25 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
 **Public embed APIs include CORS headers for cross-origin access.**
 
-## Key Features
+## Core Features
 
-### 1. Feedback Collection
-- Interactive map pins (positive, negative, question, comment)
-- Custom feedback forms with drag-drop builder
-- External form submissions: `POST /api/projects/{id}/feedback`
-- GDPR consent tracking on all submissions
+### 1. Interactive Map Feedback
+- Public map embed: `/embed/{projectId}` (customizable colors, fonts, street labels)
+- Visitors drop pins (positive, negative, question, comment) or draw lines/polygons
+- Pin voting; admin approval workflow before pins appear publicly
+- GeoJSON boundary layers and image overlays on the map
+- Enquiry form embed: `/embed/{projectId}/enquiry` (submissions stored for AI analysis)
 
-### 2. Issue Reporting
-- Construction issue tracking (mode: 'issues')
-- Categories: noise, dust, traffic, damage, safety, hours, other
-- Resolution workflow with notes
-- Email notifications to configured addresses
+### 2. Custom Feedback Forms
+- Drag-drop form builder with JSON field config
+- Public form pages: `/forms/{formId}`
+- External form submissions: `POST /api/projects/{id}/feedback` (auto-detects fields)
+- GDPR consent required on all submissions
 
 ### 3. AI Analysis
-- Sentiment analysis of feedback
-- Theme extraction
-- Summary generation
+- Sentiment analysis, theme extraction, and summary generation over map pins, form responses, and enquiries
 - Uses OpenAI GPT-4o-mini
 - Results cached in AnalysisResult table
-
-### 4. Embed System
-- Public map embed: `/embed/{projectId}`
-- Issues mode: `/embed/{projectId}?mode=issues`
-- Enquiry form: `/embed/{projectId}/enquiry`
-- Customizable: colors, fonts, street label visibility
-
-### 5. Tours
-- Guided map tours with stops
-- Show/hide overlays at stops
-- Highlight areas with polygons
 
 ## Environment Variables
 
@@ -135,9 +124,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
 DATABASE_URL=          # PostgreSQL connection
 NEXTAUTH_SECRET=       # JWT signing secret
 NEXTAUTH_URL=          # Base URL (e.g., https://placemakerai.io)
-RESEND_API_KEY=        # Email delivery
+RESEND_API_KEY=        # Email delivery (invite/reset emails)
 OPENAI_API_KEY=        # AI analysis
-EMAIL_WEBHOOK_SECRET=  # Cloudflare email worker auth
 ```
 
 ## Common Tasks
@@ -166,7 +154,6 @@ Requires `embedEnabled: true` on the project.
 - Pin comments limited to 2000 characters
 - Geographic clustering uses 3 decimal places (~100m precision)
 - Dynamic imports for heavy components (FeedbackTab, EmbedSettingsTab)
-- Email templates support placeholders: {{name}}, {{subject}}, {{project}}
 
 ## Testing
 

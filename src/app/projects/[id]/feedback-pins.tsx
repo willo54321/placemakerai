@@ -35,7 +35,6 @@ interface PublicPin {
   approved: boolean
   geometry: any
   shapeType: string
-  mode: string
 }
 
 interface Project {
@@ -79,10 +78,7 @@ export function FeedbackPinsTab({ projectId, project }: { projectId: string; pro
     }
   })
 
-  // Filter to only show feedback pins (not issues)
-  const feedbackPins = (project.publicPins || []).filter(pin =>
-    (pin.mode || 'feedback') === 'feedback'
-  )
+  const feedbackPins = project.publicPins || []
 
   const categoryStats = feedbackPins.reduce((acc, pin) => {
     acc[pin.category] = (acc[pin.category] || 0) + 1

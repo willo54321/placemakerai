@@ -8,10 +8,7 @@ const publicRoutes = [
   '/verify',
   '/forgot-password',
   '/set-password',
-  '/unsubscribe',
   '/api/auth',
-  '/api/unsubscribe',
-  '/api/webhooks',
   '/embed',
   '/api/embed',
 ]

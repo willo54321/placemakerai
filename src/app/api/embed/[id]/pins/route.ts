@@ -1,20 +1,10 @@
 import { prisma } from '@/lib/db'
 import { NextResponse } from 'next/server'
-import { Resend } from 'resend'
 import { rateLimitResponse } from '@/lib/rate-limit'
-import { escapeHtml } from '@/lib/escape-html'
 
-// Lazy initialization to avoid build errors when API key is missing
-const getResend = () => {
-  if (!process.env.RESEND_API_KEY) return null
-  return new Resend(process.env.RESEND_API_KEY)
-}
-
-// Issue categories for validation
-const ISSUE_CATEGORIES = ['noise', 'dust', 'traffic', 'damage', 'safety', 'hours', 'other']
 const FEEDBACK_CATEGORIES = ['positive', 'negative', 'question', 'comment']
 
-// Public API - submit feedback or issue (pin, line, or polygon)
+// Public API - submit feedback (pin, line, or polygon)
 export async function POST(
   request: Request,
   { params }: { params: { id: string } }
@@ -27,8 +17,6 @@ export async function POST(
     where: { id: params.id },
     select: {
       embedEnabled: true,
-      issuesEnabled: true,
-      issueNotifyEmails: true,
       name: true
     }
   })
@@ -42,14 +30,6 @@ export async function POST(
   }
 
   const body = await request.json()
-
-  // Validate mode
-  const mode = body.mode === 'issues' ? 'issues' : 'feedback'
-
-  // Check if issues mode is enabled for this project
-  if (mode === 'issues' && !project.issuesEnabled) {
-    return NextResponse.json({ error: 'Issue reporting not enabled for this project' }, { status: 403 })
-  }
 
   // Validate shape type
   const validShapeTypes = ['pin', 'line', 'polygon']
@@ -80,27 +60,13 @@ export async function POST(
     }
   }
 
-  // Validate category based on mode
-  const validCategories = mode === 'issues' ? ISSUE_CATEGORIES : FEEDBACK_CATEGORIES
-  const defaultCategory = mode === 'issues' ? 'other' : 'comment'
-  const category = validCategories.includes(body.category) ? body.category : defaultCategory
-
-  // For issues mode, name and email are required
-  if (mode === 'issues') {
-    if (!body.name?.trim() || !body.email?.trim()) {
-      return NextResponse.json(
-        { error: 'Name and email are required for issue reports' },
-        { status: 400 }
-      )
-    }
-  }
+  const category = FEEDBACK_CATEGORIES.includes(body.category) ? body.category : 'comment'
 
   // GDPR consent is required
   if (!body.gdprConsent) {
     return NextResponse.json({ error: 'GDPR consent is required' }, { status: 400 })
   }
 
-  // Create the feedback/issue item
   const pin = await prisma.publicPin.create({
     data: {
       projectId: params.id,
@@ -114,73 +80,8 @@ export async function POST(
       email: body.email?.slice(0, 255) || null,
       gdprConsent: true,
       gdprConsentDate: new Date(),
-      mailingConsent: body.mailingConsent || false,
-      mode,
     }
   })
-
-  // Send email notification for new issues
-  if (mode === 'issues' && project.issueNotifyEmails) {
-    const notifyEmails = project.issueNotifyEmails.split(',').map((e: string) => e.trim()).filter(Boolean)
-    const resend = getResend()
-    if (notifyEmails.length > 0 && resend) {
-      try {
-        const categoryLabel = category.charAt(0).toUpperCase() + category.slice(1)
-
-        await resend.emails.send({
-          from: 'PlaceMaker AI <notifications@placemaker.ai>',
-          to: notifyEmails,
-          subject: `New ${categoryLabel} Issue Reported - ${project.name}`,
-          html: `
-            <h2>New Construction Issue Reported</h2>
-            <p><strong>Project:</strong> ${escapeHtml(project.name)}</p>
-            <p><strong>Category:</strong> ${escapeHtml(categoryLabel)}</p>
-            <p><strong>Reported by:</strong> ${escapeHtml(pin.name)} (${escapeHtml(pin.email)})</p>
-            <hr>
-            <p><strong>Description:</strong></p>
-            <p>${escapeHtml(pin.comment)}</p>
-            <hr>
-            <p><em>This issue requires moderation before it appears on the public map.</em></p>
-          `
-        })
-      } catch (emailError) {
-        console.error('Failed to send issue notification email:', emailError)
-        // Don't fail the request if email fails
-      }
-    }
-  }
-
-  // Only add to mailing list if email provided AND user consented
-  if (body.email && body.mailingConsent) {
-    try {
-      await prisma.subscriber.upsert({
-        where: {
-          projectId_email: {
-            projectId: params.id,
-            email: body.email.toLowerCase(),
-          },
-        },
-        create: {
-          projectId: params.id,
-          email: body.email.toLowerCase(),
-          name: body.name || null,
-          source: 'public_pin',
-          sourceId: pin.id,
-          gdprConsent: true,
-          gdprConsentDate: new Date(),
-        },
-        update: {
-          name: body.name || undefined,
-          subscribed: true,
-          unsubscribedAt: null,
-          gdprConsent: true,
-          gdprConsentDate: new Date(),
-        },
-      })
-    } catch (error) {
-      console.error('Failed to add subscriber from public pin:', error)
-    }
-  }
 
   return NextResponse.json({
     id: pin.id,
@@ -192,7 +93,6 @@ export async function POST(
     comment: pin.comment,
     name: pin.name,
     votes: pin.votes,
-    createdAt: pin.createdAt,
-    mode: pin.mode
+    createdAt: pin.createdAt
   })
 }

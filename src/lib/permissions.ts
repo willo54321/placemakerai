@@ -11,7 +11,6 @@ export type Permission =
   | 'users:invite'
   | 'analytics:view'
   | 'feedback:manage'
-  | 'stakeholders:manage'
   | 'settings:manage'
 
 // Permissions by system role
@@ -25,7 +24,6 @@ const SYSTEM_ROLE_PERMISSIONS: Record<SystemRole, Permission[]> = {
     'users:invite',
     'analytics:view',
     'feedback:manage',
-    'stakeholders:manage',
     'settings:manage',
   ],
   USER: [],
@@ -39,7 +37,6 @@ const PROJECT_ROLE_PERMISSIONS: Record<ProjectRole, Permission[]> = {
     'users:invite',
     'analytics:view',
     'feedback:manage',
-    'stakeholders:manage',
     'settings:manage',
   ],
   CLIENT: [

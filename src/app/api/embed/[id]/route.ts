@@ -7,20 +7,6 @@ export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
-  const { searchParams } = new URL(request.url)
-  const mode = searchParams.get('mode') || 'feedback'
-
-  // Build pin filter based on mode
-  const pinFilter: { approved: boolean; mode: string; resolved?: boolean } = {
-    approved: true,
-    mode: mode
-  }
-
-  // For issues mode, hide resolved issues from public view
-  if (mode === 'issues') {
-    pinFilter.resolved = false
-  }
-
   const project = await prisma.project.findUnique({
     where: { id: params.id },
     include: {
@@ -29,17 +15,8 @@ export async function GET(
         orderBy: { createdAt: 'asc' }
       },
       publicPins: {
-        where: pinFilter,
+        where: { approved: true },
         orderBy: { createdAt: 'desc' }
-      },
-      tours: {
-        where: { active: true },
-        include: {
-          stops: {
-            orderBy: { order: 'asc' }
-          }
-        },
-        take: 1 // Only get the first active tour for now
       }
     }
   })
@@ -52,11 +29,6 @@ export async function GET(
     return NextResponse.json({ error: 'Embedding not enabled for this project' }, { status: 403 })
   }
 
-  // For issues mode, check if issues are enabled
-  if (mode === 'issues' && !project.issuesEnabled) {
-    return NextResponse.json({ error: 'Issue reporting not enabled for this project' }, { status: 403 })
-  }
-
   // Return only public-safe data
   return NextResponse.json({
     id: project.id,
@@ -67,8 +39,6 @@ export async function GET(
     mapZoom: project.mapZoom,
     allowPins: project.allowPins,
     allowDrawing: project.allowDrawing,
-    issuesEnabled: project.issuesEnabled,
-    mode: mode,
     // Styling customization
     embedPrimaryColor: project.embedPrimaryColor,
     embedFontFamily: project.embedFontFamily,
@@ -94,24 +64,6 @@ export async function GET(
       name: p.name,
       votes: p.votes,
       createdAt: p.createdAt
-    })),
-    tour: project.tours[0] ? {
-      id: project.tours[0].id,
-      name: project.tours[0].name,
-      description: project.tours[0].description,
-      stops: project.tours[0].stops.map(s => ({
-        id: s.id,
-        order: s.order,
-        title: s.title,
-        description: s.description,
-        imageUrl: s.imageUrl,
-        latitude: s.latitude,
-        longitude: s.longitude,
-        zoom: s.zoom,
-        highlight: s.highlight,
-        showOverlay: s.showOverlay,
-        icon: s.icon
-      }))
-    } : null
+    }))
   })
 }

@@ -145,64 +145,6 @@ function createNumberedMarkerIcon(color: string, number: string | number, isHove
   }
 }
 
-// Icon paths for tour stop markers
-const MARKER_ICON_PATHS: Record<string, string> = {
-  nature: 'M18 6c-2 0-3.5 1.5-3.5 3.5c0 1.2.6 2.3 1.5 3v.5h4v-.5c.9-.7 1.5-1.8 1.5-3C21.5 7.5 20 6 18 6zm-2 10v4h4v-4h2v6h-8v-6h2z', // Tree
-  access: 'M18 8a2 2 0 1 0 0-4a2 2 0 0 0 0 4zm2 3h-4a1 1 0 0 0-1 1v4h2v8h2v-8h2v-4a1 1 0 0 0-1-1z', // Wheelchair/person
-  parking: 'M12 6h5a4 4 0 0 1 0 8h-3v6h-2V6zm2 6h3a2 2 0 1 0 0-4h-3v4z', // P
-  info: 'M18 6a2 2 0 1 0 0 4a2 2 0 0 0 0-4zm-1 6h2v10h-2V12z', // i
-  home: 'M18 6l-8 6v12h5v-6h6v6h5V12l-8-6z', // House
-  food: 'M11 6v8h2v10h2V14h2V6h-2v6h-2V6h-2zm10 0v18h2V6h-2z', // Fork & knife
-  play: 'M10 6v18l14-9L10 6z', // Play triangle
-  water: 'M18 6c-4 4-6 7-6 10a6 6 0 1 0 12 0c0-3-2-6-6-10z', // Water drop
-  start: 'M18 6l2 4l4.5.7l-3.3 3.2l.8 4.5L18 16l-4 2.4l.8-4.5l-3.3-3.2L16 10l2-4z', // Star
-  view: 'M18 8c-5 0-9 4-9 8s4 8 9 8s9-4 9-8s-4-8-9-8zm0 14c-3.3 0-6-2.7-6-6s2.7-6 6-6s6 2.7 6 6s-2.7 6-6 6zm0-10a4 4 0 1 0 0 8a4 4 0 0 0 0-8z', // Eye/viewpoint
-}
-
-export const TOUR_STOP_ICONS = [
-  { id: 'number', label: 'Number', icon: '1' },
-  { id: 'nature', label: 'Nature', icon: '🌳' },
-  { id: 'access', label: 'Access', icon: '♿' },
-  { id: 'parking', label: 'Parking', icon: '🅿️' },
-  { id: 'info', label: 'Info', icon: 'ℹ️' },
-  { id: 'home', label: 'Building', icon: '🏠' },
-  { id: 'food', label: 'Food', icon: '🍴' },
-  { id: 'play', label: 'Recreation', icon: '▶️' },
-  { id: 'water', label: 'Water', icon: '💧' },
-  { id: 'start', label: 'Start', icon: '⭐' },
-  { id: 'view', label: 'Viewpoint', icon: '👁️' },
-]
-
-function createIconMarkerIcon(color: string, iconType: string, isHovered: boolean = false): google.maps.Icon {
-  const shadowBlur = isHovered ? '3' : '2'
-  const shadowOpacity = isHovered ? '0.3' : '0.2'
-  const size = isHovered ? 40 : 36
-  const height = isHovered ? 50 : 45
-  const iconPath = MARKER_ICON_PATHS[iconType] || MARKER_ICON_PATHS.info
-
-  const svg = `
-    <svg width="${size}" height="${height}" viewBox="0 0 36 45" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <filter id="shadow" x="-30%" y="-20%" width="160%" height="150%">
-          <feDropShadow dx="0" dy="2" stdDeviation="${shadowBlur}" flood-color="#000000" flood-opacity="${shadowOpacity}"/>
-        </filter>
-      </defs>
-      <g filter="url(#shadow)">
-        <path d="M18 2C9.7 2 3 8.7 3 17c0 11 15 25 15 25s15-14 15-25c0-8.3-6.7-15-15-15z" fill="${color}"/>
-        <circle cx="18" cy="16" r="10" fill="white"/>
-        <g transform="translate(9, 7) scale(0.5)">
-          <path d="${iconPath}" fill="${color}"/>
-        </g>
-      </g>
-    </svg>
-  `
-  return {
-    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
-    scaledSize: new google.maps.Size(size, height),
-    anchor: new google.maps.Point(size / 2, height)
-  }
-}
-
 // Cache marker icons so we don't allocate a brand-new google.maps.Icon object
 // (which triggers marker.setIcon churn) on every render / every hover. Keyed by
 // the parameters that actually affect the produced icon.
@@ -211,34 +153,20 @@ const markerIconCache = new globalThis.Map<string, google.maps.Icon>()
 function getMarkerIcon(
   color: string,
   label: string,
-  type: string | undefined,
   isHovered: boolean
 ): google.maps.Icon {
-  let kind: 'icon' | 'number' | 'plain'
-  if (type && type !== 'number' && MARKER_ICON_PATHS[type]) {
-    kind = 'icon'
-  } else if (label && /^\d+$/.test(label)) {
-    kind = 'number'
-  } else {
-    kind = 'plain'
-  }
+  const kind: 'number' | 'plain' = label && /^\d+$/.test(label) ? 'number' : 'plain'
 
   // Only the values that vary the SVG output participate in the cache key.
   const keyLabel = kind === 'number' ? label : ''
-  const keyType = kind === 'icon' ? type : ''
-  const cacheKey = `${kind}|${color}|${keyType}|${keyLabel}|${isHovered ? 1 : 0}`
+  const cacheKey = `${kind}|${color}|${keyLabel}|${isHovered ? 1 : 0}`
 
   const cached = markerIconCache.get(cacheKey)
   if (cached) return cached
 
-  let icon: google.maps.Icon
-  if (kind === 'icon') {
-    icon = createIconMarkerIcon(color, type as string, isHovered)
-  } else if (kind === 'number') {
-    icon = createNumberedMarkerIcon(color, label, isHovered)
-  } else {
-    icon = createMarkerIcon(color, isHovered)
-  }
+  const icon = kind === 'number'
+    ? createNumberedMarkerIcon(color, label, isHovered)
+    : createMarkerIcon(color, isHovered)
 
   markerIconCache.set(cacheKey, icon)
   return icon
@@ -306,7 +234,6 @@ const InteractiveMap = forwardRef<InteractiveMapRef, InteractiveMapProps>(({
   const [rotationStartAngle, setRotationStartAngle] = useState<number>(0)
   const overlayRefs = useRef(new globalThis.Map<string, RotatableOverlay>())
   const drawingManagerRef = useRef<google.maps.drawing.DrawingManager | null>(null)
-  const zoomRafRef = useRef<number | null>(null)
 
   const mapCenter = useMemo(() => ({ lat: center[0], lng: center[1] }), [center[0], center[1]])
 
@@ -372,54 +299,6 @@ const InteractiveMap = forwardRef<InteractiveMapRef, InteractiveMapProps>(({
 
     return () => google.maps.event.removeListener(listener)
   }, [map, onBoundsChange])
-
-  // Sync zoom when prop changes (for tour wizard zoom slider) with smooth easing
-  useEffect(() => {
-    if (!map) return
-
-    // Cancel any in-flight animation before starting a new one so we never run
-    // two rAF loops concurrently (which fought over map.setZoom and leaked
-    // frames when the effect re-ran mid-animation).
-    if (zoomRafRef.current !== null) {
-      cancelAnimationFrame(zoomRafRef.current)
-      zoomRafRef.current = null
-    }
-
-    const currentZoom = map.getZoom()
-    if (currentZoom === undefined || currentZoom === zoom) return
-
-    const diff = zoom - currentZoom
-    const steps = Math.abs(diff) * 4 // More steps for smoother animation
-    let step = 0
-
-    const easeInOutQuad = (t: number) => {
-      return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t
-    }
-
-    const animate = () => {
-      step++
-      const progress = easeInOutQuad(step / steps)
-      const newZoom = currentZoom + (diff * progress)
-      map.setZoom(newZoom)
-
-      if (step < steps) {
-        zoomRafRef.current = requestAnimationFrame(animate)
-      } else {
-        zoomRafRef.current = null
-      }
-    }
-
-    if (steps > 0) {
-      zoomRafRef.current = requestAnimationFrame(animate)
-    }
-
-    return () => {
-      if (zoomRafRef.current !== null) {
-        cancelAnimationFrame(zoomRafRef.current)
-        zoomRafRef.current = null
-      }
-    }
-  }, [map, zoom])
 
   // Keep the latest onOverlayClick in a ref so we can diff overlays without the
   // effect re-running (and tearing down every overlay) whenever the handler
@@ -771,7 +650,7 @@ const InteractiveMap = forwardRef<InteractiveMapRef, InteractiveMapProps>(({
             <MarkerF
               key={`${layer.id}-${featureIndex}`}
               position={{ lat: geometry.coordinates[1], lng: geometry.coordinates[0] }}
-              icon={getMarkerIcon(fillColor, '', undefined, false)}
+              icon={getMarkerIcon(fillColor, '', false)}
             />
           )
         }
@@ -907,7 +786,7 @@ const InteractiveMap = forwardRef<InteractiveMapRef, InteractiveMapProps>(({
           <MarkerF
             key={marker.id}
             position={{ lat: marker.latitude!, lng: marker.longitude! }}
-            icon={getMarkerIcon(marker.color, marker.label, marker.type, hoveredMarker === marker.id)}
+            icon={getMarkerIcon(marker.color, marker.label, hoveredMarker === marker.id)}
             onClick={() => onMarkerClick ? onMarkerClick(marker.id) : setSelectedMarker(marker.id)}
             onMouseOver={() => setHoveredMarker(marker.id)}
             onMouseOut={() => setHoveredMarker(null)}

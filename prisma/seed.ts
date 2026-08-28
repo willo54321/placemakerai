@@ -95,7 +95,7 @@ async function main() {
   }
   console.log(`Created ${pins.length} public pins`)
 
-  // Add Enquiries (inbox messages)
+  // Add Enquiries (analyzed by AI alongside pins and form responses)
   const enquiries = [
     {
       name: "Sarah Thompson",
@@ -103,7 +103,6 @@ async function main() {
       subject: "Parking concerns for Oak Lane residents",
       message: "As a resident of Oak Lane for 15 years, I'm extremely worried about the parking situation. We already struggle to find spaces in the evening, and adding 200 homes with only 100 parking spaces will make this impossible. What provisions are being made for existing residents? Will there be permit zones? I'd like a formal response please.",
       category: "objection",
-      priority: "high",
     },
     {
       name: "David Chen",
@@ -111,7 +110,6 @@ async function main() {
       subject: "Business relocation support",
       message: "I run Chen's Electronics on the current site. We've been here for 25 years and employ 5 local people. What support is available for businesses being displaced? Will there be affordable retail units in the new development? I need clarity on this soon as my current lease ends in 6 months.",
       category: "general",
-      priority: "high",
     },
     {
       name: "Emma Wilson",
@@ -119,7 +117,6 @@ async function main() {
       subject: "Excited about the community space",
       message: "I just wanted to say how excited I am about the plans for the public square! Our area really lacks places for the community to come together. Will there be any programming for the space - like markets or events? I'd love to help organise community activities if there's opportunity.",
       category: "support",
-      priority: "normal",
     },
     {
       name: "James Morrison",
@@ -127,7 +124,6 @@ async function main() {
       subject: "Construction hours complaint",
       message: "I work night shifts at the hospital. The proposed construction hours of 7am-7pm will make it impossible for me to sleep. Can these be changed to 8am-6pm? Also, what about weekend working? I really need this addressed or I may have to move.",
       category: "complaint",
-      priority: "normal",
     },
     {
       name: "Local History Society",
@@ -135,7 +131,6 @@ async function main() {
       subject: "Heritage preservation requirements",
       message: "We're pleased to see the Victorian facade being retained. However, we'd like clarification on exactly which elements will be preserved. The original shopfronts at numbers 45-49 are particularly significant. We'd welcome a meeting to discuss this in detail.",
       category: "planning",
-      priority: "normal",
     },
     {
       name: "Dr. Patel",
@@ -143,7 +138,6 @@ async function main() {
       subject: "Healthcare provision question",
       message: "As a local GP, I'm concerned about healthcare capacity. Our practice is already at 120% capacity. Has there been any assessment of healthcare needs? Is there space allocated for a medical facility in the plans? We would be interested in potentially opening a branch surgery.",
       category: "planning",
-      priority: "high",
     },
     {
       name: "Green Streets Campaign",
@@ -151,7 +145,6 @@ async function main() {
       subject: "Environmental sustainability measures",
       message: "We support sustainable development in the area. Can you confirm: 1) What percentage of homes will have solar panels? 2) Will there be electric vehicle charging points? 3) What's the target for carbon neutrality? 4) Are there plans for rainwater harvesting? We'd like detailed information for our members.",
       category: "general",
-      priority: "normal",
     },
     {
       name: "Mary Johnson",
@@ -159,7 +152,6 @@ async function main() {
       subject: "Accessibility concerns",
       message: "I'm 78 and use a mobility scooter. The current pavements are already difficult. Will the new development have proper dropped kerbs and wide enough paths? Also concerned about the gradient on the new pedestrian routes shown in the plans.",
       category: "general",
-      priority: "normal",
     },
   ]
 
@@ -172,8 +164,6 @@ async function main() {
         subject: enquiry.subject,
         message: enquiry.message,
         category: enquiry.category,
-        priority: enquiry.priority,
-        status: 'new',
       },
     })
   }
@@ -219,36 +209,11 @@ async function main() {
   }
   console.log(`Created ${formResponses.length} form responses`)
 
-  // Add some subscribers to the mailing list
-  const subscribers = [
-    { email: 'sarah.thompson@email.com', name: 'Sarah Thompson', source: 'enquiry' },
-    { email: 'david.chen@business.co.uk', name: 'David Chen', source: 'enquiry' },
-    { email: 'interested@local.com', name: 'Local Resident', source: 'manual' },
-    { email: 'updates@please.com', name: 'Newsletter Fan', source: 'public_pin' },
-    { email: 'community@watch.org', name: 'Community Watch', source: 'manual' },
-  ]
-
-  for (const sub of subscribers) {
-    await prisma.subscriber.upsert({
-      where: { projectId_email: { projectId: project.id, email: sub.email } },
-      update: {},
-      create: {
-        projectId: project.id,
-        email: sub.email,
-        name: sub.name,
-        source: sub.source,
-        subscribed: true,
-      },
-    })
-  }
-  console.log(`Created ${subscribers.length} subscribers`)
-
   console.log('\n✅ Test data seeded successfully!')
   console.log(`Project: ${project.name}`)
   console.log(`Public Pins: ${pins.length}`)
   console.log(`Enquiries: ${enquiries.length}`)
   console.log(`Form Responses: ${formResponses.length}`)
-  console.log(`Subscribers: ${subscribers.length}`)
 }
 
 main()

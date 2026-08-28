@@ -29,8 +29,7 @@ export async function OPTIONS() {
  * Body:
  * {
  *   "data": { ...any form fields... },
- *   "gdprConsent": true,          // Required
- *   "mailingConsent": false       // Optional
+ *   "gdprConsent": true           // Required
  * }
  *
  * Or submit fields directly at the root level:
@@ -91,19 +90,16 @@ export async function POST(
   // Extract data - support both nested {data: {...}} and flat submission
   let formData: Record<string, unknown>
   let gdprConsent: boolean
-  let mailingConsent: boolean
 
   if (body.data && typeof body.data === 'object') {
     // Nested format: { data: {...}, gdprConsent: true }
     formData = body.data
     gdprConsent = body.gdprConsent === true
-    mailingConsent = body.mailingConsent === true
   } else {
     // Flat format: { name: "...", email: "...", gdprConsent: true }
-    const { gdprConsent: gc, mailingConsent: mc, ...rest } = body
+    const { gdprConsent: gc, mailingConsent: _mc, ...rest } = body
     formData = rest
     gdprConsent = gc === true
-    mailingConsent = mc === true
   }
 
   // GDPR consent is required
@@ -179,57 +175,8 @@ export async function POST(
       data: formData as Prisma.InputJsonValue,
       gdprConsent: true,
       gdprConsentDate: new Date(),
-      mailingConsent,
     },
   })
-
-  // Extract email and name for mailing list
-  let email: string | null = null
-  let name: string | null = null
-
-  for (const [key, value] of Object.entries(formData)) {
-    if (!value || typeof value !== 'string') continue
-
-    const keyLower = key.toLowerCase()
-    if ((keyLower === 'email' || keyLower.includes('email')) && !email) {
-      email = value.toLowerCase()
-    }
-    if ((keyLower === 'name' || keyLower === 'fullname' || keyLower === 'full_name') && !name) {
-      name = value
-    }
-  }
-
-  // Add to mailing list if email found AND user consented
-  if (email && mailingConsent) {
-    try {
-      await prisma.subscriber.upsert({
-        where: {
-          projectId_email: {
-            projectId,
-            email,
-          },
-        },
-        create: {
-          projectId,
-          email,
-          name,
-          source: 'external_form',
-          sourceId: response.id,
-          gdprConsent: true,
-          gdprConsentDate: new Date(),
-        },
-        update: {
-          name: name || undefined,
-          subscribed: true,
-          unsubscribedAt: null,
-          gdprConsent: true,
-          gdprConsentDate: new Date(),
-        },
-      })
-    } catch (error) {
-      console.error('Failed to add subscriber from external form:', error)
-    }
-  }
 
   return NextResponse.json(
     {

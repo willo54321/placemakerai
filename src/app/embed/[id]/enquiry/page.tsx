@@ -21,7 +21,6 @@ export default function EnquiryFormPage({ params }: { params: { id: string } }) 
     message: '',
     category: 'general',
     gdprConsent: false,
-    mailingConsent: false,
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -219,19 +218,6 @@ export default function EnquiryFormPage({ params }: { params: { id: string } }) 
                 <a href="/privacy" target="_blank" className="text-blue-600 hover:underline">
                   Privacy Policy
                 </a>
-              </label>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <input
-                id="mailingConsent"
-                type="checkbox"
-                checked={form.mailingConsent}
-                onChange={e => setForm({ ...form, mailingConsent: e.target.checked })}
-                className="mt-1 w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-600"
-              />
-              <label htmlFor="mailingConsent" className="text-sm text-slate-600">
-                I would like to receive updates about this consultation via email (optional)
               </label>
             </div>
           </div>

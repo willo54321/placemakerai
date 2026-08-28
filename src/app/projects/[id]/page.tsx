@@ -2,13 +2,14 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { useSession } from 'next-auth/react'
-import { ArrowLeft, Users, MapPin, Settings, LayoutDashboard, BarChart3, Globe, Eye, FileText } from 'lucide-react'
+import { ArrowLeft, Users, MapPin, Settings, LayoutDashboard, BarChart3, Globe, Eye, FileText, HelpCircle } from 'lucide-react'
 import Link from 'next/link'
 import { useState, Suspense } from 'react'
 import dynamic from 'next/dynamic'
 import { OverviewTab } from './overview'
 import { SettingsTab } from './settings'
 import { AnalyticsTab } from './analytics'
+import { HowToTab } from './how-to'
 import UserMenu from '@/components/UserMenu'
 import { ProductTour, type TourStep } from '@/components/ProductTour'
 
@@ -36,7 +37,11 @@ const TOUR_COPY: Record<Tab, { title: string; body: string }> = {
   },
   settings: {
     title: 'Settings',
-    body: 'Project details, location, and configuration live here. That’s the tour — you’re ready to go.',
+    body: 'Project details, location, and configuration live here.',
+  },
+  howto: {
+    title: 'How to',
+    body: 'Step-by-step guides for every common task — approving comments, building forms, embedding the map. If you’re ever stuck, start here. That’s the tour!',
   },
 }
 
@@ -77,7 +82,7 @@ const FormsTabWrapper = dynamic(() => import('./forms-wrapper').then(mod => ({ d
   )
 })
 
-type Tab = 'overview' | 'feedback' | 'forms' | 'website' | 'analytics' | 'settings'
+type Tab = 'overview' | 'feedback' | 'forms' | 'website' | 'analytics' | 'settings' | 'howto'
 
 // Deep-link target passed alongside a tab switch (e.g. from the activity
 // feed): jump straight to a specific pin or form response.
@@ -97,6 +102,7 @@ const tabGroups: TabGroup[] = [
   { id: 'collect', label: 'Collect', tabs: ['feedback', 'forms', 'analytics'] },
   { id: 'publish', label: 'Publish', tabs: ['website'] },
   { id: 'configure', label: 'Configure', tabs: ['settings'] },
+  { id: 'help', label: 'Help', tabs: ['howto'] },
 ]
 
 export default function ProjectPage({ params }: { params: { id: string } }) {
@@ -110,8 +116,10 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
   }
 
   // Product tour: shown when the user's flag is on and not yet dismissed
-  // this session. "Don't show again" persists the opt-out.
+  // this session. "Don't show again" persists the opt-out. forceTour lets
+  // the How To page replay it on demand.
   const [tourDismissed, setTourDismissed] = useState(false)
+  const [forceTour, setForceTour] = useState(false)
   const { data: tourStatus } = useQuery({
     queryKey: ['tour-status'],
     queryFn: () => fetch('/api/me/tour').then(r => r.json()),
@@ -119,6 +127,7 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
 
   const finishTour = (dontShowAgain: boolean) => {
     setTourDismissed(true)
+    setForceTour(false)
     setActiveTab('overview')
     if (dontShowAgain) {
       fetch('/api/me/tour', {
@@ -232,6 +241,13 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
       count: 0,
       adminOnly: true,
     },
+    {
+      id: 'howto' as Tab,
+      label: 'How To',
+      icon: HelpCircle,
+      count: 0,
+      adminOnly: false,
+    },
   ]
 
   // Create a map for easy lookup
@@ -253,7 +269,7 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
         body: TOUR_COPY[tab.id].body,
       })),
   ]
-  const showTour = Boolean(tourStatus?.showTour) && !tourDismissed
+  const showTour = forceTour || (Boolean(tourStatus?.showTour) && !tourDismissed)
 
   return (
     <div className="flex min-h-screen bg-slate-50">
@@ -422,6 +438,19 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
           {activeTab === 'settings' && (
             <div className="p-6">
               <SettingsTab projectId={params.id} project={project} />
+            </div>
+          )}
+          {activeTab === 'howto' && (
+            <div className="p-6">
+              <HowToTab
+                isAdmin={Boolean(isAdmin)}
+                isSuperAdmin={session?.user?.systemRole === 'SUPER_ADMIN'}
+                onReplayTour={() => {
+                  setTourDismissed(false)
+                  setForceTour(true)
+                  setActiveTab('overview')
+                }}
+              />
             </div>
           )}
         </div>

@@ -18,7 +18,7 @@ Placemaker.ai is a public consultation platform for planning projects. It focuse
 - **Maps:** Leaflet, react-leaflet, Turf.js
 - **Data Fetching:** TanStack React Query
 - **Email:** Resend (account emails only: invite / password reset)
-- **AI:** OpenAI (GPT-4o-mini)
+- **AI:** Anthropic Claude (claude-opus-4-8 via @anthropic-ai/sdk)
 
 ## Quick Commands
 
@@ -49,7 +49,7 @@ npm run db:studio    # Open Prisma Studio
 │   ├── db.ts             # Prisma client
 │   ├── permissions.ts    # Role-based access
 │   ├── email.ts          # Account emails (invite/reset)
-│   └── openai.ts         # AI analysis
+│   └── ai.ts             # AI analysis (Anthropic Claude)
 └── /hooks
     └── usePermissions.ts
 ```
@@ -115,7 +115,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
 ### 3. AI Analysis
 - Sentiment analysis, theme extraction, and summary generation over map pins, form responses, and enquiries
-- Uses OpenAI GPT-4o-mini
+- Uses Anthropic Claude (claude-opus-4-8) with structured outputs — see `src/lib/ai.ts`
 - Results cached in AnalysisResult table
 
 ## Environment Variables
@@ -125,7 +125,7 @@ DATABASE_URL=          # PostgreSQL connection
 NEXTAUTH_SECRET=       # JWT signing secret
 NEXTAUTH_URL=          # Base URL (e.g., https://placemakerai.io)
 RESEND_API_KEY=        # Email delivery (invite/reset emails)
-OPENAI_API_KEY=        # AI analysis
+ANTHROPIC_API_KEY=     # AI analysis (Claude)
 ```
 
 ## Common Tasks

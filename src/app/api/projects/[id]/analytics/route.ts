@@ -6,7 +6,7 @@ import {
   createFeedbackHash,
   FeedbackItem,
   FullAnalysisResult,
-} from '@/lib/openai'
+} from '@/lib/ai'
 
 // GET - Retrieve cached analysis or return null
 export async function GET(

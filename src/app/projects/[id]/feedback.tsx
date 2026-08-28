@@ -64,9 +64,10 @@ export function FeedbackTab({ projectId, project }: { projectId: string; project
 
   const embedCode = `<iframe
   src="${embedUrl}"
+  title="${(project.name || 'Consultation').replace(/"/g, '&quot;')} consultation map"
   width="100%"
   height="600"
-  frameborder="0"
+  loading="lazy"
   allow="geolocation"
   style="border: 1px solid #e5e7eb; border-radius: 8px;"
 ></iframe>`

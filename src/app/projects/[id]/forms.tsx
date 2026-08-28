@@ -51,6 +51,14 @@ export function FormsTab({ projectId, forms }: { projectId: string; forms: Feedb
     enabled: !!viewingResponses,
   })
 
+  // Response numbers are stable identifiers (submission order: first ever = #1,
+  // never renumbered), displayed newest-first so new arrivals are on top.
+  const numberedResponses = ((responsesData?.responses as FeedbackResponse[] | undefined) ?? [])
+    .slice()
+    .sort((a, b) => new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime())
+    .map((response, i) => ({ ...response, responseNumber: i + 1 }))
+    .reverse()
+
   // Focus name input when form opens
   useEffect(() => {
     if (showForm && nameInputRef.current) {
@@ -573,7 +581,7 @@ export function FormsTab({ projectId, forms }: { projectId: string; forms: Feedb
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {responsesData?.responses?.map((response: FeedbackResponse, index: number) => {
+                    {numberedResponses.map((response) => {
                       const name = response.data.name || response.data.Name || response.data.fullName || response.data.full_name
                       const email = response.data.email || response.data.Email || response.data.emailAddress
                       const isExpanded = expandedResponse === response.id
@@ -627,7 +635,7 @@ export function FormsTab({ projectId, forms }: { projectId: string; forms: Feedb
                             <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 font-semibold text-sm ${
                               isExpanded ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
                             }`}>
-                              {name ? name.charAt(0).toUpperCase() : `#${responsesData.responses.length - index}`}
+                              {name ? name.charAt(0).toUpperCase() : `#${response.responseNumber}`}
                             </div>
 
                             <div className="flex-1 min-w-0">
@@ -636,7 +644,7 @@ export function FormsTab({ projectId, forms }: { projectId: string; forms: Feedb
                                 {name ? (
                                   <span className="font-semibold text-slate-900">{name}</span>
                                 ) : (
-                                  <span className="font-medium text-slate-600">Response #{responsesData.responses.length - index}</span>
+                                  <span className="font-medium text-slate-600">Response #{response.responseNumber}</span>
                                 )}
                                 {email && (
                                   <a

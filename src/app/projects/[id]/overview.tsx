@@ -24,15 +24,6 @@ export function OverviewTab({ project, onNavigate }: OverviewTabProps) {
 
   const metrics = [
     {
-      label: 'Map Markers',
-      value: mapMarkerCount,
-      icon: MapPin,
-      color: 'bg-green-500',
-      bgColor: 'bg-green-50',
-      textColor: 'text-green-700',
-      onClick: () => onNavigate('feedback'),
-    },
-    {
       label: 'Public Comments',
       value: publicPinCount,
       icon: MessageCircle,
@@ -40,7 +31,15 @@ export function OverviewTab({ project, onNavigate }: OverviewTabProps) {
       bgColor: 'bg-purple-50',
       textColor: 'text-purple-700',
       onClick: () => onNavigate('feedback'),
-      badge: pendingComments > 0 ? `${pendingComments} pending` : undefined,
+    },
+    {
+      label: 'Awaiting Review',
+      value: pendingComments,
+      icon: Clock,
+      color: 'bg-amber-500',
+      bgColor: 'bg-amber-50',
+      textColor: 'text-amber-700',
+      onClick: () => onNavigate('feedback'),
     },
     {
       label: 'Forms',
@@ -111,12 +110,6 @@ export function OverviewTab({ project, onNavigate }: OverviewTabProps) {
               </div>
               <p className="text-2xl font-bold text-slate-900">{metric.value}</p>
               <p className="text-sm text-slate-600">{metric.label}</p>
-              {metric.badge && (
-                <span className="inline-flex items-center gap-1 mt-2 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
-                  <Clock size={12} />
-                  {metric.badge}
-                </span>
-              )}
             </button>
           )
         })}

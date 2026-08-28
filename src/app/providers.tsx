@@ -26,6 +26,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <Toaster
           position="bottom-right"
           toastOptions={{
+            // Always auto-dismiss — stale toasts otherwise sit over the UI
+            duration: 5000,
             style: {
               background: 'white',
               border: '1px solid #e2e8f0',

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useJsApiLoader } from '@react-google-maps/api'
 import { MessageCircle, ThumbsUp, ThumbsDown, X, Send, MapPin, ChevronLeft, ChevronRight, Lightbulb, Pentagon, CheckCircle, AlertCircle } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
@@ -12,6 +13,22 @@ const EmbedMap = dynamic(() => import('./EmbedMap'), {
     </div>
   )
 })
+
+// Must exactly match the loader options in EmbedMap.tsx — same id, key,
+// version, and libraries — so this call starts the (single) script download
+// immediately, in parallel with the project API fetch, instead of EmbedMap
+// starting it only after the project data arrives. Saves ~2-3s on first paint.
+const MAPS_PRELOAD_LIBRARIES: ("drawing" | "geometry" | "places")[] = ['drawing', 'geometry']
+
+function MapsScriptPreloader() {
+  useJsApiLoader({
+    id: 'google-map-script-embed',
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
+    version: '3.64', // DrawingManager was removed from the Maps JS API in 3.65
+    libraries: MAPS_PRELOAD_LIBRARIES,
+  })
+  return null
+}
 
 // GeoJSON geometry types
 interface GeoJSONGeometry {
@@ -325,6 +342,7 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
   if (loading) {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-gray-50">
+        <MapsScriptPreloader />
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-brand-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
           <p className="text-gray-500">Loading consultation map...</p>

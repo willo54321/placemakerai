@@ -16,6 +16,7 @@ interface Project {
   _count: {
     feedbackForms: number
     mapMarkers: number
+    publicPins: number
   }
 }
 
@@ -201,10 +202,10 @@ export default function ProjectsPage() {
                   )}
 
                   <div className="flex gap-4 text-sm text-slate-500">
-                    <span className="flex items-center gap-1.5" title="Map markers">
+                    <span className="flex items-center gap-1.5" title="Public map comments">
                       <MapPin size={16} aria-hidden="true" />
-                      <span>{project._count.mapMarkers}</span>
-                      <span className="sr-only">map markers</span>
+                      <span>{project._count.publicPins ?? 0}</span>
+                      <span className="sr-only">public map comments</span>
                     </span>
                     <span className="flex items-center gap-1.5" title="Feedback forms">
                       <FileText size={16} aria-hidden="true" />

@@ -24,7 +24,7 @@ async function requireSuperAdmin(): Promise<NextResponse | null> {
 }
 
 async function findSubjectData(email: string) {
-  const [pins, enquiries] = await Promise.all([
+  const [pins, enquiries, accounts] = await Promise.all([
     // Legacy rows only — pin submissions no longer collect email.
     prisma.publicPin.findMany({
       where: { email: { equals: email, mode: 'insensitive' } },
@@ -37,6 +37,8 @@ async function findSubjectData(email: string) {
         latitude: true,
         longitude: true,
         approved: true,
+        gdprConsent: true,
+        gdprConsentDate: true,
         createdAt: true,
         project: { select: { id: true, name: true } },
       },
@@ -51,8 +53,23 @@ async function findSubjectData(email: string) {
         submitterOrg: true,
         subject: true,
         message: true,
+        gdprConsent: true,
+        gdprConsentDate: true,
         createdAt: true,
         project: { select: { id: true, name: true } },
+      },
+    }),
+    // Dashboard user accounts are personal data too (name, email, hashed
+    // password) — the privacy policy lists them, so the tool must cover them.
+    prisma.user.findMany({
+      where: { email: { equals: email, mode: 'insensitive' } },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        systemRole: true,
+        createdAt: true,
+        projectAccess: { select: { role: true, project: { select: { name: true } } } },
       },
     }),
   ])
@@ -69,6 +86,8 @@ async function findSubjectData(email: string) {
         select: {
           id: true,
           data: true,
+          gdprConsent: true,
+          gdprConsentDate: true,
           submittedAt: true,
           form: {
             select: { id: true, name: true, Project: { select: { id: true, name: true } } },
@@ -77,7 +96,7 @@ async function findSubjectData(email: string) {
       })
     : []
 
-  return { pins, enquiries, formResponses }
+  return { pins, enquiries, formResponses, accounts }
 }
 
 export async function GET(request: Request) {
@@ -98,6 +117,7 @@ export async function GET(request: Request) {
         pins: data.pins.length,
         enquiries: data.enquiries.length,
         formResponses: data.formResponses.length,
+        accounts: data.accounts.length,
       },
       ...data,
     })
@@ -123,15 +143,21 @@ export async function DELETE(request: Request) {
 
   try {
     const data = await findSubjectData(email)
-    const [pins, enquiries, formResponses] = await prisma.$transaction([
+    // Never erase super-admin accounts through this tool — that's platform
+    // administration (and self-lockout), not a subject request. Handle those
+    // deliberately via /admin/users.
+    const deletableAccounts = data.accounts.filter(a => a.systemRole !== 'SUPER_ADMIN')
+    const skippedAccounts = data.accounts.length - deletableAccounts.length
+    const [pins, enquiries, formResponses, accounts] = await prisma.$transaction([
       prisma.publicPin.deleteMany({ where: { id: { in: data.pins.map(p => p.id) } } }),
       prisma.enquiry.deleteMany({ where: { id: { in: data.enquiries.map(e => e.id) } } }),
       prisma.feedbackResponse.deleteMany({
         where: { id: { in: data.formResponses.map(r => r.id) } },
       }),
+      prisma.user.deleteMany({ where: { id: { in: deletableAccounts.map(a => a.id) } } }),
     ])
     console.log(
-      `GDPR erasure for ${email}: ${pins.count} pins, ${enquiries.count} enquiries, ${formResponses.count} form responses`
+      `GDPR erasure for ${email}: ${pins.count} pins, ${enquiries.count} enquiries, ${formResponses.count} form responses, ${accounts.count} accounts${skippedAccounts ? ` (${skippedAccounts} super-admin account skipped)` : ''}`
     )
     return NextResponse.json({
       email,
@@ -139,7 +165,9 @@ export async function DELETE(request: Request) {
         pins: pins.count,
         enquiries: enquiries.count,
         formResponses: formResponses.count,
+        accounts: accounts.count,
       },
+      skippedSuperAdminAccounts: skippedAccounts,
     })
   } catch (error) {
     console.error('GDPR erasure failed:', error)

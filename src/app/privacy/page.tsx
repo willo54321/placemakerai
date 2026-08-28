@@ -38,6 +38,7 @@ export default function PrivacyPolicy() {
               <li><strong>Form responses:</strong> Answers you submit through consultation feedback forms, which may include your name and contact details where a form asks for them</li>
               <li><strong>Enquiries:</strong> Your name, email address, and message when you submit an enquiry, plus phone number and organisation if you provide them</li>
               <li><strong>Account data:</strong> For consultation teams using the dashboard — name, email address, and a securely hashed password</li>
+              <li><strong>Vote de-duplication:</strong> When you vote on a map comment, we store a hashed (one-way, irreversible) identifier derived from your connection to limit duplicate votes; we do not store your IP address itself alongside your feedback</li>
             </ul>
             <p className="text-slate-600 mb-4">
               Every public submission requires your explicit consent at the point of submission, and we record when that consent was given.

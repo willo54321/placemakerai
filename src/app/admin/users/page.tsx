@@ -394,6 +394,7 @@ function UserModal({ user, projects, onClose }: UserModalProps) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               minLength={8}
+              required={!isEditing}
               autoComplete="new-password"
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
               placeholder={isEditing ? 'Leave blank to keep current password' : 'Min 8 characters'}

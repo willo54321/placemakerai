@@ -23,14 +23,20 @@ interface MaterialAnalysisData {
 
 interface MaterialClassificationProps {
   analysis: MaterialAnalysisData
+  /** Total number of responses analyzed — the denominator for all percentages. */
+  analyzedCount?: number
 }
 
-export function MaterialClassification({ analysis }: MaterialClassificationProps) {
+export function MaterialClassification({ analysis, analyzedCount }: MaterialClassificationProps) {
   const [expandedMaterial, setExpandedMaterial] = useState<string | null>(null)
   const [expandedNonMaterial, setExpandedNonMaterial] = useState<string | null>(null)
   const [showHelp, setShowHelp] = useState(false)
 
-  const total = analysis.summary.material + analysis.summary.nonMaterial + analysis.summary.mixed
+  const classified = analysis.summary.material + analysis.summary.nonMaterial + analysis.summary.mixed
+  // Percentages must be of ALL analyzed responses, not just the ones the
+  // classifier assigned a bucket — these figures get quoted in planning reports.
+  const total = analyzedCount && analyzedCount >= classified ? analyzedCount : classified
+  const unclassified = total - classified
   const materialPercent = total > 0 ? Math.round((analysis.summary.material / total) * 100) : 0
   const nonMaterialPercent = total > 0 ? Math.round((analysis.summary.nonMaterial / total) * 100) : 0
   const mixedPercent = total > 0 ? Math.round((analysis.summary.mixed / total) * 100) : 0
@@ -134,6 +140,12 @@ export function MaterialClassification({ analysis }: MaterialClassificationProps
           />
         )}
       </div>
+      {unclassified > 0 && (
+        <p className="text-xs text-slate-500 -mt-3">
+          Percentages are of all {total} analyzed responses; {unclassified} response{unclassified === 1 ? '' : 's'} could not be
+          confidently classified and {unclassified === 1 ? 'is' : 'are'} not included in any category.
+        </p>
+      )}
 
       {/* Category breakdowns */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

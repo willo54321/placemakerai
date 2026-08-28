@@ -325,7 +325,7 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
         <div>
           <h2 className="text-2xl font-semibold text-slate-900">AI Analytics</h2>
           <p className="text-slate-500 mt-1">
-            Analysis of {analysis.feedbackCount} feedback items • Last updated {new Date(analysis.analyzedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+            Analysis of {analysis.feedbackCount} feedback items (approved map comments and form responses) • Last updated {new Date(analysis.analyzedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
           </p>
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
@@ -615,7 +615,7 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
       {/* Material vs Non-Material Classification */}
       {analysis.materialAnalysis && (
         <div className="card p-6">
-          <MaterialClassification analysis={analysis.materialAnalysis} />
+          <MaterialClassification analysis={analysis.materialAnalysis} analyzedCount={analysis.feedbackCount} />
         </div>
       )}
 

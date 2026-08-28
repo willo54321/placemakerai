@@ -40,14 +40,28 @@ export async function POST(
 
   const body = await request.json()
 
-  // Basic validation
-  if (!body.submitterName || !body.submitterEmail || !body.subject || !body.message) {
-    return NextResponse.json({ error: 'Missing required fields' }, { status: 400, headers: corsHeaders })
-  }
+  // Name every problem in one response so submitters don't discover the
+  // contract one error at a time.
+  const missing = (
+    [
+      ['submitterName', 'name'],
+      ['submitterEmail', 'email'],
+      ['subject', 'subject'],
+      ['message', 'message'],
+    ] as const
+  )
+    .filter(([field]) => !body[field])
+    .map(([, label]) => label)
+  const errors: string[] = missing.length ? [`missing required field${missing.length > 1 ? 's' : ''}: ${missing.join(', ')}`] : []
 
-  // GDPR consent is required
+  if (body.submitterEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.submitterEmail)) {
+    errors.push('email must be a valid email address')
+  }
   if (!body.gdprConsent) {
-    return NextResponse.json({ error: 'GDPR consent is required' }, { status: 400, headers: corsHeaders })
+    errors.push('GDPR consent is required')
+  }
+  if (errors.length > 0) {
+    return NextResponse.json({ error: errors.join('; ') }, { status: 400, headers: corsHeaders })
   }
 
   const enquiry = await prisma.enquiry.create({

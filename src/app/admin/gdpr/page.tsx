@@ -10,7 +10,7 @@ import { toast } from 'sonner'
 interface SubjectData {
   email: string
   searchedAt: string
-  counts: { pins: number; enquiries: number; formResponses: number }
+  counts: { pins: number; enquiries: number; formResponses: number; accounts: number }
   pins: Array<{
     id: string
     comment: string
@@ -33,6 +33,14 @@ interface SubjectData {
     data: Record<string, unknown>
     submittedAt: string
     form: { name: string; Project: { name: string } | null }
+  }>
+  accounts: Array<{
+    id: string
+    name: string | null
+    email: string
+    systemRole: string
+    createdAt: string
+    projectAccess: Array<{ role: string; project: { name: string } }>
   }>
 }
 
@@ -88,7 +96,8 @@ export default function GdprPage() {
 
   const eraseAll = async () => {
     if (!result) return
-    const total = result.counts.pins + result.counts.enquiries + result.counts.formResponses
+    const total =
+      result.counts.pins + result.counts.enquiries + result.counts.formResponses + result.counts.accounts
     if (
       !confirm(
         `Permanently delete all ${total} records for ${result.email}? This cannot be undone. ` +
@@ -104,10 +113,13 @@ export default function GdprPage() {
         body: JSON.stringify({ email: result.email }),
       })
       if (!res.ok) throw new Error((await res.json()).error || 'Erasure failed')
-      const { deleted } = await res.json()
+      const { deleted, skippedSuperAdminAccounts } = await res.json()
       toast.success(
-        `Erased ${deleted.pins} pins, ${deleted.enquiries} enquiries, ${deleted.formResponses} form responses`
+        `Erased ${deleted.pins} pins, ${deleted.enquiries} enquiries, ${deleted.formResponses} form responses, ${deleted.accounts} accounts`
       )
+      if (skippedSuperAdminAccounts > 0) {
+        toast.info('A super-admin account was not deleted — remove it via User Management if intended.')
+      }
       setResult(null)
       setEmail('')
     } catch (err) {
@@ -118,7 +130,7 @@ export default function GdprPage() {
   }
 
   const total = result
-    ? result.counts.pins + result.counts.enquiries + result.counts.formResponses
+    ? result.counts.pins + result.counts.enquiries + result.counts.formResponses + result.counts.accounts
     : 0
 
   return (
@@ -162,7 +174,7 @@ export default function GdprPage() {
                 </p>
                 <p className="text-sm text-slate-500">
                   {result.counts.pins} map comments · {result.counts.enquiries} enquiries ·{' '}
-                  {result.counts.formResponses} form responses
+                  {result.counts.formResponses} form responses · {result.counts.accounts} dashboard accounts
                 </p>
               </div>
               {total > 0 && (
@@ -217,6 +229,34 @@ export default function GdprPage() {
                       </span>
                       <p className="text-slate-800 mt-1 font-medium">{e.subject}</p>
                       <p className="text-slate-700">{e.message}</p>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {result.accounts.length > 0 && (
+              <section className="card p-4">
+                <h2 className="font-medium text-slate-900 mb-3 flex items-center gap-2">
+                  <Shield size={16} className="text-green-600" /> Dashboard accounts
+                </h2>
+                <ul className="space-y-2">
+                  {result.accounts.map((a) => (
+                    <li key={a.id} className="text-sm bg-slate-50 rounded-lg p-3">
+                      <span className="text-slate-800 font-medium">
+                        {a.name || 'Unnamed'} ({a.email})
+                      </span>
+                      <span className="text-slate-500">
+                        {' '}
+                        · {a.systemRole} · created {new Date(a.createdAt).toLocaleDateString('en-GB')}
+                        {a.projectAccess.length > 0 &&
+                          ` · ${a.projectAccess.map((pa) => `${pa.project.name} (${pa.role})`).join(', ')}`}
+                      </span>
+                      {a.systemRole === 'SUPER_ADMIN' && (
+                        <p className="text-xs text-amber-600 mt-1">
+                          Super-admin accounts are not deleted by Erase All — use User Management.
+                        </p>
+                      )}
                     </li>
                   ))}
                 </ul>

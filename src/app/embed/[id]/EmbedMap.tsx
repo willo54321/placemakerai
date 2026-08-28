@@ -492,7 +492,10 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
     },
     streetViewControl: false,
     fullscreenControl: false,
-    zoomControl: false,
+    // Visible zoom buttons: needed for touch users and keyboard accessibility
+    zoomControl: true,
+    // Don't let Google's business/POI icons steal clicks aimed at feedback pins
+    clickableIcons: false,
     scaleControl: false,
     rotateControl: false,
     panControl: false,
@@ -811,6 +814,12 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
                     )}
                   </div>
                 )}
+
+                <p className="text-xs text-gray-400 mb-3">
+                  — {pin.name || 'Anonymous'}
+                  {pin.createdAt &&
+                    ` · ${new Date(pin.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`}
+                </p>
 
                 {votedPins.has(pin.id) ? (
                   <div className="w-full flex items-center justify-center py-2 mb-3 border border-green-200 bg-green-50 rounded-lg">

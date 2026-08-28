@@ -32,6 +32,7 @@ export async function GET() {
             select: {
               feedbackForms: true,
               mapMarkers: true,
+              publicPins: true,
             },
           },
           userAccess: {
@@ -58,6 +59,7 @@ export async function GET() {
             select: {
               feedbackForms: true,
               mapMarkers: true,
+              publicPins: true,
             },
           },
         },

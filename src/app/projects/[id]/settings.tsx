@@ -95,7 +95,7 @@ export function SettingsTab({ projectId, project }: SettingsTabProps) {
         <form onSubmit={handleSave} className="space-y-4">
           <div>
             <label htmlFor="project-name" className="label">
-              Project Name <span className="label-required">*</span>
+              Project Name <span className="label-required" aria-hidden="true"></span>
             </label>
             <input
               id="project-name"

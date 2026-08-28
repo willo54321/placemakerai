@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import {
   ThumbsUp,
   ThumbsDown,
@@ -47,15 +48,25 @@ interface Project {
 export function FeedbackPinsTab({ projectId, project }: { projectId: string; project: Project }) {
   const queryClient = useQueryClient()
   const [pendingApprovalId, setPendingApprovalId] = useState<string | null>(null)
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
   const deletePin = useMutation({
     mutationFn: async (pinId: string) => {
-      await fetch(`/api/projects/${projectId}/pins/${pinId}`, {
+      setPendingDeleteId(pinId)
+      const response = await fetch(`/api/projects/${projectId}/pins/${pinId}`, {
         method: 'DELETE'
       })
+      if (!response.ok) throw new Error(`Failed to delete: ${response.status}`)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
+      toast.success('Comment permanently deleted')
+    },
+    onError: () => {
+      toast.error('Failed to delete — the comment is unchanged')
+    },
+    onSettled: () => {
+      setPendingDeleteId(null)
     }
   })
 
@@ -70,13 +81,28 @@ export function FeedbackPinsTab({ projectId, project }: { projectId: string; pro
       if (!response.ok) throw new Error(`Failed to update pin: ${response.status}`)
       return response.json()
     },
-    onSuccess: () => {
+    onSuccess: (_data, { approved }) => {
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
+      toast.success(approved ? 'Approved — now visible on the public map' : 'Unapproved — hidden from the public map')
+    },
+    onError: () => {
+      toast.error('Failed to update — no change was made')
     },
     onSettled: () => {
       setPendingApprovalId(null)
     }
   })
+
+  const confirmDelete = (pin: PublicPin) => {
+    const preview = pin.comment.length > 120 ? `${pin.comment.slice(0, 120)}…` : pin.comment
+    if (
+      confirm(
+        `Permanently delete this ${pin.approved ? 'PUBLISHED ' : ''}comment${pin.name ? ` from "${pin.name}"` : ''}?\n\n"${preview}"\n\nThis cannot be undone.`
+      )
+    ) {
+      deletePin.mutate(pin.id)
+    }
+  }
 
   const feedbackPins = project.publicPins || []
 
@@ -198,7 +224,7 @@ export function FeedbackPinsTab({ projectId, project }: { projectId: string; pro
                           </span>
                         )}
                       </div>
-                      <p className="text-gray-700 whitespace-pre-wrap">{pin.comment}</p>
+                      <p className="text-gray-700 whitespace-pre-wrap break-words">{pin.comment}</p>
                       <div className="flex items-center gap-4 mt-2 text-xs text-gray-400">
                         {pin.shapeType === 'pin' || !pin.shapeType ? (
                           <span>{pin.latitude?.toFixed(6)}, {pin.longitude?.toFixed(6)}</span>
@@ -237,13 +263,10 @@ export function FeedbackPinsTab({ projectId, project }: { projectId: string; pro
                         </button>
                       )}
                       <button
-                        onClick={() => {
-                          if (confirm('Delete this feedback?')) {
-                            deletePin.mutate(pin.id)
-                          }
-                        }}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                        title="Delete"
+                        onClick={() => confirmDelete(pin)}
+                        disabled={pendingDeleteId === pin.id}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-50"
+                        title="Delete permanently"
                       >
                         <Trash2 size={18} />
                       </button>

@@ -1,0 +1,83 @@
+PLACEMAKER.AI — BUDGET PLAN
+Updated: 28 August 2026
+All figures approximate. Triggers show WHEN the cost actually starts.
+
+=====================================================================
+RECURRING — INFRASTRUCTURE
+=====================================================================
+
+Supabase Pro                     $25/mo (~£20/mo)
+  Trigger: the day the first real client consultation goes live.
+  Why: removes free-tier database pausing (which destroyed the first
+  database) and adds daily backups. Non-negotiable once the DB holds
+  real residents' responses.
+
+Vercel Pro                       $20/mo (~£16/mo)
+  Trigger: first paying client.
+  Why: the free Hobby plan prohibits commercial use in its terms, and
+  Pro raises function limits. Fine to stay on Hobby while pre-revenue.
+
+Domain renewal (placemakerai.io) ~£30-45/yr
+  Trigger: annual renewal (already owned).
+
+Google Maps                      £0 expected
+  Free tier: 10,000 map loads/month; daily quota capped at 320 loads
+  so it cannot bill accidentally. Revisit only if traffic grows past
+  ~300 map views/day (then roughly £5 per extra 1,000 loads).
+
+Resend (email delivery)          £0 (free tier)
+  Trigger: deferred by choice — manual password resets for now.
+
+Sentry / UptimeRobot             £0 (free tiers)
+
+=====================================================================
+PER PROJECT — AI ANALYSIS (Anthropic credits)
+=====================================================================
+
+Budget ~£20 (~$25) per consultation project.
+
+  Basis: one full AI analysis run costs roughly $0.30-0.50 on a
+  typical project (~50 feedback items) and up to ~$2.50 at the
+  400-item cap. Results are cached and only re-run when feedback
+  changes, so a live consultation triggers a handful of paid runs
+  per week. £20/project is comfortable headroom; actual spend will
+  likely be £5-15.
+
+  The $20 already loaded covers the first project entirely.
+  Set a monthly spend cap in console.anthropic.com as a backstop.
+  Fold the £20 into per-project client pricing.
+
+=====================================================================
+ONE-OFF / ANNUAL — CREDIBILITY & COMPLIANCE
+=====================================================================
+
+Cyber Essentials certification   ~£320 + VAT (= £384/yr)
+  Trigger: when actively pitching councils. Includes £25k cyber
+  insurance. Renews annually. Half a day of prep (laptop hardening,
+  asset inventory) before applying.
+
+Cyber Essentials PLUS            ~£1,500-2,000/yr
+  Trigger: ONLY if a specific contract/framework demands the audited
+  version. Do not buy speculatively.
+
+External penetration test        ~£2,000-5,000 one-off
+  Trigger: ONLY when a contract requires it. Until then "internally
+  security reviewed" is the honest answer.
+
+Legal review (DPA + terms)       ~£500-1,500 one-off
+  Trigger: before signing the first council contract. Drafts can be
+  prepared free; a solicitor reviews rather than writes.
+
+=====================================================================
+SUMMARY
+=====================================================================
+
+Today (pre-revenue):             ~£3/mo (domain amortised) + AI usage
+At first client:                 ~£36/mo infra + ~£20/project AI
+When pitching councils:          + £384/yr Cyber Essentials
+First council contract:          + legal review one-off; pen test
+                                   only if demanded
+
+Rule of thumb: a single client project needs roughly £60-70/month of
+underlying cost at the start (infra + AI + amortised certification) —
+price accordingly.

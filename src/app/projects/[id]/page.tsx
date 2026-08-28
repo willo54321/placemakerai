@@ -429,8 +429,11 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
             </a>
           </div>
           <UserMenu />
-          <div className="text-xs text-slate-400">
-            Last updated: {new Date(project.updatedAt).toLocaleDateString()}
+          <div className="text-xs text-slate-400 flex items-center justify-between">
+            <span>Last updated: {new Date(project.updatedAt).toLocaleDateString()}</span>
+            <span title={`Build ${process.env.NEXT_PUBLIC_COMMIT_SHA}`}>
+              v{process.env.NEXT_PUBLIC_APP_VERSION} · {process.env.NEXT_PUBLIC_COMMIT_SHA}
+            </span>
           </div>
         </div>
       </aside>

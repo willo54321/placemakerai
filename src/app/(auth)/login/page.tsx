@@ -125,7 +125,8 @@ export default function LoginPage() {
       </div>
 
       <p className="text-center text-xs text-slate-400 mt-4">
-        Placemaker is in alpha testing — please report any bugs to{' '}
+        Placemaker is in alpha testing (v{process.env.NEXT_PUBLIC_APP_VERSION} ·{' '}
+        {process.env.NEXT_PUBLIC_COMMIT_SHA}) — please report any bugs to{' '}
         <a
           href="mailto:william.neale@secnewgate.co.uk?subject=Placemaker%20bug%20report"
           className="text-slate-500 underline hover:text-slate-700"

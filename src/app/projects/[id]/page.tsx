@@ -419,6 +419,15 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
 
         {/* Footer with User Menu */}
         <div className="p-4 border-t border-slate-200 space-y-3">
+          <div className="text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-3 py-2">
+            <span className="font-semibold">Alpha testing</span> — spotted a bug?{' '}
+            <a
+              href="mailto:william.neale@secnewgate.co.uk?subject=Placemaker%20bug%20report"
+              className="underline hover:text-amber-900"
+            >
+              Tell Will Neale
+            </a>
+          </div>
           <UserMenu />
           <div className="text-xs text-slate-400">
             Last updated: {new Date(project.updatedAt).toLocaleDateString()}

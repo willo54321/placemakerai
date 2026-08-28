@@ -1,6 +1,12 @@
+const { withSentryConfig } = require('@sentry/nextjs')
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  experimental: {
+    // Required on Next 14 for instrumentation.ts (Sentry server init)
+    instrumentationHook: true,
+  },
   async headers() {
     return [
       {
@@ -25,4 +31,6 @@ const nextConfig = {
   },
 }
 
-module.exports = nextConfig
+// Sentry wrapping injects the client config; without a SENTRY_AUTH_TOKEN it
+// skips source-map upload, and without a DSN the SDK is a no-op at runtime.
+module.exports = withSentryConfig(nextConfig, { silent: true })

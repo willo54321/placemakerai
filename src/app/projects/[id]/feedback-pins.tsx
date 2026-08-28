@@ -143,7 +143,12 @@ export function FeedbackPinsTab({ projectId, project }: { projectId: string; pro
       {/* Pins list */}
       <div className="bg-white rounded-xl shadow-sm border">
         <div className="px-6 py-4 border-b flex items-center justify-between">
-          <h3 className="font-semibold">Map Feedback ({feedbackPins.length})</h3>
+          <div>
+            <h3 className="font-semibold">Map Feedback ({feedbackPins.length})</h3>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Vote counts are indicative — public voting is protected against casual duplicates but not identity-verified.
+            </p>
+          </div>
           <div className="flex gap-2 text-sm">
             <span className="text-amber-600">
               {feedbackPins.filter(p => !p.approved).length} pending

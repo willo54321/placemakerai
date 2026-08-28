@@ -2,6 +2,7 @@ import { NextAuthOptions, getServerSession } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
 import { prisma } from './db'
+import { rateLimit } from './rate-limit'
 import type { SystemRole } from '@prisma/client'
 
 // Extend the built-in session types
@@ -39,9 +40,25 @@ export const authOptions: NextAuthOptions = {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' },
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         if (!credentials?.email || !credentials?.password) {
           throw new Error('Email and password required')
+        }
+
+        // Brute-force protection: bound login attempts per IP and per
+        // IP+account before touching the database or bcrypt. Best-effort
+        // (in-memory per instance) but raises the cost of credential
+        // stuffing substantially.
+        const fwd = req?.headers?.['x-forwarded-for']
+        const ip = (typeof fwd === 'string' ? fwd.split(',')[0].trim() : '') || 'unknown'
+        const perIp = rateLimit(`login-ip:${ip}`, 30, 15 * 60_000)
+        const perAccount = rateLimit(
+          `login-acct:${ip}:${credentials.email.toLowerCase()}`,
+          10,
+          15 * 60_000
+        )
+        if (!perIp.ok || !perAccount.ok) {
+          throw new Error('Too many login attempts. Please wait 15 minutes and try again.')
         }
 
         const user = await prisma.user.findUnique({

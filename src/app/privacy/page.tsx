@@ -16,70 +16,98 @@ export default function PrivacyPolicy() {
         <h1 className="text-3xl font-bold text-slate-900 mb-8">Privacy Policy</h1>
 
         <div className="prose prose-slate max-w-none">
-          <p className="text-slate-600 mb-6">
-            Last updated: {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
-          </p>
+          <p className="text-slate-600 mb-6">Last updated: 28 August 2026</p>
 
           <section className="mb-8">
             <h2 className="text-xl font-semibold text-slate-900 mb-4">1. Introduction</h2>
             <p className="text-slate-600 mb-4">
-              This Privacy Policy explains how we collect, use, store, and protect your personal data when you use our consultation platform. We are committed to protecting your privacy and ensuring your personal data is handled in accordance with the UK General Data Protection Regulation (UK GDPR) and the Data Protection Act 2018.
+              Placemaker.ai is a platform for public consultation on planning and development projects. Each consultation on this platform is run by an organisation — such as a council, developer, or their consultants — who decides what feedback to collect and how it is used. Placemaker.ai provides the software they use to collect and analyse it.
+            </p>
+            <p className="text-slate-600 mb-4">
+              This Privacy Policy explains what personal data the platform collects, how it is used, and your rights. We handle personal data in accordance with the UK General Data Protection Regulation (UK GDPR) and the Data Protection Act 2018.
             </p>
           </section>
 
           <section className="mb-8">
             <h2 className="text-xl font-semibold text-slate-900 mb-4">2. Data We Collect</h2>
-            <p className="text-slate-600 mb-4">We may collect the following personal data:</p>
-            <ul className="list-disc pl-6 text-slate-600 space-y-2 mb-4">
-              <li><strong>Contact Information:</strong> Name, email address, phone number, organisation</li>
-              <li><strong>Feedback Data:</strong> Comments, opinions, and responses submitted through feedback forms and interactive maps</li>
-              <li><strong>Location Data:</strong> Geographic coordinates when you place pins on consultation maps (only when you choose to do so)</li>
-              <li><strong>Communication Data:</strong> Enquiries, messages, and correspondence you send us</li>
-              <li><strong>Technical Data:</strong> Browser type, device information, and cookies (with your consent)</li>
-            </ul>
-          </section>
-
-          <section className="mb-8">
-            <h2 className="text-xl font-semibold text-slate-900 mb-4">3. How We Use Your Data</h2>
-            <p className="text-slate-600 mb-4">We use your personal data for the following purposes:</p>
-            <ul className="list-disc pl-6 text-slate-600 space-y-2 mb-4">
-              <li>To process and respond to your consultation feedback</li>
-              <li>To respond to enquiries and provide customer support</li>
-              <li>To send updates about consultations you've participated in (with your consent)</li>
-              <li>To analyse feedback and improve our consultation processes</li>
-              <li>To comply with legal obligations</li>
-            </ul>
-          </section>
-
-          <section className="mb-8">
-            <h2 className="text-xl font-semibold text-slate-900 mb-4">4. Legal Basis for Processing</h2>
-            <p className="text-slate-600 mb-4">We process your personal data under the following legal bases:</p>
-            <ul className="list-disc pl-6 text-slate-600 space-y-2 mb-4">
-              <li><strong>Consent:</strong> When you actively opt-in to receive communications or submit feedback</li>
-              <li><strong>Legitimate Interests:</strong> To conduct consultations and analyse feedback for planning purposes</li>
-              <li><strong>Legal Obligation:</strong> When required to comply with planning regulations or other laws</li>
-            </ul>
-          </section>
-
-          <section className="mb-8">
-            <h2 className="text-xl font-semibold text-slate-900 mb-4">5. Data Sharing</h2>
             <p className="text-slate-600 mb-4">
-              We may share anonymised and aggregated feedback data with local planning authorities, councils, and stakeholders involved in the consultation process. We will never sell your personal data to third parties.
+              We only collect personal data you actively choose to submit:
             </p>
+            <ul className="list-disc pl-6 text-slate-600 space-y-2 mb-4">
+              <li><strong>Map feedback:</strong> Comments you attach to map pins or drawn shapes, the map location you choose, and — optionally — your name and email address</li>
+              <li><strong>Form responses:</strong> Answers you submit through consultation feedback forms, which may include your name and contact details where a form asks for them</li>
+              <li><strong>Enquiries:</strong> Your name, email address, and message when you submit an enquiry, plus phone number and organisation if you provide them</li>
+              <li><strong>Account data:</strong> For consultation teams using the dashboard — name, email address, and a securely hashed password</li>
+            </ul>
             <p className="text-slate-600 mb-4">
-              Your feedback comments may be published in consultation reports, but personal contact details will be removed unless you have given explicit consent.
+              Every public submission requires your explicit consent at the point of submission, and we record when that consent was given.
             </p>
           </section>
 
           <section className="mb-8">
-            <h2 className="text-xl font-semibold text-slate-900 mb-4">6. Data Retention</h2>
+            <h2 className="text-xl font-semibold text-slate-900 mb-4">3. How Your Data Is Used</h2>
+            <ul className="list-disc pl-6 text-slate-600 space-y-2 mb-4">
+              <li>
+                <strong>Public display of map feedback:</strong> Map comments are reviewed by the consultation team before publication. Once approved, your comment — together with your name, if you provided one — is visible to anyone viewing the consultation map. Your email address is never displayed publicly.
+              </li>
+              <li>
+                <strong>Review by the consultation team:</strong> The organisation running the consultation can see your full submissions, including any contact details you provided, in order to understand and respond to public feedback.
+              </li>
+              <li>
+                <strong>AI-assisted analysis:</strong> The text of submissions is analysed to produce sentiment summaries, common themes, and reports for the consultation team (see section 4).
+              </li>
+              <li>
+                <strong>Legal compliance:</strong> Where required by planning regulations or other legal obligations.
+              </li>
+            </ul>
             <p className="text-slate-600 mb-4">
-              We retain your personal data for as long as necessary to fulfil the purposes for which it was collected, typically for the duration of the consultation process plus any statutory retention period required for planning applications (usually 6 years after completion).
+              We do not send marketing emails, operate mailing lists, or use your contact details for any purpose beyond the consultation you contributed to.
             </p>
           </section>
 
           <section className="mb-8">
-            <h2 className="text-xl font-semibold text-slate-900 mb-4">7. Your Rights</h2>
+            <h2 className="text-xl font-semibold text-slate-900 mb-4">4. AI-Assisted Analysis</h2>
+            <p className="text-slate-600 mb-4">
+              To help consultation teams understand large volumes of feedback, the text of submissions is processed by an AI service (provided by Anthropic) to generate summaries, sentiment analysis, and theme identification. This analysis is advisory only: it summarises feedback in aggregate and is not used to make automated decisions about any individual. Under our agreement with the provider, submissions sent for analysis are not used to train AI models.
+            </p>
+          </section>
+
+          <section className="mb-8">
+            <h2 className="text-xl font-semibold text-slate-900 mb-4">5. Legal Basis for Processing</h2>
+            <ul className="list-disc pl-6 text-slate-600 space-y-2 mb-4">
+              <li><strong>Consent:</strong> You give explicit consent when submitting feedback, forms, or enquiries</li>
+              <li><strong>Legitimate interests:</strong> Running consultations and analysing feedback for planning purposes</li>
+              <li><strong>Legal obligation:</strong> Compliance with planning regulations and other laws</li>
+            </ul>
+          </section>
+
+          <section className="mb-8">
+            <h2 className="text-xl font-semibold text-slate-900 mb-4">6. Who Can See Your Data</h2>
+            <ul className="list-disc pl-6 text-slate-600 space-y-2 mb-4">
+              <li>
+                <strong>The public:</strong> Approved map comments (with name, if given) are publicly visible. Form responses and enquiries are never publicly visible.
+              </li>
+              <li>
+                <strong>The consultation team:</strong> The organisation running the consultation sees full submissions, including contact details.
+              </li>
+              <li>
+                <strong>Consultation reports:</strong> Feedback may be quoted in consultation reports and planning submissions; contact details are removed unless you have given explicit consent.
+              </li>
+            </ul>
+            <p className="text-slate-600 mb-4">
+              We never sell personal data. We use a small number of service providers to operate the platform: our database is hosted with Supabase in the European Union (Frankfurt, Germany), the application is hosted by Vercel, and AI analysis is provided by Anthropic in the United States. Where data is processed outside the UK, transfers are protected by appropriate safeguards, including standard contractual clauses.
+            </p>
+          </section>
+
+          <section className="mb-8">
+            <h2 className="text-xl font-semibold text-slate-900 mb-4">7. Data Retention</h2>
+            <p className="text-slate-600 mb-4">
+              We retain personal data for as long as necessary for the consultation it was submitted to, plus any statutory retention period that applies to planning applications (typically 6 years after completion). Data is deleted when the consultation project it belongs to is deleted.
+            </p>
+          </section>
+
+          <section className="mb-8">
+            <h2 className="text-xl font-semibold text-slate-900 mb-4">8. Your Rights</h2>
             <p className="text-slate-600 mb-4">Under UK GDPR, you have the following rights:</p>
             <ul className="list-disc pl-6 text-slate-600 space-y-2 mb-4">
               <li><strong>Right of Access:</strong> Request a copy of the personal data we hold about you</li>
@@ -96,24 +124,21 @@ export default function PrivacyPolicy() {
           </section>
 
           <section className="mb-8">
-            <h2 className="text-xl font-semibold text-slate-900 mb-4">8. Cookies</h2>
+            <h2 className="text-xl font-semibold text-slate-900 mb-4">9. Cookies</h2>
             <p className="text-slate-600 mb-4">
-              We use essential cookies to make our site work. These cookies are necessary for the basic functionality of the platform and cannot be disabled.
-            </p>
-            <p className="text-slate-600 mb-4">
-              With your consent, we may also use analytics cookies to understand how visitors interact with our site. You can manage your cookie preferences at any time.
+              We use only essential cookies, which are required to sign consultation teams in to the dashboard. We do not use analytics, advertising, or tracking cookies, and members of the public can view and respond to consultations without any account or non-essential cookies.
             </p>
           </section>
 
           <section className="mb-8">
-            <h2 className="text-xl font-semibold text-slate-900 mb-4">9. Data Security</h2>
+            <h2 className="text-xl font-semibold text-slate-900 mb-4">10. Data Security</h2>
             <p className="text-slate-600 mb-4">
-              We implement appropriate technical and organisational measures to protect your personal data against unauthorised access, alteration, disclosure, or destruction. This includes encrypted data transmission (HTTPS), secure database storage, and access controls.
+              We implement appropriate technical and organisational measures to protect your personal data, including encrypted data transmission (HTTPS), encrypted database storage, hashed passwords, and role-based access controls so that consultation teams can only access their own projects.
             </p>
           </section>
 
           <section className="mb-8">
-            <h2 className="text-xl font-semibold text-slate-900 mb-4">10. Contact Us</h2>
+            <h2 className="text-xl font-semibold text-slate-900 mb-4">11. Contact Us</h2>
             <p className="text-slate-600 mb-4">
               If you have any questions about this Privacy Policy or wish to exercise your data rights, please contact us:
             </p>
@@ -123,7 +148,7 @@ export default function PrivacyPolicy() {
           </section>
 
           <section className="mb-8">
-            <h2 className="text-xl font-semibold text-slate-900 mb-4">11. Complaints</h2>
+            <h2 className="text-xl font-semibold text-slate-900 mb-4">12. Complaints</h2>
             <p className="text-slate-600 mb-4">
               If you are unhappy with how we have handled your personal data, you have the right to lodge a complaint with the Information Commissioner's Office (ICO):
             </p>

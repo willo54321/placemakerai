@@ -23,6 +23,7 @@ model Account {
   user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+  @@index([userId])
 }
 
 model Council {
@@ -73,30 +74,34 @@ model Councillor {
 }
 
 model Enquiry {
-  id               String           @id @default(cuid())
-  projectId        String
-  submitterName    String
-  submitterEmail   String
-  submitterPhone   String?
-  submitterOrg     String?
-  subject          String
-  message          String
-  category         String           @default("general")
-  priority         String           @default("normal")
-  status           String           @default("new")
-  assignedToId     String?
-  draftResponse    String?
-  finalResponse    String?
-  sentAt           DateTime?
-  gdprConsent      Boolean          @default(false)
-  gdprConsentDate  DateTime?
-  mailingConsent   Boolean          @default(false)
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-  assignedTo       TeamMember?      @relation(fields: [assignedToId], references: [id])
-  project          Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  messages         EnquiryMessage[]
-  queries          EnquiryQuery[]
+  id              String           @id @default(cuid())
+  projectId       String
+  submitterName   String
+  submitterEmail  String
+  submitterPhone  String?
+  submitterOrg    String?
+  subject         String
+  message         String
+  category        String           @default("general")
+  priority        String           @default("normal")
+  status          String           @default("new")
+  assignedToId    String?
+  draftResponse   String?
+  finalResponse   String?
+  sentAt          DateTime?
+  gdprConsent     Boolean          @default(false)
+  gdprConsentDate DateTime?
+  mailingConsent  Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  assignedTo      TeamMember?      @relation(fields: [assignedToId], references: [id])
+  project         Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  messages        EnquiryMessage[]
+  queries         EnquiryQuery[]
+
+  @@index([projectId, status])
+  @@index([projectId, createdAt])
+  @@index([assignedToId])
 }
 
 model EnquiryMessage {
@@ -107,6 +112,8 @@ model EnquiryMessage {
   authorName String
   createdAt  DateTime @default(now())
   enquiry    Enquiry  @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+
+  @@index([enquiryId])
 }
 
 model EnquiryQuery {
@@ -121,18 +128,23 @@ model EnquiryQuery {
   respondedAt  DateTime?
   enquiry      Enquiry    @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
   teamMember   TeamMember @relation(fields: [teamMemberId], references: [id], onDelete: Cascade)
+
+  @@index([enquiryId])
+  @@index([teamMemberId])
 }
 
 model FeedbackForm {
-  id               String             @id @default(cuid())
-  projectId        String
-  name             String
-  fields           Json
-  active           Boolean            @default(true)
-  createdAt        DateTime           @default(now())
-  updatedAt DateTime @updatedAt
-  Project          Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id        String             @id @default(cuid())
+  projectId String
+  name      String
+  fields    Json
+  active    Boolean            @default(true)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  Project   Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
   responses FeedbackResponse[]
+
+  @@index([projectId])
 }
 
 model FeedbackResponse {
@@ -144,6 +156,8 @@ model FeedbackResponse {
   gdprConsentDate DateTime?
   mailingConsent  Boolean      @default(false)
   form            FeedbackForm @relation(fields: [formId], references: [id], onDelete: Cascade)
+
+  @@index([formId])
 }
 
 model GeoLayer {
@@ -157,6 +171,8 @@ model GeoLayer {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
 }
 
 model ImageOverlay {
@@ -174,6 +190,8 @@ model ImageOverlay {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
 }
 
 model Invitation {
@@ -206,19 +224,21 @@ model MapMarker {
   createdAt DateTime @default(now())
   geometry  Json?
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
 }
 
 model Organization {
-  id                 String               @id @default(cuid())
-  name               String
-  slug               String               @unique
-  plan               String               @default("free")
-  stripeCustomerId   String?
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
-  invitations        Invitation[]
-  members            OrganizationMember[]
-  projects           Project[]
+  id               String               @id @default(cuid())
+  name             String
+  slug             String               @unique
+  plan             String               @default("free")
+  stripeCustomerId String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  invitations      Invitation[]
+  members          OrganizationMember[]
+  projects         Project[]
 }
 
 model OrganizationMember {
@@ -234,51 +254,48 @@ model OrganizationMember {
 }
 
 model Project {
-  id               String         @id @default(cuid())
-  name             String
-  description      String?
-  latitude         Float?
-  longitude        Float?
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  mapZoom          Int?           @default(10)
-  embedEnabled     Boolean        @default(false)
-  allowPins        Boolean        @default(true)  // Allow visitors to drop pins/comments
-  allowDrawing     Boolean        @default(false) // Allow visitors to draw shapes
-  organizationId   String?
+  id                    String           @id @default(cuid())
+  name                  String
+  description           String?
+  latitude              Float?
+  longitude             Float?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  mapZoom               Int?             @default(10)
+  embedEnabled          Boolean          @default(false)
+  allowPins             Boolean          @default(true) // Allow visitors to drop pins/comments
+  allowDrawing          Boolean          @default(false) // Allow visitors to draw shapes
+  organizationId        String?
   // Email configuration - requires domain to be verified in Resend
-  emailFromName    String?        // e.g., "Project ABC Team"
-  emailFromAddress String?        // e.g., "noreply@projectabc.com"
+  emailFromName         String? // e.g., "Project ABC Team"
+  emailFromAddress      String? // e.g., "noreply@projectabc.com"
   // Auto-reply settings for inbound emails
-  autoReplyEnabled Boolean        @default(false)
-  autoReplySubject String?        // e.g., "Thank you for your enquiry"
-  autoReplyMessage String?        // The auto-reply email body (supports HTML)
+  autoReplyEnabled      Boolean          @default(false)
+  autoReplySubject      String? // e.g., "Thank you for your enquiry"
+  autoReplyMessage      String? // The auto-reply email body (supports HTML)
   // Construction issue reporting
-  issuesEnabled    Boolean        @default(false) // Enable issue reporting embed
-  issueNotifyEmails String?       // Comma-separated emails for issue notifications
-  // Panorama embed settings
-  panoramaEnabled  Boolean        @default(false) // Enable 360° panorama embed
+  issuesEnabled         Boolean          @default(false) // Enable issue reporting embed
+  issueNotifyEmails     String? // Comma-separated emails for issue notifications
   // Embed styling customization
-  embedPrimaryColor String?       // Primary color for buttons/accents (hex)
-  embedFontFamily   String?       // Font family (google fonts name)
-  embedHideStreetLabels Boolean   @default(false) // Hide street labels on map
-  embedReferenceOnly Boolean      @default(false) // Reference mode - no interactions, view only
-  embedDefaultSatellite Boolean   @default(false) // Default to satellite view instead of roadmap
-  enquiries      Enquiry[]
-  feedbackForms  FeedbackForm[]
-  geoLayers      GeoLayer[]
-  imageOverlays  ImageOverlay[]
-  mapMarkers     MapMarker[]
-  organization   Organization?  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  projectEmails  ProjectEmail[]
-  publicPins     PublicPin[]
-  stakeholders   Stakeholder[]
-  subscribers    Subscriber[]
-  teamMembers    TeamMember[]
-  analysisResults AnalysisResult[]
-  tours          Tour[]
-  panoramas      Panorama[]
-  userAccess     ProjectAccess[]
+  embedPrimaryColor     String? // Primary color for buttons/accents (hex)
+  embedFontFamily       String? // Font family (google fonts name)
+  embedHideStreetLabels Boolean          @default(false) // Hide street labels on map
+  embedReferenceOnly    Boolean          @default(false) // Reference mode - no interactions, view only
+  embedDefaultSatellite Boolean          @default(false) // Default to satellite view instead of roadmap
+  enquiries             Enquiry[]
+  feedbackForms         FeedbackForm[]
+  geoLayers             GeoLayer[]
+  imageOverlays         ImageOverlay[]
+  mapMarkers            MapMarker[]
+  organization          Organization?    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  projectEmails         ProjectEmail[]
+  publicPins            PublicPin[]
+  stakeholders          Stakeholder[]
+  subscribers           Subscriber[]
+  teamMembers           TeamMember[]
+  analysisResults       AnalysisResult[]
+  tours                 Tour[]
+  userAccess            ProjectAccess[]
 }
 
 model ProjectEmail {
@@ -289,7 +306,10 @@ model ProjectEmail {
   sentBy         String
   sentAt         DateTime @default(now())
   recipientCount Int      @default(0)
+  status         String   @default("sent") // "sent" | "failed"
   project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
 }
 
 model PublicPin {
@@ -302,6 +322,7 @@ model PublicPin {
   name            String?
   email           String?
   createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
   votes           Int       @default(0)
   approved        Boolean   @default(false)
   geometry        Json?
@@ -312,11 +333,26 @@ model PublicPin {
   // Mode: "feedback" for proposal feedback, "issues" for construction issues
   mode            String    @default("feedback")
   // Issue-specific fields
-  urgency         String?   // "low" | "medium" | "high" | "urgent"
+  urgency         String? // "low" | "medium" | "high" | "urgent"
   resolved        Boolean   @default(false)
   resolvedAt      DateTime?
   resolvedNotes   String?
   project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  voteRecords     PinVote[]
+
+  @@index([projectId, approved, mode])
+  @@index([projectId, createdAt])
+}
+
+model PinVote {
+  id        String    @id @default(cuid())
+  pinId     String
+  voterHash String
+  createdAt DateTime  @default(now())
+  pin       PublicPin @relation(fields: [pinId], references: [id], onDelete: Cascade)
+
+  @@unique([pinId, voterHash])
+  @@index([pinId])
 }
 
 model Session {
@@ -325,27 +361,32 @@ model Session {
   userId       String
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Stakeholder {
-  id                    String                  @id @default(cuid())
-  projectId             String
-  name                  String
-  email                 String?
-  phone                 String?
-  organization          String?
-  role                  String?
-  category              String                  @default("neutral")
-  notes                 String?
-  latitude              Float?
-  longitude             Float?
-  createdAt             DateTime                @default(now())
-  updatedAt DateTime @updatedAt
-  influence             Int?
-  interest              Int?
-  type                  String                  @default("other")
-  Project               Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  engagements StakeholderEngagement[]
+  id           String                  @id @default(cuid())
+  projectId    String
+  name         String
+  email        String?
+  phone        String?
+  organization String?
+  role         String?
+  category     String                  @default("neutral")
+  notes        String?
+  latitude     Float?
+  longitude    Float?
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+  influence    Int?
+  interest     Int?
+  type         String                  @default("other")
+  Project      Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  engagements  StakeholderEngagement[]
+
+  @@index([projectId])
+  @@index([projectId, email])
 }
 
 model StakeholderEngagement {
@@ -359,6 +400,8 @@ model StakeholderEngagement {
   nextAction    String?
   createdAt     DateTime    @default(now())
   stakeholder   Stakeholder @relation(fields: [stakeholderId], references: [id], onDelete: Cascade)
+
+  @@index([stakeholderId])
 }
 
 model Subscriber {
@@ -390,6 +433,8 @@ model TeamMember {
   Enquiry      Enquiry[]
   EnquiryQuery EnquiryQuery[]
   Project      Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
 }
 
 enum SystemRole {
@@ -403,20 +448,23 @@ enum ProjectRole {
 }
 
 model User {
-  id                 String               @id @default(cuid())
-  name               String?
-  email              String               @unique
-  emailVerified      DateTime?
-  image              String?
-  password           String?
-  systemRole         SystemRole           @default(USER)
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
-  accounts           Account[]
-  invitations        Invitation[]
+  id                      String               @id @default(cuid())
+  name                    String?
+  email                   String               @unique
+  emailVerified           DateTime?
+  image                   String?
+  password                String?
+  // Set-password / reset flow: emailed on invite and on "forgot password"
+  passwordResetToken      String?              @unique
+  passwordResetExpires    DateTime?
+  systemRole              SystemRole           @default(USER)
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
+  accounts                Account[]
+  invitations             Invitation[]
   organizationMemberships OrganizationMember[]
-  sessions           Session[]
-  projectAccess      ProjectAccess[]
+  sessions                Session[]
+  projectAccess           ProjectAccess[]
 }
 
 model ProjectAccess {
@@ -445,9 +493,9 @@ model VerificationToken {
 model AnalysisResult {
   id           String   @id @default(cuid())
   projectId    String
-  type         String   // "sentiment" | "themes" | "summary" | "full"
-  data         Json     // Analysis results
-  feedbackHash String   // Hash of feedback to detect changes
+  type         String // "sentiment" | "themes" | "summary" | "full"
+  data         Json // Analysis results
+  feedbackHash String // Hash of feedback to detect changes
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -480,50 +528,12 @@ model TourStop {
   latitude    Float
   longitude   Float
   zoom        Int      @default(16)
-  highlight   Json?    // Optional polygon geometry to highlight
-  showOverlay String?  // Optional overlay ID to show at this stop
-  icon        String?  // Optional icon type (nature, access, parking, info, etc.)
+  highlight   Json? // Optional polygon geometry to highlight
+  showOverlay String? // Optional overlay ID to show at this stop
+  icon        String? // Optional icon type (nature, access, parking, info, etc.)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   tour        Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
 
   @@index([tourId])
-}
-
-model Panorama {
-  id           String            @id @default(cuid())
-  projectId    String
-  name         String
-  description  String?
-  imageUrl     String            // Equirectangular image URL
-  initialYaw   Float             @default(0)    // Initial view direction (degrees)
-  initialPitch Float             @default(0)    // Initial vertical angle (degrees)
-  initialFov   Float             @default(100)  // Initial field of view (degrees)
-  order        Int               @default(0)    // For multi-scene ordering
-  active       Boolean           @default(true)
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
-  project      Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  hotspots     PanoramaHotspot[]
-
-  @@index([projectId])
-}
-
-model PanoramaHotspot {
-  id         String   @id @default(cuid())
-  panoramaId String
-  type       String   // "info" | "link" | "video" | "image"
-  yaw        Float    // Horizontal position (degrees, -180 to 180)
-  pitch      Float    // Vertical position (degrees, -90 to 90)
-  title      String?
-  content    String?  // Text content or URL depending on type
-  icon       String?  // Icon identifier
-  targetId   String?  // For "link" type - target panorama ID
-  videoUrl   String?  // For "video" type
-  imageUrl   String?  // For "image" type
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  panorama   Panorama @relation(fields: [panoramaId], references: [id], onDelete: Cascade)
-
-  @@index([panoramaId])
 }

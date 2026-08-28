@@ -8,10 +8,14 @@ export async function GET(
   const { searchParams } = new URL(request.url)
   const token = searchParams.get('token')
 
+  if (!token) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const query = await prisma.enquiryQuery.findFirst({
     where: {
       id: params.queryId,
-      token: token || undefined,
+      token,
     },
     include: {
       teamMember: true,
@@ -41,9 +45,13 @@ export async function POST(
   const { searchParams } = new URL(request.url)
   const token = searchParams.get('token')
 
+  if (!token) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   // Verify token
   const existingQuery = await prisma.enquiryQuery.findFirst({
-    where: { id: params.queryId, token: token || undefined },
+    where: { id: params.queryId, token },
   })
 
   if (!existingQuery) {

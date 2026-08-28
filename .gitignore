@@ -1,4 +1,12 @@
 .vercel
-.env*.local
+
+# Environment / secrets — ignore all env files except examples
+.env
+.env.*
+!.env.example
+
 node_modules/
 .next/
+
+# Prisma build artifact
+tsconfig.tsbuildinfo

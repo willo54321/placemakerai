@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 import { sendAutoReplyEmail } from '@/lib/email'
+import { escapeHtml, escapeHtmlWithBreaks } from '@/lib/escape-html'
 
 // Webhook secret for verifying requests
 const WEBHOOK_SECRET = process.env.EMAIL_WEBHOOK_SECRET
@@ -36,13 +37,21 @@ interface GenericInboundEmail {
 // POST /api/webhooks/email - Receive emails from Resend or other providers
 export async function POST(request: Request) {
   try {
-    // Verify webhook secret (optional but recommended)
+    // Verify the shared webhook secret unconditionally. There is no bypass:
+    // if the secret is not configured we cannot authenticate any request, and
+    // if it is configured every request must present a matching Bearer token.
     const headersList = headers()
     const authHeader = headersList.get('authorization')
-    const svixId = headersList.get('svix-id') // Resend uses Svix for webhooks
 
-    // If we have a secret configured, verify it (skip for Resend which uses different auth)
-    if (WEBHOOK_SECRET && !svixId && authHeader !== `Bearer ${WEBHOOK_SECRET}`) {
+    if (!WEBHOOK_SECRET) {
+      console.error('EMAIL_WEBHOOK_SECRET not configured; rejecting inbound webhook')
+      return NextResponse.json(
+        { error: 'Webhook secret not configured' },
+        { status: 500 }
+      )
+    }
+
+    if (authHeader !== `Bearer ${WEBHOOK_SECRET}`) {
       console.error('Invalid webhook authorization')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -162,8 +171,23 @@ export async function POST(request: Request) {
       select: { id: true, name: true, organization: true }
     })
 
-    // Use stakeholder name if found, otherwise use sender name
-    const submitterName = stakeholder?.name || senderName
+    // Use stakeholder name if found, otherwise use sender name. Keep a raw copy
+    // for functions that do their own HTML escaping (sendAutoReplyEmail), and an
+    // escaped copy for values stored in the DB that are later rendered as HTML.
+    const rawSubmitterName = stakeholder?.name || senderName
+    const submitterName = escapeHtml(rawSubmitterName)
+
+    // Build the message body from the inbound email. Prefer the plain-text
+    // part; if only an HTML part exists it is attacker-controllable markup, so
+    // escape it (with line breaks preserved) before storing so it cannot inject
+    // script/markup wherever the enquiry is later rendered.
+    const messageContent = textBody
+      ? escapeHtmlWithBreaks(textBody)
+      : htmlBody
+        ? escapeHtml(htmlBody)
+        : '(No message body)'
+
+    const escapedSubject = escapeHtml(subject)
 
     // Create the enquiry
     const enquiry = await prisma.enquiry.create({
@@ -171,9 +195,9 @@ export async function POST(request: Request) {
         projectId: project.id,
         submitterName,
         submitterEmail: senderEmail,
-        submitterOrg: stakeholder?.organization || null,
-        subject,
-        message: textBody || htmlBody || '(No message body)',
+        submitterOrg: stakeholder?.organization ? escapeHtml(stakeholder.organization) : null,
+        subject: escapedSubject,
+        message: messageContent,
         category: 'email',
         priority: 'normal',
         status: 'new',
@@ -186,7 +210,7 @@ export async function POST(request: Request) {
       data: {
         enquiryId: enquiry.id,
         type: 'inbound',
-        content: textBody || htmlBody || '(No message body)',
+        content: messageContent,
         authorName: submitterName
       }
     })
@@ -197,9 +221,11 @@ export async function POST(request: Request) {
     let autoReplySent = false
     if (project.autoReplyEnabled && project.autoReplySubject && project.autoReplyMessage) {
       try {
+        // Pass RAW values; sendAutoReplyEmail escapes the substituted values
+        // itself before rendering them into HTML.
         const autoReplyResult = await sendAutoReplyEmail({
           to: senderEmail,
-          submitterName,
+          submitterName: rawSubmitterName,
           originalSubject: subject,
           autoReplySubject: project.autoReplySubject,
           autoReplyMessage: project.autoReplyMessage,
@@ -210,15 +236,17 @@ export async function POST(request: Request) {
 
         if (autoReplyResult) {
           autoReplySent = true
-          // Log the auto-reply as an outbound message in the thread
+          // Log the auto-reply as an outbound message in the thread. The
+          // admin-authored template text is trusted; escape only the
+          // substituted user-controlled values before storing HTML content.
           await prisma.enquiryMessage.create({
             data: {
               enquiryId: enquiry.id,
               type: 'outbound',
               content: project.autoReplyMessage
                 .replace(/\{\{name\}\}/gi, submitterName)
-                .replace(/\{\{subject\}\}/gi, subject)
-                .replace(/\{\{project\}\}/gi, project.name),
+                .replace(/\{\{subject\}\}/gi, escapedSubject)
+                .replace(/\{\{project\}\}/gi, escapeHtml(project.name)),
               authorName: 'Auto-Reply'
             }
           })

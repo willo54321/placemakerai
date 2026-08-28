@@ -1,6 +1,8 @@
 import { prisma } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { getAuth } from '@/lib/auth'
+import { sendSetPasswordEmail } from '@/lib/email'
+import { issuePasswordToken, appBaseUrl, INVITE_TOKEN_TTL_HOURS } from '@/lib/password-reset'
 
 // Get all users (super admin only)
 export async function GET() {
@@ -108,7 +110,22 @@ export async function POST(request: Request) {
       },
     })
 
-    return NextResponse.json(user)
+    // Email the new user a set-password link so they can actually sign in.
+    let inviteEmailSent = false
+    try {
+      const token = await issuePasswordToken(user.id, INVITE_TOKEN_TTL_HOURS)
+      const result = await sendSetPasswordEmail({
+        to: user.email,
+        name: user.name,
+        url: `${appBaseUrl()}/set-password?token=${token}`,
+        mode: 'invite',
+      })
+      inviteEmailSent = Boolean(result)
+    } catch (inviteError) {
+      console.error('Failed to send invite email:', inviteError)
+    }
+
+    return NextResponse.json({ ...user, inviteEmailSent })
   } catch (error) {
     console.error('Failed to create user:', error)
     return NextResponse.json({ error: 'Failed to create user' }, { status: 500 })

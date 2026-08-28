@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db'
+import { authorizeProject } from '@/lib/api-auth'
 import { NextResponse } from 'next/server'
 
 // GET - Get a single stop
@@ -22,14 +23,22 @@ export async function PATCH(
   request: Request,
   { params }: { params: { id: string; tourId: string; stopId: string } }
 ) {
+  const denied = await authorizeProject(params.id, 'ADMIN')
+  if (denied) return denied
+
   const body = await request.json()
 
-  // Verify stop belongs to tour
+  // Verify stop belongs to tour which belongs to project
   const existingStop = await prisma.tourStop.findUnique({
-    where: { id: params.stopId }
+    where: { id: params.stopId },
+    include: { tour: { select: { projectId: true } } }
   })
 
-  if (!existingStop || existingStop.tourId !== params.tourId) {
+  if (
+    !existingStop ||
+    existingStop.tourId !== params.tourId ||
+    existingStop.tour.projectId !== params.id
+  ) {
     return NextResponse.json({ error: 'Stop not found' }, { status: 404 })
   }
 
@@ -56,12 +65,20 @@ export async function DELETE(
   request: Request,
   { params }: { params: { id: string; tourId: string; stopId: string } }
 ) {
-  // Verify stop belongs to tour
+  const denied = await authorizeProject(params.id, 'ADMIN')
+  if (denied) return denied
+
+  // Verify stop belongs to tour which belongs to project
   const existingStop = await prisma.tourStop.findUnique({
-    where: { id: params.stopId }
+    where: { id: params.stopId },
+    include: { tour: { select: { projectId: true } } }
   })
 
-  if (!existingStop || existingStop.tourId !== params.tourId) {
+  if (
+    !existingStop ||
+    existingStop.tourId !== params.tourId ||
+    existingStop.tour.projectId !== params.id
+  ) {
     return NextResponse.json({ error: 'Stop not found' }, { status: 404 })
   }
 

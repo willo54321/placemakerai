@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { MessageCircle, ThumbsUp, ThumbsDown, X, Send, MapPin, ChevronLeft, ChevronRight, Lightbulb, Pentagon, Play } from 'lucide-react'
+import { MessageCircle, ThumbsUp, ThumbsDown, X, Send, MapPin, ChevronLeft, ChevronRight, Lightbulb, Pentagon, Play, CheckCircle, AlertCircle } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { TourPlayer, StartTourButton } from './TourPlayer'
 
@@ -120,6 +120,9 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
   // Form state
   const [selectedCategory, setSelectedCategory] = useState('question')
   const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [submitSuccess, setSubmitSuccess] = useState(false)
+  const [voteError, setVoteError] = useState<string | null>(null)
   const [form, setForm] = useState({
     comment: '',
     name: '',
@@ -128,7 +131,8 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
     mailingConsent: false,
   })
 
-  // UI state
+  // UI state - start collapsed on small screens so the sidebar doesn't cover
+  // the top-right action buttons in narrow iframes (initialized on mount).
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [categoryFilters, setCategoryFilters] = useState<Record<string, boolean>>({
     question: true,
@@ -144,6 +148,20 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
   const [isTourActive, setIsTourActive] = useState(false)
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null)
   const [mapZoom, setMapZoom] = useState<number | null>(null)
+  const [tourHighlight, setTourHighlight] = useState<HighlightGeometry | null>(null)
+
+  // Coarse (touch) pointer detection for touch-appropriate draw copy
+  const [isCoarsePointer, setIsCoarsePointer] = useState(false)
+
+  // Collapse the sidebar by default on small screens (narrow iframes)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (window.matchMedia('(max-width: 640px)').matches) {
+        setSidebarCollapsed(true)
+      }
+      setIsCoarsePointer(window.matchMedia('(pointer: coarse)').matches)
+    }
+  }, [])
 
   // Load voted pins from localStorage on mount
   useEffect(() => {
@@ -177,6 +195,16 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
       })
   }, [params.id])
 
+  // Exit draw mode on Escape (only while drawing and the form isn't open)
+  useEffect(() => {
+    if (!drawMode || showForm) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setDrawMode(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [drawMode, showForm])
+
   // Handle map click for pins
   const handleMapClick = (lat: number, lng: number) => {
     if (drawMode === 'pin') {
@@ -197,6 +225,7 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
     if (!pendingShape || !form.comment.trim() || !form.gdprConsent) return
 
     setSubmitting(true)
+    setSubmitError(null)
     try {
       let body: Record<string, unknown> = {
         shapeType: pendingShape.type,
@@ -223,16 +252,18 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
 
       if (!response.ok) throw new Error('Failed to submit')
 
-      const newPin = await response.json()
-      setProject(prev => prev ? {
-        ...prev,
-        pins: [newPin, ...prev.pins]
-      } : null)
+      // Consume the response so the request completes, but do NOT add the
+      // pin to the visible map: submissions are moderated and would otherwise
+      // appear published, then vanish on reload (looking like deletion).
+      await response.json().catch(() => null)
 
-      // Reset form
-      cancelDrawing()
+      // Show an explicit success state instead of silently closing.
+      setPendingShape(null)
+      setDrawMode(null)
+      setSubmitSuccess(true)
     } catch (err) {
-      alert('Failed to submit your feedback. Please try again.')
+      // Inline error (window.alert is blocked in cross-origin iframes).
+      setSubmitError('Failed to submit your feedback. Please try again.')
     } finally {
       setSubmitting(false)
     }
@@ -242,6 +273,8 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
     setPendingShape(null)
     setShowForm(false)
     setDrawMode(null)
+    setSubmitError(null)
+    setSubmitSuccess(false)
     setForm({ comment: '', name: '', email: '', gdprConsent: false, mailingConsent: false })
     setSelectedCategory('question')
   }
@@ -280,6 +313,9 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
       localStorage.setItem(storageKey, JSON.stringify(Array.from(newVotedPins)))
     } catch (err) {
       console.error('Failed to vote:', err)
+      // Surface a brief inline error instead of failing silently.
+      setVoteError('Could not register your vote. Please try again.')
+      window.setTimeout(() => setVoteError(null), 4000)
     }
   }
 
@@ -290,10 +326,12 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
     }))
   }
 
-  // Tour navigation handler
-  const handleTourNavigate = useCallback((lat: number, lng: number, zoom: number) => {
+  // Tour navigation handler - threads the stop's highlight geometry through
+  // to the map so tour stops show their authored spotlight on the main embed.
+  const handleTourNavigate = useCallback((lat: number, lng: number, zoom: number, highlight?: HighlightGeometry | null) => {
     setMapCenter({ lat, lng })
     setMapZoom(zoom)
+    setTourHighlight(highlight ?? null)
   }, [])
 
   const handleTourClose = () => {
@@ -301,6 +339,7 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
     // Reset map to original position
     setMapCenter(null)
     setMapZoom(null)
+    setTourHighlight(null)
   }
 
   const handleStartTour = () => {
@@ -316,13 +355,15 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
 
   const filteredPins = project?.pins.filter(p => categoryFilters[p.category] !== false) || []
 
-  // Get instruction text based on draw mode
+  // Get instruction text based on draw mode (touch-appropriate copy on coarse pointers)
   const getDrawModeInstruction = () => {
     switch (drawMode) {
       case 'pin':
-        return 'Click on the map to place your pin'
+        return isCoarsePointer ? 'Tap on the map to place your pin' : 'Click on the map to place your pin'
       case 'polygon':
-        return 'Click to draw an area. Double-click to close the shape.'
+        return isCoarsePointer
+          ? 'Tap points to draw an area, then tap the first point to finish'
+          : 'Click to draw an area. Double-click to close the shape.'
       default:
         return ''
     }
@@ -410,6 +451,7 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
           animateToCenter={mapCenter !== null}
           hideStreetLabels={project.embedHideStreetLabels || false}
           primaryColor={project.embedPrimaryColor || undefined}
+          highlight={tourHighlight}
         />
 
         {/* Feedback Buttons - Top Right (only if pins or drawing allowed and not reference mode) */}
@@ -461,8 +503,22 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
 
         {/* Instruction Banner - Top Center (when drawing) */}
         {drawMode && !showForm && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 bg-brand-600 text-white px-6 py-3 rounded-lg shadow-lg">
-            <p className="font-medium">{getDrawModeInstruction()}</p>
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 bg-brand-600 text-white pl-6 pr-3 py-3 rounded-lg shadow-lg flex items-center gap-3 max-w-[calc(100vw-2rem)]">
+            <p className="font-medium text-sm">{getDrawModeInstruction()}</p>
+            <button
+              onClick={() => setDrawMode(null)}
+              aria-label="Cancel drawing"
+              className="flex items-center gap-1 px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-md text-sm font-medium transition-colors whitespace-nowrap"
+            >
+              <X size={16} /> Cancel
+            </button>
+          </div>
+        )}
+
+        {/* Vote error toast */}
+        {voteError && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 text-sm">
+            <AlertCircle size={16} /> {voteError}
           </div>
         )}
 
@@ -489,7 +545,7 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
 
           {/* Sidebar Content */}
           {!sidebarCollapsed && (
-            <div className="bg-white rounded-b-xl shadow-lg">
+            <div className="bg-white rounded-b-xl shadow-lg max-h-[calc(100vh-6rem)] overflow-y-auto">
               <div className="p-4">
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
                   Categories
@@ -551,7 +607,7 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
         {/* Tour Button - Bottom Left (only if tour exists and has stops) */}
         {project.tour && project.tour.stops.length > 0 && !isTourActive && !showForm && !drawMode && (
           <div className="absolute bottom-4 left-4 z-10">
-            <StartTourButton onClick={handleStartTour} />
+            <StartTourButton onClick={handleStartTour} primaryColor={primaryColor} />
           </div>
         )}
 
@@ -561,11 +617,33 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
             tour={project.tour}
             onNavigate={handleTourNavigate}
             onClose={handleTourClose}
+            primaryColor={primaryColor}
           />
         )}
 
+        {/* Success Confirmation Panel */}
+        {showForm && submitSuccess && (
+          <div className="absolute inset-0 z-20 bg-black/30 flex items-end sm:items-center justify-center p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 text-center">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle className="w-8 h-8 text-green-600" />
+              </div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Thank you</h2>
+              <p className="text-gray-600 mb-6">
+                Your feedback has been received and will appear on the map once it has been reviewed.
+              </p>
+              <button
+                onClick={cancelDrawing}
+                className="w-full px-4 py-2.5 bg-brand-600 text-white rounded-lg hover:bg-brand-700 font-medium transition-colors"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Feedback Form Modal */}
-        {showForm && pendingShape && (
+        {showForm && !submitSuccess && pendingShape && (
           <div className="absolute inset-0 z-20 bg-black/30 flex items-end sm:items-center justify-center p-4">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-auto">
               {/* Form Header */}
@@ -701,6 +779,14 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
                     </div>
                   )}
                 </div>
+
+                {/* Inline submit error (window.alert is blocked in iframes) */}
+                {submitError && (
+                  <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <AlertCircle size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-red-700">{submitError}</p>
+                  </div>
+                )}
 
                 {/* Submit */}
                 <div className="flex gap-3 pt-2">

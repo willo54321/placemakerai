@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
+import { authorizeSuperAdmin } from '@/lib/api-auth'
 
 const testFeedback = [
   // Traffic concerns
@@ -62,6 +63,9 @@ const testFormSubmissions = [
 
 // GET to list projects (for finding the right one)
 export async function GET() {
+  if (process.env.NODE_ENV === 'production') return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  const denied = await authorizeSuperAdmin(); if (denied) return denied
+
   const projects = await prisma.project.findMany({
     select: { id: true, name: true },
     orderBy: { createdAt: 'desc' },
@@ -72,6 +76,9 @@ export async function GET() {
 
 // POST to add test data - accepts ?name=project-name&type=pins|forms|all query params
 export async function POST(request: Request) {
+  if (process.env.NODE_ENV === 'production') return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  const denied = await authorizeSuperAdmin(); if (denied) return denied
+
   const { searchParams } = new URL(request.url)
   const projectName = searchParams.get('name')
   const type = searchParams.get('type') || 'all' // pins, forms, or all
@@ -172,6 +179,9 @@ export async function POST(request: Request) {
 
 // DELETE to remove test data - accepts ?name=project-name query param
 export async function DELETE(request: Request) {
+  if (process.env.NODE_ENV === 'production') return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  const denied = await authorizeSuperAdmin(); if (denied) return denied
+
   const { searchParams } = new URL(request.url)
   const projectName = searchParams.get('name')
 

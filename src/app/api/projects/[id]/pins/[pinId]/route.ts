@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db'
+import { authorizeProject } from '@/lib/api-auth'
 import { NextResponse } from 'next/server'
 
 // Update pin (approve/reject, resolve issues)
@@ -6,6 +7,9 @@ export async function PATCH(
   request: Request,
   { params }: { params: { id: string; pinId: string } }
 ) {
+  const denied = await authorizeProject(params.id, 'ADMIN')
+  if (denied) return denied
+
   const body = await request.json()
 
   // Verify the pin belongs to this project
@@ -52,6 +56,9 @@ export async function DELETE(
   request: Request,
   { params }: { params: { id: string; pinId: string } }
 ) {
+  const denied = await authorizeProject(params.id, 'ADMIN')
+  if (denied) return denied
+
   // Verify the pin belongs to this project
   const pin = await prisma.publicPin.findFirst({
     where: {

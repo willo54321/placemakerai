@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db'
+import { authorizeProject } from '@/lib/api-auth'
 import { NextResponse } from 'next/server'
 import { findCouncillors } from '@/lib/scrapers'
 
@@ -29,6 +30,9 @@ export async function POST(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  const denied = await authorizeProject(params.id, 'ADMIN')
+  if (denied) return denied
+
   // Get project location
   const project = await prisma.project.findUnique({
     where: { id: params.id },

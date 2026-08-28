@@ -34,9 +34,13 @@ interface TourPlayerProps {
   onNavigate: (lat: number, lng: number, zoom: number, highlight: HighlightGeometry | null) => void
   onClose: () => void
   onFeedback?: (stopId: string) => void
+  primaryColor?: string
 }
 
-export function TourPlayer({ tour, onNavigate, onClose, onFeedback }: TourPlayerProps) {
+const DEFAULT_ACCENT = '#16A34A' // green-600
+
+export function TourPlayer({ tour, onNavigate, onClose, onFeedback, primaryColor }: TourPlayerProps) {
+  const accent = primaryColor || DEFAULT_ACCENT
   const [currentStopIndex, setCurrentStopIndex] = useState(-1) // -1 = intro screen
   const [isAnimating, setIsAnimating] = useState(false)
 
@@ -81,20 +85,20 @@ export function TourPlayer({ tour, onNavigate, onClose, onFeedback }: TourPlayer
   return (
     <div className="absolute bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 bg-white rounded-xl shadow-2xl overflow-hidden z-20 max-h-[80vh] flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-green-600 text-white">
+      <div className="flex items-center justify-between px-4 py-3 text-white" style={{ backgroundColor: accent }}>
         <div className="flex items-center gap-2">
           <MapPin size={18} />
           <span className="font-medium">{tour.name}</span>
         </div>
         <div className="flex items-center gap-3">
           {!isIntro && (
-            <span className="text-sm text-green-100">
+            <span className="text-sm text-white/80">
               {currentStopIndex + 1} / {tour.stops.length}
             </span>
           )}
           <button
             onClick={onClose}
-            className="p-1 hover:bg-green-700 rounded transition-colors"
+            className="p-1 rounded transition-colors hover:bg-black/10"
             aria-label="Close tour"
           >
             <X size={18} />
@@ -104,10 +108,10 @@ export function TourPlayer({ tour, onNavigate, onClose, onFeedback }: TourPlayer
 
       {/* Progress Bar */}
       {!isIntro && (
-        <div className="h-1 bg-green-100">
+        <div className="h-1" style={{ backgroundColor: `${accent}22` }}>
           <div
-            className="h-full bg-green-600 transition-all duration-500"
-            style={{ width: `${((currentStopIndex + 1) / tour.stops.length) * 100}%` }}
+            className="h-full transition-all duration-500"
+            style={{ width: `${((currentStopIndex + 1) / tour.stops.length) * 100}%`, backgroundColor: accent }}
           />
         </div>
       )}
@@ -117,8 +121,8 @@ export function TourPlayer({ tour, onNavigate, onClose, onFeedback }: TourPlayer
         {isIntro ? (
           // Intro/Welcome Screen
           <div className="p-6 text-center">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Play size={28} className="text-green-600 ml-1" />
+            <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: `${accent}1F` }}>
+              <Play size={28} className="ml-1" style={{ color: accent }} />
             </div>
             <h2 className="text-xl font-bold text-slate-900 mb-2">{tour.name}</h2>
             {tour.description && (
@@ -129,7 +133,8 @@ export function TourPlayer({ tour, onNavigate, onClose, onFeedback }: TourPlayer
             </p>
             <button
               onClick={handleStart}
-              className="w-full py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+              className="w-full py-3 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2 hover:brightness-95"
+              style={{ backgroundColor: accent }}
             >
               <Play size={18} />
               Start Tour
@@ -147,7 +152,7 @@ export function TourPlayer({ tour, onNavigate, onClose, onFeedback }: TourPlayer
                     onClick={() => handleGoToStop(idx)}
                     className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
                   >
-                    <span className="w-5 h-5 bg-green-100 text-green-700 rounded-full flex items-center justify-center text-xs font-medium">
+                    <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-medium" style={{ backgroundColor: `${accent}1F`, color: accent }}>
                       {idx + 1}
                     </span>
                     <span className="truncate">{stop.title}</span>
@@ -175,7 +180,7 @@ export function TourPlayer({ tour, onNavigate, onClose, onFeedback }: TourPlayer
             {/* Stop Info */}
             <div className="p-4">
               <div className="flex items-start gap-3 mb-3">
-                <span className="flex-shrink-0 w-7 h-7 bg-green-600 text-white rounded-full flex items-center justify-center text-sm font-medium">
+                <span className="flex-shrink-0 w-7 h-7 text-white rounded-full flex items-center justify-center text-sm font-medium" style={{ backgroundColor: accent }}>
                   {currentStopIndex + 1}
                 </span>
                 <h3 className="text-lg font-bold text-slate-900">{currentStop.title}</h3>
@@ -188,7 +193,8 @@ export function TourPlayer({ tour, onNavigate, onClose, onFeedback }: TourPlayer
               {onFeedback && (
                 <button
                   onClick={() => onFeedback(currentStop.id)}
-                  className="mt-4 w-full py-2 border-2 border-green-600 text-green-700 font-medium rounded-lg hover:bg-green-50 transition-colors"
+                  className="mt-4 w-full py-2 border-2 font-medium rounded-lg transition-colors"
+                  style={{ borderColor: accent, color: accent }}
                 >
                   Leave Feedback
                 </button>
@@ -210,28 +216,39 @@ export function TourPlayer({ tour, onNavigate, onClose, onFeedback }: TourPlayer
             <span className="hidden sm:inline">Previous</span>
           </button>
 
-          {/* Stop dots */}
-          <div className="flex gap-1">
-            {tour.stops.map((_, idx) => (
-              <button
-                key={idx}
-                onClick={() => handleGoToStop(idx)}
-                className={`w-2 h-2 rounded-full transition-colors ${
-                  idx === currentStopIndex
-                    ? 'bg-green-600'
-                    : idx < currentStopIndex
-                    ? 'bg-green-300'
-                    : 'bg-slate-300'
-                }`}
-                aria-label={`Go to stop ${idx + 1}`}
-              />
-            ))}
+          {/* Stop dots - wrapped in larger padded hit areas for touch */}
+          <div className="flex">
+            {tour.stops.map((_, idx) => {
+              const isCurrent = idx === currentStopIndex
+              const isPast = idx < currentStopIndex
+              return (
+                <button
+                  key={idx}
+                  onClick={() => handleGoToStop(idx)}
+                  className="p-2 flex items-center justify-center"
+                  aria-label={`Go to stop ${idx + 1}`}
+                  aria-current={isCurrent ? 'step' : undefined}
+                >
+                  <span
+                    className="w-2 h-2 rounded-full transition-colors block"
+                    style={{
+                      backgroundColor: isCurrent
+                        ? accent
+                        : isPast
+                        ? `${accent}80`
+                        : '#CBD5E1' // slate-300
+                    }}
+                  />
+                </button>
+              )
+            })}
           </div>
 
           <button
             onClick={handleNext}
             disabled={isAnimating}
-            className="flex items-center gap-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+            className="flex items-center gap-1 px-3 py-2 text-white rounded-lg disabled:opacity-50 transition-colors hover:brightness-95"
+            style={{ backgroundColor: accent }}
           >
             <span>{isLastStop ? 'Finish' : 'Next'}</span>
             <ChevronRight size={18} />
@@ -243,11 +260,13 @@ export function TourPlayer({ tour, onNavigate, onClose, onFeedback }: TourPlayer
 }
 
 // Start Tour Button Component
-export function StartTourButton({ onClick }: { onClick: () => void }) {
+export function StartTourButton({ onClick, primaryColor }: { onClick: () => void; primaryColor?: string }) {
+  const accent = primaryColor || DEFAULT_ACCENT
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-2 px-4 py-2 bg-white text-green-700 border-2 border-green-600 rounded-lg shadow-lg hover:bg-green-50 transition-colors font-medium"
+      className="flex items-center gap-2 px-4 py-2 bg-white border-2 rounded-lg shadow-lg transition-colors font-medium hover:brightness-95"
+      style={{ color: accent, borderColor: accent }}
     >
       <Play size={18} />
       Take the Tour

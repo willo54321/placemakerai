@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db'
+import { authorizeProject } from '@/lib/api-auth'
 import { sendEnquiryResponseEmail } from '@/lib/email'
 import { NextResponse } from 'next/server'
 
@@ -6,6 +7,9 @@ export async function POST(
   request: Request,
   { params }: { params: { id: string; enquiryId: string } }
 ) {
+  const denied = await authorizeProject(params.id, 'ADMIN')
+  if (denied) return denied
+
   try {
     const body = await request.json()
 
@@ -23,9 +27,10 @@ export async function POST(
       )
     }
 
-    // Get the enquiry for email details
-    const existingEnquiry = await prisma.enquiry.findUnique({
-      where: { id: params.enquiryId },
+    // Get the enquiry for email details, scoped to this project so an
+    // enquiry from another project cannot be approved via a mismatched URL.
+    const existingEnquiry = await prisma.enquiry.findFirst({
+      where: { id: params.enquiryId, projectId: params.id },
       select: { submitterEmail: true, submitterName: true, subject: true, draftResponse: true },
     })
 

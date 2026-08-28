@@ -1,6 +1,8 @@
 import { prisma } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { Resend } from 'resend'
+import { rateLimitResponse } from '@/lib/rate-limit'
+import { escapeHtml } from '@/lib/escape-html'
 
 // Lazy initialization to avoid build errors when API key is missing
 const getResend = () => {
@@ -17,6 +19,9 @@ export async function POST(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  const limited = rateLimitResponse(request, 'embed-pins', 15, 60_000)
+  if (limited) return limited
+
   // First check if project exists and has embedding enabled
   const project = await prisma.project.findUnique({
     where: { id: params.id },
@@ -128,12 +133,12 @@ export async function POST(
           subject: `New ${categoryLabel} Issue Reported - ${project.name}`,
           html: `
             <h2>New Construction Issue Reported</h2>
-            <p><strong>Project:</strong> ${project.name}</p>
-            <p><strong>Category:</strong> ${categoryLabel}</p>
-            <p><strong>Reported by:</strong> ${pin.name} (${pin.email})</p>
+            <p><strong>Project:</strong> ${escapeHtml(project.name)}</p>
+            <p><strong>Category:</strong> ${escapeHtml(categoryLabel)}</p>
+            <p><strong>Reported by:</strong> ${escapeHtml(pin.name)} (${escapeHtml(pin.email)})</p>
             <hr>
             <p><strong>Description:</strong></p>
-            <p>${pin.comment}</p>
+            <p>${escapeHtml(pin.comment)}</p>
             <hr>
             <p><em>This issue requires moderation before it appears on the public map.</em></p>
           `

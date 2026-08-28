@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { fetchJson } from '@/lib/fetch-json'
 import {
   BarChart3, TrendingUp, TrendingDown, Minus, RefreshCw,
   MessageSquare, AlertCircle, CheckCircle,
@@ -163,26 +164,32 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
   const [selectedTheme, setSelectedTheme] = useState<Theme | null>(null)
   const [showAllFindings, setShowAllFindings] = useState(false)
 
-  // Fetch existing analysis
+  // Latch so the auto-run effect fires AT MOST ONCE per mount and never
+  // re-fires after a failure (which would otherwise loop forever since
+  // `analysis` stays null on error).
+  const hasAutoRun = useRef(false)
+
+  // Fetch existing analysis. fetchJson throws on non-2xx so genuine server
+  // errors surface via the query's `error` state instead of silently resolving.
   const { data, isLoading, error } = useQuery({
     queryKey: ['analytics', projectId],
-    queryFn: () => fetch(`/api/projects/${projectId}/analytics`).then(r => r.json()),
+    queryFn: () => fetchJson(`/api/projects/${projectId}/analytics`),
   })
 
-  // Run new analysis
+  // Run new analysis. Pass `force: true` to bypass the server-side cache check.
   const runAnalysis = useMutation({
-    mutationFn: () =>
-      fetch(`/api/projects/${projectId}/analytics`, { method: 'POST' }).then(r => r.json()),
-    onSuccess: (result) => {
-      if (result.error) {
-        toast.error(result.error)
-      } else {
-        queryClient.invalidateQueries({ queryKey: ['analytics', projectId] })
-        toast.success('Analysis complete!')
-      }
+    mutationFn: ({ force }: { force?: boolean } = {}) =>
+      fetchJson(`/api/projects/${projectId}/analytics`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ force: force ?? false }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['analytics', projectId] })
+      toast.success('Analysis complete!')
     },
-    onError: () => {
-      toast.error('Failed to run analysis')
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : 'Failed to run analysis')
     },
   })
 
@@ -190,12 +197,23 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
   const needsUpdate = data?.needsUpdate
   const feedbackCount = data?.feedbackCount || 0
 
-  // Auto-run analysis if needed and there's feedback
+  // Auto-run analysis at most once when needed and there's feedback. The latch
+  // and the `isError` bail prevent the infinite-retry loop on POST failure.
+  // Deps are scalar values only (no mutation-object identity) so the effect
+  // doesn't re-fire on every render.
+  const canAutoRun = Boolean(needsUpdate) && feedbackCount > 0 && !analysis
   useEffect(() => {
-    if (needsUpdate && feedbackCount > 0 && !runAnalysis.isPending && !analysis) {
-      runAnalysis.mutate()
+    if (
+      canAutoRun &&
+      !hasAutoRun.current &&
+      !runAnalysis.isPending &&
+      !runAnalysis.isError
+    ) {
+      hasAutoRun.current = true
+      runAnalysis.mutate({})
     }
-  }, [needsUpdate, feedbackCount, analysis, runAnalysis])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canAutoRun])
 
   if (isLoading) {
     return (
@@ -243,7 +261,7 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
           Analyze <span className="font-semibold text-slate-700">{feedbackCount}</span> pieces of feedback using AI to extract insights, sentiment, and themes.
         </p>
         <button
-          onClick={() => runAnalysis.mutate()}
+          onClick={() => runAnalysis.mutate({})}
           disabled={runAnalysis.isPending}
           className="btn-primary px-8 py-3"
         >
@@ -324,7 +342,7 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
             </span>
           )}
           <button
-            onClick={() => runAnalysis.mutate()}
+            onClick={() => runAnalysis.mutate({ force: true })}
             disabled={runAnalysis.isPending}
             className="btn-secondary"
           >

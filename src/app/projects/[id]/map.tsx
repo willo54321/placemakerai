@@ -2,8 +2,10 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Trash2, X, Pentagon, Minus, Eye, EyeOff, Upload, Save, ChevronLeft, ChevronRight, Image, ZoomIn, Map, Code, MessageCircle, Globe, Copy, Check, ThumbsUp, ThumbsDown, HelpCircle, ExternalLink, Clock, CheckCircle, XCircle, FileUp, Layers, MapPinned, AlertTriangle, Volume2, Wind, Car, ShieldAlert, Palette, Type, MapIcon } from 'lucide-react'
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import dynamic from 'next/dynamic'
+import { toast } from 'sonner'
+import { fetchJson } from '@/lib/fetch-json'
 
 // Direct dynamic import - bypass MapWrapper to test if wrapper is causing issues
 const InteractiveMap = dynamic(
@@ -148,6 +150,12 @@ export function MapTab({ projectId, project }: { projectId: string; project: Pro
   const queryClient = useQueryClient()
   const mapRef = useRef<{ fitToOverlay: (bounds: [[number, number], [number, number]]) => void } | null>(null)
 
+  // Debounce state for overlay PATCHes: Google Maps fires onDrag hundreds of
+  // times per drag, so we update local state synchronously but coalesce the
+  // server PATCH per overlay (latest-wins) instead of firing one per event.
+  const overlayPatchTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const overlayPatchPending = useRef<Record<string, { bounds?: [[number, number], [number, number]]; opacity?: number; rotation?: number; visible?: boolean }>>({})
+
   // Map state
   const [showForm, setShowForm] = useState(false)
   const [isAddingMarker, setIsAddingMarker] = useState(false)
@@ -257,41 +265,50 @@ export function MapTab({ projectId, project }: { projectId: string; project: Pro
   // Overlay mutations
   const [overlayError, setOverlayError] = useState<string | null>(null)
   const createOverlay = useMutation({
-    mutationFn: async (overlay: ImageOverlay & { tempId?: string }) => {
-      const response = await fetch(`/api/projects/${projectId}/overlays`, {
+    mutationFn: (overlay: ImageOverlay & { tempId?: string }) =>
+      fetchJson<any>(`/api/projects/${projectId}/overlays`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(overlay)
-      })
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to save overlay')
-      }
-      return response.json()
-    },
-    onSuccess: (data) => {
+      }),
+    onSuccess: (data, variables) => {
       setOverlayError(null)
+      // Prefer the tempId we sent (available on the mutation variables) so we
+      // update exactly the right overlay even if the server echo omits it.
+      const tempId = variables.tempId ?? data.tempId
       // Update local state with the server-assigned ID
       setOverlays(prev => prev.map(o =>
-        o.id === data.tempId ? { ...o, id: data.id } : o
+        o.id === tempId ? { ...o, id: data.id } : o
       ))
+      // selectedOverlayId may still hold the temp id (which would silently
+      // deselect the overlay once its id is swapped) — keep it pointing at the
+      // now-persisted overlay.
+      setSelectedOverlayId(prev => (prev === tempId ? data.id : prev))
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
     },
-    onError: (error: Error) => {
+    onError: (error: Error, variables) => {
       setOverlayError(error.message)
-      // Remove the optimistically added overlay
-      setOverlays(prev => prev.filter(o => !o.id.startsWith('temp-') && !o.id.match(/^\d+$/)))
+      toast.error(error.message || 'Failed to save overlay')
+      // Roll back ONLY the overlay for this failed mutation (temp ids are
+      // Date.now()+i — all digits — so a broad regex filter would wipe every
+      // not-yet-confirmed overlay in a multi-file upload).
+      const tempId = variables.tempId
+      if (tempId) {
+        setOverlays(prev => prev.filter(o => o.id !== tempId))
+        setSelectedOverlayId(prev => (prev === tempId ? null : prev))
+      }
     }
   })
 
   const updateOverlay = useMutation({
-    mutationFn: async ({ id, ...data }: { id: string; bounds?: [[number, number], [number, number]]; opacity?: number; rotation?: number; visible?: boolean }) => {
-      const response = await fetch(`/api/projects/${projectId}/overlays/${id}`, {
+    mutationFn: async ({ id, ...data }: { id: string; bounds?: [[number, number], [number, number]]; opacity?: number; rotation?: number; visible?: boolean }) =>
+      fetchJson(`/api/projects/${projectId}/overlays/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
-      })
-      return response.json()
+      }),
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to update overlay')
     }
   })
 
@@ -459,6 +476,12 @@ export function MapTab({ projectId, project }: { projectId: string; project: Pro
     setActiveDrawingTool(null)
   }
 
+  // Stable handler so InteractiveMap's overlay effect doesn't re-run on every
+  // unrelated re-render of this component.
+  const handleOverlayClick = useCallback((id: string) => {
+    setSelectedOverlayId(id)
+  }, [])
+
   const saveDrawing = () => {
     if (!pendingDrawing) return
 
@@ -576,31 +599,71 @@ export function MapTab({ projectId, project }: { projectId: string; project: Pro
     }
   }
 
+  // Coalesce rapid overlay edits (continuous drag / slider) into a single
+  // debounced PATCH per overlay, latest-wins. Discrete actions (visibility
+  // toggle, delete) flush/cancel any pending debounce for that id first.
+  const scheduleOverlayPatch = useCallback((
+    overlayId: string,
+    data: { bounds?: [[number, number], [number, number]]; opacity?: number; rotation?: number }
+  ) => {
+    overlayPatchPending.current[overlayId] = {
+      ...overlayPatchPending.current[overlayId],
+      ...data,
+    }
+    if (overlayPatchTimers.current[overlayId]) {
+      clearTimeout(overlayPatchTimers.current[overlayId])
+    }
+    overlayPatchTimers.current[overlayId] = setTimeout(() => {
+      const pending = overlayPatchPending.current[overlayId]
+      delete overlayPatchPending.current[overlayId]
+      delete overlayPatchTimers.current[overlayId]
+      if (pending) {
+        updateOverlay.mutate({ id: overlayId, ...pending })
+      }
+    }, 500)
+  }, [updateOverlay])
+
+  const flushOverlayPatch = useCallback((overlayId: string) => {
+    if (overlayPatchTimers.current[overlayId]) {
+      clearTimeout(overlayPatchTimers.current[overlayId])
+      delete overlayPatchTimers.current[overlayId]
+    }
+    delete overlayPatchPending.current[overlayId]
+  }, [])
+
+  // Cancel any pending debounced PATCHes on unmount.
+  useEffect(() => {
+    const timers = overlayPatchTimers.current
+    return () => {
+      Object.values(timers).forEach(clearTimeout)
+    }
+  }, [])
+
   const updateOverlayBounds = (overlayId: string, bounds: [[number, number], [number, number]]) => {
-    // Update local state immediately
-    setOverlays(overlays.map(o =>
+    // Update local state immediately (functional update — drag fires rapidly)
+    setOverlays(prev => prev.map(o =>
       o.id === overlayId ? { ...o, bounds } : o
     ))
-    // Save to database
-    updateOverlay.mutate({ id: overlayId, bounds })
+    // Save to database (debounced, latest-wins)
+    scheduleOverlayPatch(overlayId, { bounds })
   }
 
   const updateOverlayOpacity = (overlayId: string, opacity: number) => {
     // Update local state immediately
-    setOverlays(overlays.map(o =>
+    setOverlays(prev => prev.map(o =>
       o.id === overlayId ? { ...o, opacity } : o
     ))
-    // Save to database
-    updateOverlay.mutate({ id: overlayId, opacity })
+    // Save to database (debounced, latest-wins)
+    scheduleOverlayPatch(overlayId, { opacity })
   }
 
   const updateOverlayRotation = (overlayId: string, rotation: number) => {
     // Update local state immediately
-    setOverlays(overlays.map(o =>
+    setOverlays(prev => prev.map(o =>
       o.id === overlayId ? { ...o, rotation } : o
     ))
-    // Save to database
-    updateOverlay.mutate({ id: overlayId, rotation })
+    // Save to database (debounced, latest-wins)
+    scheduleOverlayPatch(overlayId, { rotation })
   }
 
   const toggleOverlayVisibility = (overlayId: string) => {
@@ -608,20 +671,22 @@ export function MapTab({ projectId, project }: { projectId: string; project: Pro
     if (!overlay) return
     const newVisible = !overlay.visible
     // Update local state immediately
-    setOverlays(overlays.map(o =>
+    setOverlays(prev => prev.map(o =>
       o.id === overlayId ? { ...o, visible: newVisible } : o
     ))
-    // Save to database
+    // Discrete action: flush any queued debounced PATCH, then save immediately
+    flushOverlayPatch(overlayId)
     updateOverlay.mutate({ id: overlayId, visible: newVisible })
   }
 
   const deleteOverlay = (overlayId: string) => {
     // Update local state immediately
-    setOverlays(overlays.filter(o => o.id !== overlayId))
+    setOverlays(prev => prev.filter(o => o.id !== overlayId))
     if (selectedOverlayId === overlayId) {
       setSelectedOverlayId(null)
     }
-    // Delete from database
+    // Cancel any queued PATCH for this overlay, then delete from database
+    flushOverlayPatch(overlayId)
     deleteOverlayMutation.mutate(overlayId)
   }
 
@@ -632,7 +697,7 @@ export function MapTab({ projectId, project }: { projectId: string; project: Pro
   const saveMapLocation = async () => {
     setSavingLocation(true)
     try {
-      await fetch(`/api/projects/${projectId}`, {
+      await fetchJson(`/api/projects/${projectId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -642,9 +707,9 @@ export function MapTab({ projectId, project }: { projectId: string; project: Pro
         }),
       })
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
-      alert('Map location saved!')
+      toast.success('Map location saved!')
     } catch (error) {
-      alert('Failed to save map location')
+      toast.error(error instanceof Error ? error.message : 'Failed to save map location')
     } finally {
       setSavingLocation(false)
     }
@@ -858,7 +923,7 @@ export function MapTab({ projectId, project }: { projectId: string; project: Pro
             {/* Map wrapper with explicit height (not percentage) */}
             <div style={{ height: '600px', width: '100%' }}>
               <InteractiveMap
-              ref={mapRef}
+              apiRef={mapRef}
               center={mapCenter}
               zoom={mapZoom}
               markers={allMarkers}
@@ -876,7 +941,7 @@ export function MapTab({ projectId, project }: { projectId: string; project: Pro
                 setMapCenter(center)
                 setMapZoom(zoom)
               }}
-              onOverlayClick={(id: string) => setSelectedOverlayId(id)}
+              onOverlayClick={handleOverlayClick}
               onOverlayBoundsChange={updateOverlayBounds}
               onOverlayRotationChange={updateOverlayRotation}
             />
@@ -1257,7 +1322,6 @@ export function EmbedSettingsTab({ projectId, project }: { projectId: string; pr
   const [copiedFeedback, setCopiedFeedback] = useState(false)
   const [copiedTour, setCopiedTour] = useState(false)
   const [copiedIssues, setCopiedIssues] = useState(false)
-  const [copiedPanorama, setCopiedPanorama] = useState(false)
   const [toggling, setToggling] = useState<string | null>(null)
 
   const toggleSetting = useMutation({
@@ -1295,10 +1359,6 @@ export function EmbedSettingsTab({ projectId, project }: { projectId: string; pr
     ? `${window.location.origin}/embed/${projectId}/issues`
     : `/embed/${projectId}/issues`
 
-  const panoramaEmbedUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/embed/${projectId}/panorama`
-    : `/embed/${projectId}/panorama`
-
   const feedbackEmbedCode = `<iframe
   src="${feedbackEmbedUrl}"
   width="100%"
@@ -1325,15 +1385,6 @@ export function EmbedSettingsTab({ projectId, project }: { projectId: string; pr
   style="border: 1px solid #e5e7eb; border-radius: 8px;"
 ></iframe>`
 
-  const panoramaEmbedCode = `<iframe
-  src="${panoramaEmbedUrl}"
-  width="100%"
-  height="600"
-  frameborder="0"
-  allowfullscreen
-  style="border: 1px solid #e5e7eb; border-radius: 8px;"
-></iframe>`
-
   const copyFeedbackCode = () => {
     navigator.clipboard.writeText(feedbackEmbedCode)
     setCopiedFeedback(true)
@@ -1352,14 +1403,7 @@ export function EmbedSettingsTab({ projectId, project }: { projectId: string; pr
     setTimeout(() => setCopiedIssues(false), 2000)
   }
 
-  const copyPanoramaCode = () => {
-    navigator.clipboard.writeText(panoramaEmbedCode)
-    setCopiedPanorama(true)
-    setTimeout(() => setCopiedPanorama(false), 2000)
-  }
-
   const hasTours = (project as any).tours?.length > 0
-  const hasPanoramas = (project as any).panoramas?.length > 0
 
   return (
     <div className="space-y-6">
@@ -1561,49 +1605,6 @@ export function EmbedSettingsTab({ projectId, project }: { projectId: string; pr
               )}
             </div>
 
-            {/* 360 Panorama Settings */}
-            <div className="mt-6 pt-6 border-t space-y-4">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">360° Panorama</p>
-
-              {/* Enable Panorama Toggle */}
-              <div className="flex items-center justify-between p-4 bg-purple-50 rounded-lg border border-purple-100">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-purple-600">
-                      <circle cx="12" cy="12" r="10"/>
-                      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-                      <line x1="2" y1="12" x2="22" y2="12"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-900">Enable 360° Panorama</p>
-                    <p className="text-sm text-gray-500">Allow visitors to explore immersive panorama views</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => toggleSetting.mutate({ key: 'panoramaEnabled', value: !(project as any).panoramaEnabled })}
-                  disabled={toggling === 'panoramaEnabled'}
-                  className={`relative w-12 h-6 rounded-full transition-colors ${
-                    (project as any).panoramaEnabled ? 'bg-purple-500' : 'bg-gray-300'
-                  } ${toggling === 'panoramaEnabled' ? 'opacity-50' : ''}`}
-                >
-                  <span
-                    className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                      (project as any).panoramaEnabled ? 'left-6' : 'left-0.5'
-                    }`}
-                  />
-                </button>
-              </div>
-
-              {(project as any).panoramaEnabled && !hasPanoramas && (
-                <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                  <p className="text-sm text-amber-800">
-                    Go to the Panoramas tab to create your first 360° panorama.
-                  </p>
-                </div>
-              )}
-            </div>
-
             {/* Styling Customization */}
             <div className="mt-6 pt-6 border-t space-y-4">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Styling</p>
@@ -1790,42 +1791,6 @@ export function EmbedSettingsTab({ projectId, project }: { projectId: string; pr
               </div>
             )}
 
-            {/* Panorama Embed Code */}
-            {(project as any).panoramaEnabled && (
-              <div className="mt-6 pt-6 border-t">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Code size={18} className="text-purple-400" />
-                    <span className="font-medium text-sm text-gray-700">360° Panorama Embed</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <a
-                      href={panoramaEmbedUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-sm text-purple-600 hover:text-purple-700"
-                    >
-                      <ExternalLink size={14} /> Preview
-                    </a>
-                    <button
-                      onClick={copyPanoramaCode}
-                      className="flex items-center gap-1 text-sm text-purple-600 hover:text-purple-700"
-                    >
-                      {copiedPanorama ? <Check size={14} /> : <Copy size={14} />}
-                      {copiedPanorama ? 'Copied!' : 'Copy'}
-                    </button>
-                  </div>
-                </div>
-                <pre className="bg-gray-900 text-gray-100 text-sm p-4 rounded-lg overflow-x-auto">
-                  <code>{panoramaEmbedCode}</code>
-                </pre>
-                <p className="text-sm text-gray-500 mt-3">
-                  {hasPanoramas
-                    ? 'Embed the 360° panorama viewer for an immersive virtual experience.'
-                    : 'Create panoramas in the Panoramas tab to enable this embed.'}
-                </p>
-              </div>
-            )}
           </>
         )}
       </div>

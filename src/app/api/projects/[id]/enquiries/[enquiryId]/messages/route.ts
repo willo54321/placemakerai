@@ -1,11 +1,31 @@
 import { prisma } from '@/lib/db'
+import { authorizeProject } from '@/lib/api-auth'
 import { NextResponse } from 'next/server'
 
 export async function POST(
   request: Request,
   { params }: { params: { id: string; enquiryId: string } }
 ) {
-  const body = await request.json()
+  const denied = await authorizeProject(params.id, 'ADMIN')
+  if (denied) return denied
+
+  let body: any
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+
+  // Verify the enquiry belongs to this project before creating a message.
+  const enquiry = await prisma.enquiry.findFirst({
+    where: { id: params.enquiryId, projectId: params.id },
+    select: { id: true },
+  })
+
+  if (!enquiry) {
+    return NextResponse.json({ error: 'Enquiry not found' }, { status: 404 })
+  }
+
   const message = await prisma.enquiryMessage.create({
     data: {
       enquiryId: params.enquiryId,

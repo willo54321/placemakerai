@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
+import { authorizeSuperAdmin } from '@/lib/api-auth'
 
 const testFeedback = [
   // Traffic concerns
@@ -46,6 +47,9 @@ export async function POST(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  if (process.env.NODE_ENV === 'production') return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  const denied = await authorizeSuperAdmin(); if (denied) return denied
+
   const projectId = params.id
 
   // Check project exists
@@ -99,6 +103,9 @@ export async function DELETE(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  if (process.env.NODE_ENV === 'production') return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  const denied = await authorizeSuperAdmin(); if (denied) return denied
+
   const projectId = params.id
 
   const deleted = await prisma.publicPin.deleteMany({

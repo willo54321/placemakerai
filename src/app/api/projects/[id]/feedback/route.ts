@@ -1,6 +1,10 @@
 import { prisma } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
+import { rateLimitResponse } from '@/lib/rate-limit'
+
+// Cap auto-detected form fields to prevent unbounded schema growth
+const MAX_AUTO_FIELDS = 50
 
 // CORS headers for cross-origin form submissions
 const corsHeaders = {
@@ -42,7 +46,27 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   const projectId = params.id
-  const body = await request.json()
+
+  const limited = rateLimitResponse(request, 'ext-feedback', 10, 60_000)
+  if (limited) return limited
+
+  let body: any
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json(
+      { error: 'Invalid JSON body' },
+      { status: 400, headers: corsHeaders }
+    )
+  }
+
+  // Cap the size of the submitted payload
+  if (JSON.stringify(body).length > 20000) {
+    return NextResponse.json(
+      { error: 'Submission too large' },
+      { status: 400, headers: corsHeaders }
+    )
+  }
 
   // Check project exists and embedding is enabled
   const project = await prisma.project.findUnique({
@@ -116,6 +140,10 @@ export async function POST(
   const newFields = [...existingFields]
 
   for (const key of Object.keys(formData)) {
+    // Stop auto-adding fields once the form is at capacity to prevent
+    // unbounded growth of the form schema from malicious submissions.
+    if (newFields.length >= MAX_AUTO_FIELDS) break
+
     // Skip common meta fields
     if (['gdprConsent', 'consent', 'mailingConsent'].includes(key)) continue
 

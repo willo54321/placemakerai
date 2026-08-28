@@ -1,10 +1,14 @@
 import { prisma } from '@/lib/db'
+import { authorizeProject } from '@/lib/api-auth'
 import { NextResponse } from 'next/server'
 
 export async function PATCH(
   request: Request,
   { params }: { params: { id: string; overlayId: string } }
 ) {
+  const denied = await authorizeProject(params.id, 'ADMIN')
+  if (denied) return denied
+
   const body = await request.json()
 
   // Build update data dynamically based on what's provided
@@ -44,6 +48,9 @@ export async function DELETE(
   request: Request,
   { params }: { params: { id: string; overlayId: string } }
 ) {
+  const denied = await authorizeProject(params.id, 'ADMIN')
+  if (denied) return denied
+
   await prisma.imageOverlay.delete({
     where: {
       id: params.overlayId,

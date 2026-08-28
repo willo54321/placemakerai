@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db'
+import { authorizeProject } from '@/lib/api-auth'
 import { NextResponse } from 'next/server'
 
 // GET - Get a single tour with its stops
@@ -6,6 +7,9 @@ export async function GET(
   request: Request,
   { params }: { params: { id: string; tourId: string } }
 ) {
+  const denied = await authorizeProject(params.id, 'CLIENT')
+  if (denied) return denied
+
   const tour = await prisma.tour.findUnique({
     where: { id: params.tourId },
     include: {
@@ -31,6 +35,9 @@ export async function PATCH(
   request: Request,
   { params }: { params: { id: string; tourId: string } }
 ) {
+  const denied = await authorizeProject(params.id, 'ADMIN')
+  if (denied) return denied
+
   const body = await request.json()
 
   // Verify tour belongs to project
@@ -64,6 +71,9 @@ export async function DELETE(
   request: Request,
   { params }: { params: { id: string; tourId: string } }
 ) {
+  const denied = await authorizeProject(params.id, 'ADMIN')
+  if (denied) return denied
+
   // Verify tour belongs to project
   const existingTour = await prisma.tour.findUnique({
     where: { id: params.tourId }

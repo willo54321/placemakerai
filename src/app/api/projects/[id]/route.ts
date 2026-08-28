@@ -54,12 +54,6 @@ export async function GET(
           },
           orderBy: { createdAt: 'desc' }
         },
-        panoramas: {
-          include: {
-            hotspots: true
-          },
-          orderBy: { order: 'asc' }
-        },
         userAccess: {
           include: {
             user: {
@@ -126,7 +120,6 @@ export async function PATCH(
     if (body.embedHideStreetLabels !== undefined) updateData.embedHideStreetLabels = body.embedHideStreetLabels
     if (body.embedReferenceOnly !== undefined) updateData.embedReferenceOnly = body.embedReferenceOnly
     if (body.embedDefaultSatellite !== undefined) updateData.embedDefaultSatellite = body.embedDefaultSatellite
-    if (body.panoramaEnabled !== undefined) updateData.panoramaEnabled = body.panoramaEnabled
 
     const project = await prisma.project.update({
       where: { id: params.id },

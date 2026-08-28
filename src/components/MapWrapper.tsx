@@ -18,7 +18,13 @@ const DynamicMap = dynamic<any>(
   }
 );
 
-// Simple passthrough - no extra wrappers, observers, or state
+// NOTE: This wrapper is superseded — map.tsx imports InteractiveMap via
+// next/dynamic directly. It also has the same forwardRef-into-dynamic flaw as
+// the old map.tsx: next/dynamic does NOT forward refs in Next 14, so the `ref`
+// passed here never reaches InteractiveMap and the imperative API
+// (fitToOverlay) is a no-op. For consumers that need the imperative API, pass
+// `apiRef` (a normal prop InteractiveMap populates) instead of `ref`. The
+// `ref` passthrough is retained only for backward-compat / non-imperative use.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const InteractiveMap = forwardRef<InteractiveMapRef, any>((props, ref) => (
   <DynamicMap {...props} ref={ref} />

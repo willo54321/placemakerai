@@ -1,12 +1,16 @@
 import { prisma } from '@/lib/db'
+import { authorizeProject } from '@/lib/api-auth'
 import { NextResponse } from 'next/server'
 
 export async function GET(
   request: Request,
   { params }: { params: { id: string; enquiryId: string } }
 ) {
-  const enquiry = await prisma.enquiry.findUnique({
-    where: { id: params.enquiryId },
+  const denied = await authorizeProject(params.id, 'CLIENT')
+  if (denied) return denied
+
+  const enquiry = await prisma.enquiry.findFirst({
+    where: { id: params.enquiryId, projectId: params.id },
     include: {
       assignedTo: true,
       messages: { orderBy: { createdAt: 'asc' } },
@@ -26,13 +30,21 @@ export async function PATCH(
   request: Request,
   { params }: { params: { id: string; enquiryId: string } }
 ) {
+  const denied = await authorizeProject(params.id, 'ADMIN')
+  if (denied) return denied
+
   const body = await request.json()
 
   // Get the current enquiry to check if this is a new response being sent
-  const currentEnquiry = await prisma.enquiry.findUnique({
-    where: { id: params.enquiryId },
+  // and to verify it belongs to this project before mutating.
+  const currentEnquiry = await prisma.enquiry.findFirst({
+    where: { id: params.enquiryId, projectId: params.id },
     select: { sentAt: true, submitterEmail: true, subject: true },
   })
+
+  if (!currentEnquiry) {
+    return NextResponse.json({ error: 'Enquiry not found' }, { status: 404 })
+  }
 
   const enquiry = await prisma.enquiry.update({
     where: { id: params.enquiryId },
@@ -81,8 +93,18 @@ export async function DELETE(
   request: Request,
   { params }: { params: { id: string; enquiryId: string } }
 ) {
-  await prisma.enquiry.delete({
-    where: { id: params.enquiryId },
+  const denied = await authorizeProject(params.id, 'ADMIN')
+  if (denied) return denied
+
+  // Scope the delete to this project so an enquiry from another project
+  // cannot be deleted via a mismatched projectId in the URL.
+  const { count } = await prisma.enquiry.deleteMany({
+    where: { id: params.enquiryId, projectId: params.id },
   })
+
+  if (count === 0) {
+    return NextResponse.json({ error: 'Enquiry not found' }, { status: 404 })
+  }
+
   return NextResponse.json({ success: true })
 }

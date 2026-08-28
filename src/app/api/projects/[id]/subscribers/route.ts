@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db'
+import { authorizeProject } from '@/lib/api-auth'
 import { NextResponse } from 'next/server'
 
 // GET all subscribers for a project
@@ -6,6 +7,9 @@ export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  const denied = await authorizeProject(params.id, 'CLIENT')
+  if (denied) return denied
+
   const subscribers = await prisma.subscriber.findMany({
     where: { projectId: params.id },
     orderBy: { createdAt: 'desc' },
@@ -18,6 +22,9 @@ export async function POST(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  const denied = await authorizeProject(params.id, 'ADMIN')
+  if (denied) return denied
+
   const body = await request.json()
 
   // Check if subscriber already exists
@@ -64,13 +71,16 @@ export async function DELETE(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  const denied = await authorizeProject(params.id, 'ADMIN')
+  if (denied) return denied
+
   const { searchParams } = new URL(request.url)
   const email = searchParams.get('email')
   const subscriberId = searchParams.get('subscriberId')
 
   if (subscriberId) {
-    await prisma.subscriber.delete({
-      where: { id: subscriberId },
+    await prisma.subscriber.deleteMany({
+      where: { id: subscriberId, projectId: params.id },
     })
   } else if (email) {
     await prisma.subscriber.updateMany({

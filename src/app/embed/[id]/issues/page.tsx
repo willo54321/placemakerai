@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
-import { Volume2, Wind, Car, AlertTriangle, ShieldAlert, Clock, HelpCircle, X, Send, MapPin, Pentagon } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Volume2, Wind, Car, AlertTriangle, ShieldAlert, Clock, HelpCircle, X, Send, MapPin, Pentagon, CheckCircle, AlertCircle } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
 const EmbedMap = dynamic(() => import('../EmbedMap'), {
@@ -93,6 +93,9 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
   // Form state
   const [selectedCategory, setSelectedCategory] = useState('noise')
   const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [submitReference, setSubmitReference] = useState<string | null>(null)
+  const [voteError, setVoteError] = useState<string | null>(null)
   const [form, setForm] = useState({
     comment: '',
     name: '',
@@ -101,9 +104,18 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
     mailingConsent: false,
   })
 
+  // Coarse (touch) pointer detection for touch-appropriate draw copy
+  const [isCoarsePointer, setIsCoarsePointer] = useState(false)
+
   // Default to roadmap (map view) so labels are visible
   const [mapType, setMapType] = useState<'roadmap' | 'satellite'>('roadmap')
   const [votedPins, setVotedPins] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsCoarsePointer(window.matchMedia('(pointer: coarse)').matches)
+    }
+  }, [])
 
   // Load voted pins from localStorage on mount
   useEffect(() => {
@@ -135,6 +147,16 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
       })
   }, [params.id])
 
+  // Exit draw mode on Escape (only while drawing and the form isn't open)
+  useEffect(() => {
+    if (!drawMode || showForm) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setDrawMode(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [drawMode, showForm])
+
   // Handle map click for pins
   const handleMapClick = (lat: number, lng: number) => {
     if (drawMode === 'pin') {
@@ -155,6 +177,7 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
     if (!pendingShape || !form.comment.trim() || !form.name.trim() || !form.email.trim() || !form.gdprConsent) return
 
     setSubmitting(true)
+    setSubmitError(null)
     try {
       let body: Record<string, unknown> = {
         mode: 'issues',
@@ -182,16 +205,16 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
 
       if (!response.ok) throw new Error('Failed to submit')
 
-      const newPin = await response.json()
-      setProject(prev => prev ? {
-        ...prev,
-        pins: [newPin, ...prev.pins]
-      } : null)
-
-      // Reset form
-      cancelDrawing()
+      // Capture the created report id to show as a reference. Reports are
+      // reviewed before publishing, so don't add it to the visible map (it
+      // would appear published then vanish on reload).
+      const newPin = await response.json().catch(() => null)
+      setPendingShape(null)
+      setDrawMode(null)
+      setSubmitReference(newPin?.id ?? '')
     } catch (err) {
-      alert('Failed to submit your issue. Please try again.')
+      // Inline error (window.alert is blocked in cross-origin iframes).
+      setSubmitError('Failed to submit your issue. Please try again.')
     } finally {
       setSubmitting(false)
     }
@@ -201,6 +224,8 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
     setPendingShape(null)
     setShowForm(false)
     setDrawMode(null)
+    setSubmitError(null)
+    setSubmitReference(null)
     setForm({ comment: '', name: '', email: '', gdprConsent: false, mailingConsent: false })
     setSelectedCategory('noise')
   }
@@ -236,15 +261,19 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
       localStorage.setItem(storageKey, JSON.stringify(Array.from(newVotedPins)))
     } catch (err) {
       console.error('Failed to vote:', err)
+      setVoteError('Could not register your support. Please try again.')
+      window.setTimeout(() => setVoteError(null), 4000)
     }
   }
 
   const getDrawModeInstruction = () => {
     switch (drawMode) {
       case 'pin':
-        return 'Click on the map to mark the issue location'
+        return isCoarsePointer ? 'Tap on the map to mark the issue location' : 'Click on the map to mark the issue location'
       case 'polygon':
-        return 'Click to draw the affected area. Double-click to close.'
+        return isCoarsePointer
+          ? 'Tap points to draw the affected area, then tap the first point to finish'
+          : 'Click to draw the affected area. Double-click to close.'
       default:
         return ''
     }
@@ -385,10 +414,24 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
         {/* Instruction Banner */}
         {drawMode && !showForm && (
           <div
-            className="absolute top-4 left-1/2 -translate-x-1/2 z-10 text-white px-6 py-3 rounded-lg shadow-lg"
+            className="absolute top-4 left-1/2 -translate-x-1/2 z-10 text-white pl-6 pr-3 py-3 rounded-lg shadow-lg flex items-center gap-3 max-w-[calc(100vw-2rem)]"
             style={{ backgroundColor: primaryColor }}
           >
-            <p className="font-medium">{getDrawModeInstruction()}</p>
+            <p className="font-medium text-sm">{getDrawModeInstruction()}</p>
+            <button
+              onClick={() => setDrawMode(null)}
+              aria-label="Cancel drawing"
+              className="flex items-center gap-1 px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-md text-sm font-medium transition-colors whitespace-nowrap"
+            >
+              <X size={16} /> Cancel
+            </button>
+          </div>
+        )}
+
+        {/* Vote error toast */}
+        {voteError && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 text-sm">
+            <AlertCircle size={16} /> {voteError}
           </div>
         )}
 
@@ -403,8 +446,38 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
           {mapType === 'satellite' ? 'Map' : 'Satellite'}
         </button>
 
+        {/* Success Confirmation Panel */}
+        {showForm && submitReference !== null && (
+          <div className="absolute inset-0 z-20 bg-black/30 flex items-end sm:items-center justify-center p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 text-center">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle className="w-8 h-8 text-green-600" />
+              </div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Report received</h2>
+              <p className="text-gray-600 mb-4">
+                Thank you. Your report has been received and will be reviewed by the project team.
+              </p>
+              {submitReference && (
+                <p className="text-sm text-gray-500 mb-6">
+                  Your report reference is{' '}
+                  <span className="font-mono font-medium text-gray-700">#{submitReference}</span>
+                </p>
+              )}
+              <button
+                onClick={cancelDrawing}
+                className="w-full px-4 py-2.5 text-white rounded-lg font-medium transition-colors"
+                style={{ backgroundColor: primaryColor }}
+                onMouseOver={(e) => { e.currentTarget.style.filter = 'brightness(0.9)' }}
+                onMouseOut={(e) => { e.currentTarget.style.filter = '' }}
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Issue Form Modal */}
-        {showForm && pendingShape && (
+        {showForm && submitReference === null && pendingShape && (
           <div className="absolute inset-0 z-20 bg-black/30 flex items-end sm:items-center justify-center p-4">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-auto">
               {/* Form Header */}
@@ -543,6 +616,14 @@ export default function IssuesEmbedPage({ params }: { params: { id: string } }) 
                     </label>
                   </div>
                 </div>
+
+                {/* Inline submit error (window.alert is blocked in iframes) */}
+                {submitError && (
+                  <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <AlertCircle size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-red-700">{submitError}</p>
+                  </div>
+                )}
 
                 {/* Submit */}
                 <div className="flex gap-3 pt-2">

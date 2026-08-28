@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { MapPin, Mail, Lock, ArrowRight, Loader2 } from 'lucide-react'
 
 export default function LoginPage() {
@@ -89,6 +90,12 @@ export default function LoginPage() {
                 className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-colors"
               />
             </div>
+          </div>
+
+          <div className="text-right">
+            <Link href="/forgot-password" className="text-sm text-brand-600 hover:text-brand-700 font-medium">
+              Forgot password?
+            </Link>
           </div>
 
           {error && (

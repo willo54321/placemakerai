@@ -4,6 +4,9 @@ import OpenAI from 'openai'
 let openaiClient: OpenAI | null = null
 
 function getOpenAI(): OpenAI {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error('OPENAI_API_KEY is not configured — AI analysis is unavailable')
+  }
   if (!openaiClient) {
     openaiClient = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
@@ -20,6 +23,30 @@ export interface FeedbackItem {
   latitude?: number | null
   longitude?: number | null
   createdAt: Date
+}
+
+// Input caps to protect against context-window blowups and unbounded cost.
+// We analyze at most the MAX_ITEMS most recent items, and truncate each item's
+// text to MAX_ITEM_CHARS before it's placed into any prompt.
+const MAX_ITEMS = 400
+const MAX_ITEM_CHARS = 1000
+
+/**
+ * Cap the feedback set for LLM analysis: keep at most MAX_ITEMS of the most
+ * recent items (by createdAt, newest first) and truncate each item's content to
+ * MAX_ITEM_CHARS. Returns a new array; input is left untouched. If the input was
+ * larger than the caps we simply analyze the capped subset (no throw).
+ */
+function capFeedbackForAnalysis(feedbackItems: FeedbackItem[]): FeedbackItem[] {
+  const recent = [...feedbackItems]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, MAX_ITEMS)
+
+  return recent.map(item =>
+    item.content.length > MAX_ITEM_CHARS
+      ? { ...item, content: item.content.slice(0, MAX_ITEM_CHARS) }
+      : item
+  )
 }
 
 export interface SentimentResult {
@@ -138,7 +165,9 @@ export async function analyzeSentiment(feedbackItems: FeedbackItem[]): Promise<S
     }
   }
 
-  const feedbackText = feedbackItems.map((item, i) =>
+  const capped = capFeedbackForAnalysis(feedbackItems)
+
+  const feedbackText = capped.map((item, i) =>
     `[${i + 1}] (${item.type}) ${item.content}`
   ).join('\n\n')
 
@@ -170,12 +199,37 @@ Be accurate and consider the context of planning/development projects. Oppositio
 
   const result = JSON.parse(response.choices[0].message.content || '{}')
 
-  // Map results back to original items and calculate breakdowns
-  const itemResults = (result.items || []).map((item: { id: string; sentiment: string; confidence: number }) => ({
-    id: feedbackItems[parseInt(item.id) - 1]?.id || item.id,
-    sentiment: item.sentiment as 'positive' | 'negative' | 'neutral',
-    confidence: item.confidence,
-  }))
+  // Map results back to original items, resolving each returned item to the
+  // original feedback item by the bracket number (1-based index into `capped`).
+  // We capture the resolved original alongside the mapped result so the
+  // by-source aggregation attributes sentiment by the *actual* item — not by a
+  // positional index, which breaks if the model reorders, drops, or adds items.
+  const mapped = (result.items || []).map(
+    (item: { id: string; sentiment: string; confidence: number }) => {
+      const original = capped[parseInt(item.id) - 1]
+      return {
+        original,
+        result: {
+          id: original?.id || item.id,
+          sentiment: item.sentiment as 'positive' | 'negative' | 'neutral',
+          confidence: item.confidence,
+        },
+      }
+    }
+  ) as Array<{
+    original: FeedbackItem | undefined
+    result: { id: string; sentiment: 'positive' | 'negative' | 'neutral'; confidence: number }
+  }>
+
+  const itemResults = mapped.map(m => m.result)
+
+  // Guard: the model may not return exactly one result per input item. We don't
+  // throw — we just aggregate over whatever resolved items we got.
+  if (itemResults.length !== capped.length) {
+    console.warn(
+      `analyzeSentiment: model returned ${itemResults.length} items for ${capped.length} inputs`
+    )
+  }
 
   // Calculate breakdowns
   const breakdown = { positive: 0, negative: 0, neutral: 0 }
@@ -185,9 +239,11 @@ Be accurate and consider the context of planning/development projects. Oppositio
     enquiries: { positive: 0, negative: 0, neutral: 0 },
   }
 
-  itemResults.forEach((item: { id: string; sentiment: 'positive' | 'negative' | 'neutral' }, i: number) => {
-    const original = feedbackItems[i]
+  mapped.forEach(({ original, result: item }) => {
+    // Skip results that didn't resolve to a real item, or with an unexpected
+    // sentiment value, so counts stay correct.
     if (!original) return
+    if (item.sentiment !== 'positive' && item.sentiment !== 'negative' && item.sentiment !== 'neutral') return
 
     breakdown[item.sentiment]++
 
@@ -210,7 +266,9 @@ export async function extractThemes(feedbackItems: FeedbackItem[]): Promise<Them
     return { themes: [], totalFeedback: 0 }
   }
 
-  const feedbackText = feedbackItems.map((item, i) =>
+  const capped = capFeedbackForAnalysis(feedbackItems)
+
+  const feedbackText = capped.map((item, i) =>
     `[${i + 1}] ${item.content}`
   ).join('\n\n')
 
@@ -254,7 +312,7 @@ The sentimentBreakdown should reflect the actual split of positive/negative/neut
       keywords: theme.keywords || [],
       sampleQuotes: (theme.sampleQuotes || []).slice(0, 2),
     })),
-    totalFeedback: feedbackItems.length,
+    totalFeedback: capped.length,
   }
 }
 
@@ -274,7 +332,10 @@ export async function generateSummary(
   }
 
   const topThemes = themes.themes.slice(0, 5).map(t => `${t.name} (${t.sentiment})`).join(', ')
-  const feedbackSample = feedbackItems.slice(0, 20).map(item => item.content).join('\n---\n')
+  const feedbackSample = feedbackItems
+    .slice(0, 20)
+    .map(item => item.content.slice(0, MAX_ITEM_CHARS))
+    .join('\n---\n')
 
   const response = await getOpenAI().chat.completions.create({
     model: 'gpt-4o',
@@ -419,7 +480,9 @@ export async function classifyMaterialConsiderations(
     }
   }
 
-  const feedbackText = feedbackItems.map((item, i) =>
+  const capped = capFeedbackForAnalysis(feedbackItems)
+
+  const feedbackText = capped.map((item, i) =>
     `[${i + 1}] ${item.content}`
   ).join('\n\n')
 
@@ -471,9 +534,9 @@ Return a JSON object with:
 
   const result = JSON.parse(response.choices[0].message.content || '{}')
 
-  // Map item IDs back to actual feedback item IDs
+  // Map item IDs (bracket numbers, 1-based into `capped`) back to actual feedback item IDs
   const items = (result.items || []).map((item: { id: string; classification: string; materialCategories: string[]; nonMaterialCategories: string[] }) => ({
-    id: feedbackItems[parseInt(item.id) - 1]?.id || item.id,
+    id: capped[parseInt(item.id) - 1]?.id || item.id,
     classification: item.classification as 'material' | 'non-material' | 'mixed',
     materialCategories: item.materialCategories || [],
     nonMaterialCategories: item.nonMaterialCategories || [],

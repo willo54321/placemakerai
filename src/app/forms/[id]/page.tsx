@@ -1,32 +1,46 @@
 'use client'
 
 import { useQuery, useMutation } from '@tanstack/react-query'
-import { CheckCircle } from 'lucide-react'
+import { CheckCircle, AlertCircle } from 'lucide-react'
 import { useState } from 'react'
+import { fetchJson } from '@/lib/fetch-json'
 
 export default function PublicFormPage({ params }: { params: { id: string } }) {
   const [submitted, setSubmitted] = useState(false)
   const [formData, setFormData] = useState<Record<string, any>>({})
   const [gdprConsent, setGdprConsent] = useState(false)
   const [mailingConsent, setMailingConsent] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
 
-  const { data: form, isLoading } = useQuery({
+  const { data: form, isLoading, isError } = useQuery({
     queryKey: ['form', params.id],
-    queryFn: () => fetch(`/api/forms/${params.id}`).then(r => r.json()),
+    queryFn: () => fetchJson(`/api/forms/${params.id}`),
+    retry: false,
   })
 
   const submitResponse = useMutation({
     mutationFn: (payload: { data: Record<string, any>; gdprConsent: boolean; mailingConsent: boolean }) =>
-      fetch(`/api/forms/${params.id}/responses`, {
+      fetchJson(`/api/forms/${params.id}/responses`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-      }).then(r => r.json()),
-    onSuccess: () => setSubmitted(true),
+      }),
+    onSuccess: () => {
+      setSubmitError(null)
+      setSubmitted(true)
+    },
+    onError: (err: unknown) => {
+      setSubmitError(
+        err instanceof Error && err.message
+          ? err.message
+          : 'Something went wrong submitting your feedback. Please try again.'
+      )
+    },
   })
 
   if (isLoading) return <div className="p-8 text-center">Loading...</div>
-  if (!form) return <div className="p-8 text-center">Form not found</div>
+  if (isError || !form) return <div className="p-8 text-center">Form not found</div>
 
   if (submitted) {
     return (
@@ -40,9 +54,48 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
     )
   }
 
+  const fieldKey = (field: any) => field.id ?? field.label
+
+  const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!gdprConsent) return
+
+    const errors: Record<string, string> = {}
+
+    for (const field of (form.fields || [])) {
+      const key = fieldKey(field)
+      const value = formData[key]
+
+      // Required-field enforcement for rating and checkbox groups (native
+      // `required` doesn't cover these custom controls).
+      if (field.required) {
+        if (field.type === 'rating' && (value === undefined || value === null || value === '')) {
+          errors[key] = 'Please select a rating.'
+        } else if (field.type === 'checkbox' && (!Array.isArray(value) || value.length === 0)) {
+          errors[key] = 'Please select at least one option.'
+        }
+      }
+
+      // Email-format validation for any email field.
+      if (field.type === 'email' && typeof value === 'string' && value.trim() && !isValidEmail(value.trim())) {
+        errors[key] = 'Please enter a valid email address.'
+      }
+    }
+
+    // Top-level email, if the form captures one directly.
+    if (typeof formData.email === 'string' && formData.email.trim() && !isValidEmail(formData.email.trim())) {
+      errors.email = 'Please enter a valid email address.'
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors)
+      return
+    }
+
+    setValidationErrors({})
+    setSubmitError(null)
     submitResponse.mutate({ data: formData, gdprConsent, mailingConsent })
   }
 
@@ -52,7 +105,10 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
         <h1 className="text-2xl font-bold mb-6">{form.name}</h1>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {form.fields?.map((field: any, i: number) => (
+          {form.fields?.map((field: any, i: number) => {
+            const key = fieldKey(field)
+            const fieldError = validationErrors[key]
+            return (
             <div key={i}>
               <label className="block text-sm font-medium mb-2">
                 {field.label} {field.required && <span className="text-red-500">*</span>}
@@ -61,16 +117,16 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
               {field.type === 'textarea' ? (
                 <textarea
                   required={field.required}
-                  value={formData[field.label] || ''}
-                  onChange={e => setFormData({ ...formData, [field.label]: e.target.value })}
+                  value={formData[key] || ''}
+                  onChange={e => setFormData({ ...formData, [key]: e.target.value })}
                   className="w-full p-2 border rounded"
                   rows={3}
                 />
               ) : field.type === 'select' ? (
                 <select
                   required={field.required}
-                  value={formData[field.label] || ''}
-                  onChange={e => setFormData({ ...formData, [field.label]: e.target.value })}
+                  value={formData[key] || ''}
+                  onChange={e => setFormData({ ...formData, [key]: e.target.value })}
                   className="w-full p-2 border rounded"
                 >
                   <option value="">Select...</option>
@@ -82,28 +138,28 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                     <label key={o} className="flex items-center gap-2">
                       <input
                         type="radio"
-                        name={field.label}
+                        name={key}
                         value={o}
                         required={field.required}
-                        checked={formData[field.label] === o}
-                        onChange={e => setFormData({ ...formData, [field.label]: e.target.value })}
+                        checked={formData[key] === o}
+                        onChange={e => setFormData({ ...formData, [key]: e.target.value })}
                       />
                       {o}
                     </label>
                   ))}
                 </div>
               ) : field.type === 'checkbox' ? (
-                <div className="space-y-2">
+                <div className={`space-y-2 ${fieldError ? 'rounded border border-red-500 p-2' : ''}`}>
                   {field.options?.map((o: string) => (
                     <label key={o} className="flex items-center gap-2">
                       <input
                         type="checkbox"
-                        checked={(formData[field.label] || []).includes(o)}
+                        checked={(formData[key] || []).includes(o)}
                         onChange={e => {
-                          const current = formData[field.label] || []
+                          const current = formData[key] || []
                           setFormData({
                             ...formData,
-                            [field.label]: e.target.checked
+                            [key]: e.target.checked
                               ? [...current, o]
                               : current.filter((v: string) => v !== o),
                           })
@@ -114,13 +170,13 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                   ))}
                 </div>
               ) : field.type === 'rating' ? (
-                <div className="flex gap-2">
+                <div className={`flex gap-2 ${fieldError ? 'rounded border border-red-500 p-2' : ''}`}>
                   {[1, 2, 3, 4, 5].map(n => (
                     <button
                       key={n}
                       type="button"
-                      className={`w-10 h-10 border rounded ${formData[field.label] === n ? 'bg-blue-600 text-white' : 'hover:bg-gray-50'}`}
-                      onClick={() => setFormData({ ...formData, [field.label]: n })}
+                      className={`w-10 h-10 border rounded ${formData[key] === n ? 'bg-blue-600 text-white' : 'hover:bg-gray-50'}`}
+                      onClick={() => setFormData({ ...formData, [key]: n })}
                     >
                       {n}
                     </button>
@@ -130,13 +186,16 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                 <input
                   type={field.type}
                   required={field.required}
-                  value={formData[field.label] || ''}
-                  onChange={e => setFormData({ ...formData, [field.label]: e.target.value })}
-                  className="w-full p-2 border rounded"
+                  value={formData[key] || ''}
+                  onChange={e => setFormData({ ...formData, [key]: e.target.value })}
+                  className={`w-full p-2 border rounded ${fieldError ? 'border-red-500' : ''}`}
                 />
               )}
+
+              {fieldError && <p className="mt-1 text-sm text-red-600">{fieldError}</p>}
             </div>
-          ))}
+            )
+          })}
 
           {/* GDPR Consent */}
           <div className="space-y-3 pt-4 border-t border-gray-200">
@@ -170,6 +229,13 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
               </label>
             </div>
           </div>
+
+          {submitError && (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <p className="text-red-700">{submitError}</p>
+            </div>
+          )}
 
           <button
             type="submit"

@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db'
+import { authorizeProject } from '@/lib/api-auth'
 import { NextResponse } from 'next/server'
 
 // GET - List all tours for a project
@@ -6,6 +7,9 @@ export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  const denied = await authorizeProject(params.id, 'CLIENT')
+  if (denied) return denied
+
   const tours = await prisma.tour.findMany({
     where: { projectId: params.id },
     include: {
@@ -24,6 +28,9 @@ export async function POST(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  const denied = await authorizeProject(params.id, 'ADMIN')
+  if (denied) return denied
+
   const body = await request.json()
 
   const tour = await prisma.tour.create({

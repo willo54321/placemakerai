@@ -1,7 +1,7 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, Users, MapPin, Inbox, Settings, Mail, LayoutDashboard, BarChart3, Navigation, Globe, Eye, AlertTriangle, FileText, Camera } from 'lucide-react'
+import { ArrowLeft, Users, MapPin, Inbox, Settings, Mail, LayoutDashboard, BarChart3, Navigation, Globe, Eye, AlertTriangle, FileText } from 'lucide-react'
 import Link from 'next/link'
 import { useState, Suspense } from 'react'
 import dynamic from 'next/dynamic'
@@ -12,7 +12,6 @@ import { SettingsTab } from './settings'
 import { MailingListTab } from './mailing-list'
 import { AnalyticsTab } from './analytics'
 import { ToursTab } from './tours'
-import { PanoramasTab } from './panoramas'
 import UserMenu from '@/components/UserMenu'
 
 // Dynamic imports for components that use Google Maps to avoid SSR/chunk issues
@@ -64,10 +63,10 @@ const FormsTabWrapper = dynamic(() => import('./forms-wrapper').then(mod => ({ d
   )
 })
 
-type Tab = 'overview' | 'stakeholders' | 'feedback' | 'forms' | 'issues' | 'tours' | 'panoramas' | 'website' | 'analytics' | 'inbox' | 'mailing' | 'settings'
+type Tab = 'overview' | 'stakeholders' | 'feedback' | 'forms' | 'issues' | 'tours' | 'website' | 'analytics' | 'inbox' | 'mailing' | 'settings'
 
 // Tabs that require admin access
-const ADMIN_ONLY_TABS: Tab[] = ['stakeholders', 'tours', 'panoramas', 'website', 'inbox', 'mailing', 'settings', 'issues', 'forms']
+const ADMIN_ONLY_TABS: Tab[] = ['stakeholders', 'tours', 'website', 'inbox', 'mailing', 'settings', 'issues', 'forms']
 
 // Tab groups for organized navigation
 type TabGroup = {
@@ -80,7 +79,7 @@ const tabGroups: TabGroup[] = [
   { id: 'top', label: '', tabs: ['overview'] },
   { id: 'collect', label: 'Collect', tabs: ['feedback', 'forms', 'issues', 'analytics'] },
   { id: 'engage', label: 'Engage', tabs: ['stakeholders', 'inbox', 'mailing'] },
-  { id: 'publish', label: 'Publish', tabs: ['website', 'tours', 'panoramas'] },
+  { id: 'publish', label: 'Publish', tabs: ['website', 'tours'] },
   { id: 'configure', label: 'Configure', tabs: ['settings'] },
 ]
 
@@ -191,13 +190,6 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
       label: 'Tours',
       icon: Navigation,
       count: project.tours?.length || 0,
-      adminOnly: true,
-    },
-    {
-      id: 'panoramas' as Tab,
-      label: 'Panoramas',
-      icon: Camera,
-      count: project.panoramas?.length || 0,
       adminOnly: true,
     },
     {
@@ -387,11 +379,6 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
           {activeTab === 'tours' && (
             <div className="p-6">
               <ToursTab projectId={params.id} project={project} />
-            </div>
-          )}
-          {activeTab === 'panoramas' && (
-            <div className="p-6">
-              <PanoramasTab projectId={params.id} />
             </div>
           )}
           {activeTab === 'website' && (

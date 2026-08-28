@@ -13,6 +13,11 @@ interface GeoJSONGeometry {
   coordinates: number[][] | number[][][]
 }
 
+interface HighlightGeometry {
+  type: 'Polygon'
+  coordinates: number[][][]
+}
+
 interface Overlay {
   id: string
   name: string
@@ -56,6 +61,8 @@ interface EmbedMapProps {
   // Styling options
   hideStreetLabels?: boolean
   primaryColor?: string
+  // Tour spotlight / highlight area (dimmed-outside polygon)
+  highlight?: HighlightGeometry | null
 }
 
 const CATEGORY_CONFIG: Record<string, { color: string; bg: string; icon: any; label: string }> = {
@@ -162,6 +169,20 @@ function createPinIcon(category: string, isHovered: boolean = false, mode: 'feed
   }
 }
 
+// Module-level cache for marker icons keyed by (mode|category|hovered).
+// google.maps.Icon objects are only created once loaded; the cache avoids
+// building a fresh object (and triggering setIcon churn) on every render.
+const pinIconCache = new Map<string, google.maps.Icon>()
+
+function getPinIcon(category: string, isHovered: boolean = false, mode: 'feedback' | 'issues' = 'feedback'): google.maps.Icon {
+  const key = `${mode}|${category}|${isHovered ? 'h' : 'n'}`
+  const cached = pinIconCache.get(key)
+  if (cached) return cached
+  const icon = createPinIcon(category, isHovered, mode)
+  pinIconCache.set(key, icon)
+  return icon
+}
+
 function createPendingPinIcon(): google.maps.Icon {
   const svg = `
     <svg width="48" height="58" viewBox="0 0 48 58" xmlns="http://www.w3.org/2000/svg">
@@ -244,9 +265,10 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
   animateToCenter = false,
   mode = 'feedback',
   hideStreetLabels = false,
-  primaryColor
+  primaryColor,
+  highlight = null
 }, ref) {
-  const { isLoaded } = useJsApiLoader({
+  const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script-embed',
     googleMapsApiKey: GOOGLE_MAPS_API_KEY,
     libraries: LIBRARIES
@@ -256,6 +278,7 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
   const [selectedPin, setSelectedPin] = useState<string | null>(null)
   const [closingPin, setClosingPin] = useState<string | null>(null)
   const [hoveredPin, setHoveredPin] = useState<string | null>(null)
+  const [showFullComment, setShowFullComment] = useState(false)
   const drawingManagerRef = useRef<google.maps.drawing.DrawingManager | null>(null)
 
   // Expose map instance via ref
@@ -272,6 +295,21 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
       }, 200)
     }
   }, [selectedPin])
+
+  // Select a pin: reset the read-more toggle and pan the map so the
+  // popup (which floats above the point) is brought fully into view.
+  const selectPin = useCallback((pinId: string, position: { lat: number; lng: number }) => {
+    setShowFullComment(false)
+    setSelectedPin(pinId)
+    if (map) {
+      map.panTo(position)
+      // The popup renders above the anchor point, so shift the map down a
+      // little afterwards so the popup body isn't clipped by the top edge.
+      window.setTimeout(() => {
+        map.panBy(0, -140)
+      }, 60)
+    }
+  }, [map])
 
   const overlayRefs = useRef<Map<string, RotatableOverlay>>(new Map())
 
@@ -549,6 +587,59 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
     }
   }), [])
 
+  // Separate pins by shape type (memoized so we don't re-filter every render)
+  const pointPins = useMemo(
+    () => pins.filter(p => (!p.shapeType || p.shapeType === 'pin') && p.latitude && p.longitude),
+    [pins]
+  )
+  const linePins = useMemo(
+    () => pins.filter(p => p.shapeType === 'line' && p.geometry),
+    [pins]
+  )
+  const polygonPins = useMemo(
+    () => pins.filter(p => p.shapeType === 'polygon' && p.geometry),
+    [pins]
+  )
+
+  // Pre-compute polygon path conversions (GeoJSON [lng,lat] -> {lat,lng})
+  const polygonPaths = useMemo(() => {
+    const paths = new globalThis.Map<string, { lat: number; lng: number }[]>()
+    polygonPins.forEach(pin => {
+      const geometry = pin.geometry as GeoJSONGeometry
+      paths.set(pin.id, (geometry.coordinates[0] as number[][]).map(coord => ({
+        lat: coord[1],
+        lng: coord[0]
+      })))
+    })
+    return paths
+  }, [polygonPins])
+
+  const linePaths = useMemo(() => {
+    const paths = new globalThis.Map<string, { lat: number; lng: number }[]>()
+    linePins.forEach(pin => {
+      const geometry = pin.geometry as GeoJSONGeometry
+      paths.set(pin.id, (geometry.coordinates as number[][]).map(coord => ({
+        lat: coord[1],
+        lng: coord[0]
+      })))
+    })
+    return paths
+  }, [linePins])
+
+  if (loadError) {
+    return (
+      <div className="h-full w-full flex items-center justify-center bg-gray-100 p-6">
+        <div className="text-center max-w-sm">
+          <div className="w-14 h-14 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertTriangle size={28} className="text-red-500" />
+          </div>
+          <p className="text-gray-700 font-medium mb-1">The map could not be loaded</p>
+          <p className="text-gray-500 text-sm">Please refresh the page. If the problem persists, try again later.</p>
+        </div>
+      </div>
+    )
+  }
+
   if (!isLoaded) {
     return (
       <div className="h-full w-full flex items-center justify-center bg-gray-100">
@@ -556,11 +647,6 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
       </div>
     )
   }
-
-  // Separate pins by shape type
-  const pointPins = pins.filter(p => (!p.shapeType || p.shapeType === 'pin') && p.latitude && p.longitude)
-  const linePins = pins.filter(p => p.shapeType === 'line' && p.geometry)
-  const polygonPins = pins.filter(p => p.shapeType === 'polygon' && p.geometry)
 
   return (
     <>
@@ -618,13 +704,38 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
           onPolygonComplete={handlePolygonComplete}
         />
 
+        {/* Tour Spotlight - dark overlay with a hole over the highlighted area */}
+        {highlight && highlight.coordinates && highlight.coordinates[0] && (
+          <PolygonF
+            paths={[
+              // Outer bounds covering the world (clockwise)
+              [
+                { lat: -85, lng: -180 },
+                { lat: 85, lng: -180 },
+                { lat: 85, lng: 180 },
+                { lat: -85, lng: 180 },
+              ],
+              // Inner hole - the spotlight area (counter-clockwise for hole)
+              highlight.coordinates[0].map(coord => ({
+                lat: coord[1],
+                lng: coord[0]
+              })).reverse()
+            ]}
+            options={{
+              fillColor: '#000000',
+              fillOpacity: 0.5,
+              strokeColor: '#F59E0B',
+              strokeWeight: 3,
+              strokeOpacity: 1,
+              clickable: false,
+              zIndex: 5
+            }}
+          />
+        )}
+
         {/* Existing Polygon Pins */}
         {polygonPins.map(pin => {
-          const geometry = pin.geometry as GeoJSONGeometry
-          const coords = (geometry.coordinates[0] as number[][]).map(coord => ({
-            lat: coord[1],
-            lng: coord[0]
-          }))
+          const coords = polygonPaths.get(pin.id) || []
           const isSelected = selectedPin === pin.id
           return (
             <PolygonF
@@ -639,7 +750,7 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
                 clickable: true,
                 zIndex: isSelected ? 10 : 1
               }}
-              onClick={() => setSelectedPin(pin.id)}
+              onClick={() => selectPin(pin.id, getShapeCentroid(pin.geometry as GeoJSONGeometry))}
               onMouseOver={() => setHoveredPin(pin.id)}
               onMouseOut={() => setHoveredPin(null)}
             />
@@ -648,11 +759,7 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
 
         {/* Existing Line Pins */}
         {linePins.map(pin => {
-          const geometry = pin.geometry as GeoJSONGeometry
-          const coords = (geometry.coordinates as number[][]).map(coord => ({
-            lat: coord[1],
-            lng: coord[0]
-          }))
+          const coords = linePaths.get(pin.id) || []
           const isSelected = selectedPin === pin.id
           return (
             <PolylineF
@@ -665,7 +772,7 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
                 clickable: true,
                 zIndex: isSelected ? 10 : 1
               }}
-              onClick={() => setSelectedPin(pin.id)}
+              onClick={() => selectPin(pin.id, getShapeCentroid(pin.geometry as GeoJSONGeometry))}
               onMouseOver={() => setHoveredPin(pin.id)}
               onMouseOut={() => setHoveredPin(null)}
             />
@@ -694,12 +801,13 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
           <MarkerF
             key={pin.id}
             position={{ lat: pin.latitude!, lng: pin.longitude! }}
-            icon={createPinIcon(pin.category, hoveredPin === pin.id, mode)}
+            icon={getPinIcon(pin.category, hoveredPin === pin.id, mode)}
+            title={pin.comment ? pin.comment.split(/(?<=[.!?])\s+/)[0] : undefined}
             onClick={() => {
               if (selectedPin === pin.id) {
                 closePopup()
               } else {
-                setSelectedPin(pin.id)
+                selectPin(pin.id, { lat: pin.latitude!, lng: pin.longitude! })
               }
             }}
             onMouseOver={() => setHoveredPin(pin.id)}
@@ -742,7 +850,8 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
           const sentences = pin.comment.split(/(?<=[.!?])\s+/)
           const title = sentences[0] || pin.comment
           const description = sentences.length > 1 ? sentences.slice(1).join(' ') : ''
-          const truncatedDesc = description.length > 120 ? description.slice(0, 120) + '...' : description
+          const isLongDesc = description.length > 120
+          const truncatedDesc = isLongDesc ? description.slice(0, 120).trimEnd() + '…' : description
 
           return (
             <OverlayView
@@ -751,10 +860,11 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
             >
               <div
                 className={`bg-white rounded-xl shadow-2xl p-4 relative ${closingPin === pin.id ? 'animate-popup-out' : 'animate-popup'}`}
-                style={{ width: '320px', fontFamily: "'DM Sans', sans-serif" }}
+                style={{ width: '320px', maxWidth: 'calc(100vw - 32px)', fontFamily: "'DM Sans', sans-serif" }}
               >
                 <button
                   onClick={closePopup}
+                  aria-label="Close popup"
                   className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-full transition-colors z-10"
                 >
                   <X size={16} className="text-gray-500" />
@@ -779,10 +889,23 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
                   </div>
                 </div>
 
-                {truncatedDesc && (
-                  <p className="text-sm text-gray-500 leading-relaxed mb-3">
-                    {truncatedDesc}
-                  </p>
+                {description && (
+                  <div className="mb-3">
+                    <p className="text-sm text-gray-500 leading-relaxed max-h-40 overflow-y-auto">
+                      {showFullComment || !isLongDesc ? description : truncatedDesc}
+                    </p>
+                    {isLongDesc && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setShowFullComment(v => !v)
+                        }}
+                        className="mt-1 text-xs font-medium text-brand-600 hover:underline"
+                      >
+                        {showFullComment ? 'Show less' : 'Read more'}
+                      </button>
+                    )}
+                  </div>
                 )}
 
                 {votedPins.has(pin.id) ? (

@@ -6,9 +6,12 @@ import { getToken } from 'next-auth/jwt'
 const publicRoutes = [
   '/login',
   '/verify',
+  '/forgot-password',
+  '/set-password',
+  '/unsubscribe',
   '/api/auth',
+  '/api/unsubscribe',
   '/api/webhooks',
-  '/api/test-data',
   '/embed',
   '/api/embed',
 ]

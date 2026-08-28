@@ -84,6 +84,11 @@ interface InteractiveMapProps {
   onOverlayClick?: (overlayId: string) => void
   onOverlayBoundsChange?: (overlayId: string, bounds: [[number, number], [number, number]]) => void
   onOverlayRotationChange?: (overlayId: string, rotation: number) => void
+  // Imperative API exposed via a normal prop, because next/dynamic does NOT
+  // forward refs in Next 14 (so the `ref`/useImperativeHandle path silently
+  // fails when this component is loaded via dynamic()). Consumers that go
+  // through next/dynamic should use `apiRef` instead of `ref`.
+  apiRef?: React.MutableRefObject<InteractiveMapRef | null>
 }
 
 function createMarkerIcon(color: string, isHovered: boolean = false): google.maps.Icon {
@@ -198,6 +203,47 @@ function createIconMarkerIcon(color: string, iconType: string, isHovered: boolea
   }
 }
 
+// Cache marker icons so we don't allocate a brand-new google.maps.Icon object
+// (which triggers marker.setIcon churn) on every render / every hover. Keyed by
+// the parameters that actually affect the produced icon.
+const markerIconCache = new globalThis.Map<string, google.maps.Icon>()
+
+function getMarkerIcon(
+  color: string,
+  label: string,
+  type: string | undefined,
+  isHovered: boolean
+): google.maps.Icon {
+  let kind: 'icon' | 'number' | 'plain'
+  if (type && type !== 'number' && MARKER_ICON_PATHS[type]) {
+    kind = 'icon'
+  } else if (label && /^\d+$/.test(label)) {
+    kind = 'number'
+  } else {
+    kind = 'plain'
+  }
+
+  // Only the values that vary the SVG output participate in the cache key.
+  const keyLabel = kind === 'number' ? label : ''
+  const keyType = kind === 'icon' ? type : ''
+  const cacheKey = `${kind}|${color}|${keyType}|${keyLabel}|${isHovered ? 1 : 0}`
+
+  const cached = markerIconCache.get(cacheKey)
+  if (cached) return cached
+
+  let icon: google.maps.Icon
+  if (kind === 'icon') {
+    icon = createIconMarkerIcon(color, type as string, isHovered)
+  } else if (kind === 'number') {
+    icon = createNumberedMarkerIcon(color, label, isHovered)
+  } else {
+    icon = createMarkerIcon(color, isHovered)
+  }
+
+  markerIconCache.set(cacheKey, icon)
+  return icon
+}
+
 function createResizeHandleIcon(): google.maps.Symbol {
   return {
     path: google.maps.SymbolPath.CIRCLE,
@@ -240,7 +286,8 @@ const InteractiveMap = forwardRef<InteractiveMapRef, InteractiveMapProps>(({
   onBoundsChange,
   onOverlayClick,
   onOverlayBoundsChange,
-  onOverlayRotationChange
+  onOverlayRotationChange,
+  apiRef
 }, ref) => {
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script-embed',
@@ -259,10 +306,14 @@ const InteractiveMap = forwardRef<InteractiveMapRef, InteractiveMapProps>(({
   const [rotationStartAngle, setRotationStartAngle] = useState<number>(0)
   const overlayRefs = useRef(new globalThis.Map<string, RotatableOverlay>())
   const drawingManagerRef = useRef<google.maps.drawing.DrawingManager | null>(null)
+  const zoomRafRef = useRef<number | null>(null)
 
   const mapCenter = useMemo(() => ({ lat: center[0], lng: center[1] }), [center[0], center[1]])
 
-  useImperativeHandle(ref, () => ({
+  // Build the imperative API once per `map` change so it can be shared between
+  // the forwarded ref (backward compat) and the `apiRef` prop (used through
+  // next/dynamic, which doesn't forward refs in Next 14).
+  const imperativeApi = useMemo<InteractiveMapRef>(() => ({
     fitToOverlay: (bounds: [[number, number], [number, number]]) => {
       if (map) {
         const googleBounds = new google.maps.LatLngBounds(
@@ -273,6 +324,17 @@ const InteractiveMap = forwardRef<InteractiveMapRef, InteractiveMapProps>(({
       }
     }
   }), [map])
+
+  useImperativeHandle(ref, () => imperativeApi, [imperativeApi])
+
+  // Populate the apiRef prop (next/dynamic-safe alternative to `ref`).
+  useEffect(() => {
+    if (!apiRef) return
+    apiRef.current = imperativeApi
+    return () => {
+      apiRef.current = null
+    }
+  }, [apiRef, imperativeApi])
 
   const onLoad = useCallback((map: google.maps.Map) => {
     map.setCenter({ lat: center[0], lng: center[1] })
@@ -313,68 +375,130 @@ const InteractiveMap = forwardRef<InteractiveMapRef, InteractiveMapProps>(({
 
   // Sync zoom when prop changes (for tour wizard zoom slider) with smooth easing
   useEffect(() => {
-    if (map) {
-      const currentZoom = map.getZoom()
-      if (currentZoom !== undefined && currentZoom !== zoom) {
-        // Smooth zoom animation
-        const diff = zoom - currentZoom
-        const steps = Math.abs(diff) * 4 // More steps for smoother animation
-        const stepSize = diff / steps
-        let step = 0
+    if (!map) return
 
-        const easeInOutQuad = (t: number) => {
-          return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t
-        }
+    // Cancel any in-flight animation before starting a new one so we never run
+    // two rAF loops concurrently (which fought over map.setZoom and leaked
+    // frames when the effect re-ran mid-animation).
+    if (zoomRafRef.current !== null) {
+      cancelAnimationFrame(zoomRafRef.current)
+      zoomRafRef.current = null
+    }
 
-        const animate = () => {
-          step++
-          const progress = easeInOutQuad(step / steps)
-          const newZoom = currentZoom + (diff * progress)
-          map.setZoom(newZoom)
+    const currentZoom = map.getZoom()
+    if (currentZoom === undefined || currentZoom === zoom) return
 
-          if (step < steps) {
-            requestAnimationFrame(animate)
-          }
-        }
+    const diff = zoom - currentZoom
+    const steps = Math.abs(diff) * 4 // More steps for smoother animation
+    let step = 0
 
-        if (steps > 0) {
-          requestAnimationFrame(animate)
-        }
+    const easeInOutQuad = (t: number) => {
+      return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t
+    }
+
+    const animate = () => {
+      step++
+      const progress = easeInOutQuad(step / steps)
+      const newZoom = currentZoom + (diff * progress)
+      map.setZoom(newZoom)
+
+      if (step < steps) {
+        zoomRafRef.current = requestAnimationFrame(animate)
+      } else {
+        zoomRafRef.current = null
+      }
+    }
+
+    if (steps > 0) {
+      zoomRafRef.current = requestAnimationFrame(animate)
+    }
+
+    return () => {
+      if (zoomRafRef.current !== null) {
+        cancelAnimationFrame(zoomRafRef.current)
+        zoomRafRef.current = null
       }
     }
   }, [map, zoom])
 
+  // Keep the latest onOverlayClick in a ref so we can diff overlays without the
+  // effect re-running (and tearing down every overlay) whenever the handler
+  // identity changes.
+  const onOverlayClickRef = useRef(onOverlayClick)
+  useEffect(() => {
+    onOverlayClickRef.current = onOverlayClick
+  }, [onOverlayClick])
+
+  // Diff overlays by id: create new ones, remove deleted ones, and update
+  // existing instances in place via setBounds/setRotation/setOpacity so we
+  // don't tear down and recreate every RotatableOverlay on each change
+  // (which caused image flicker/thrash on drag, opacity/rotation edits, etc.).
   useEffect(() => {
     if (!map) return
 
-    overlayRefs.current.forEach((overlay) => {
-      overlay.setMap(null)
-    })
-    overlayRefs.current.clear()
+    // Only visible overlays should have a live instance on the map.
+    const visibleOverlays = overlays.filter(o => o.visible)
+    const visibleIds = new Set(visibleOverlays.map(o => o.id))
 
-    overlays.filter(o => o.visible).forEach(overlay => {
-      const rotatableOverlay = new RotatableOverlay({
-        imageUrl: overlay.imageUrl,
-        bounds: overlay.bounds,
-        rotation: overlay.rotation || 0,
-        opacity: overlay.opacity,
-        clickable: true,
-        onClick: () => {
-          onOverlayClick?.(overlay.id)
+    // Remove instances that are gone or no longer visible.
+    overlayRefs.current.forEach((instance, id) => {
+      if (!visibleIds.has(id)) {
+        instance.setMap(null)
+        overlayRefs.current.delete(id)
+      }
+    })
+
+    // Create new instances, or update existing ones in place.
+    visibleOverlays.forEach(overlay => {
+      const existing = overlayRefs.current.get(overlay.id)
+
+      if (existing) {
+        const nextRotation = overlay.rotation || 0
+        const prevBounds = existing.getBounds()
+        const boundsChanged =
+          prevBounds[0][0] !== overlay.bounds[0][0] ||
+          prevBounds[0][1] !== overlay.bounds[0][1] ||
+          prevBounds[1][0] !== overlay.bounds[1][0] ||
+          prevBounds[1][1] !== overlay.bounds[1][1]
+
+        if (existing.getOpacity() !== overlay.opacity) {
+          existing.setOpacity(overlay.opacity)
         }
-      })
+        if (existing.getRotation() !== nextRotation) {
+          existing.setRotation(nextRotation)
+        }
+        if (boundsChanged) {
+          existing.setBounds(overlay.bounds)
+        }
+      } else {
+        const rotatableOverlay = new RotatableOverlay({
+          imageUrl: overlay.imageUrl,
+          bounds: overlay.bounds,
+          rotation: overlay.rotation || 0,
+          opacity: overlay.opacity,
+          clickable: true,
+          onClick: () => {
+            onOverlayClickRef.current?.(overlay.id)
+          }
+        })
 
-      rotatableOverlay.setMap(map)
-      overlayRefs.current.set(overlay.id, rotatableOverlay)
+        rotatableOverlay.setMap(map)
+        overlayRefs.current.set(overlay.id, rotatableOverlay)
+      }
     })
+  }, [map, overlays])
 
+  // Only remove all overlays on unmount / map change.
+  useEffect(() => {
+    if (!map) return
+    const refs = overlayRefs.current
     return () => {
-      overlayRefs.current.forEach((overlay) => {
-        overlay.setMap(null)
+      refs.forEach((instance) => {
+        instance.setMap(null)
       })
-      overlayRefs.current.clear()
+      refs.clear()
     }
-  }, [map, overlays, onOverlayClick])
+  }, [map])
 
   const handlePolygonComplete = useCallback((polygon: google.maps.Polygon) => {
     if (!onDrawingCreated) return
@@ -522,6 +646,140 @@ const InteractiveMap = forwardRef<InteractiveMapRef, InteractiveMapProps>(({
     setRotationStartAngle(0)
   }, [])
 
+  // Memoize the GoogleMap options object so we don't hand a fresh literal to
+  // <GoogleMap> on every render (which caused constant map.setOptions churn).
+  // Gated on isLoaded because it references google.maps.* enums.
+  const mapOptions = useMemo<google.maps.MapOptions | undefined>(() => {
+    if (!isLoaded) return undefined
+    return {
+      mapTypeId: 'hybrid',
+      mapTypeControl: true,
+      mapTypeControlOptions: {
+        style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
+        position: google.maps.ControlPosition.TOP_RIGHT,
+      },
+      streetViewControl: false,
+      fullscreenControl: true,
+      fullscreenControlOptions: {
+        position: google.maps.ControlPosition.TOP_LEFT,
+      },
+      clickableIcons: false,
+      zoomControl: true,
+      zoomControlOptions: {
+        position: google.maps.ControlPosition.RIGHT_CENTER,
+      },
+      scaleControl: true,
+      rotateControl: false,
+      panControl: false,
+      tilt: 0,
+      gestureHandling: 'greedy',
+      maxZoom: 17,
+      minZoom: 10,
+    }
+  }, [isLoaded])
+
+  // Memoize the geoLayer feature -> Google LatLng path conversion + elements.
+  // Boundary layers can carry thousands of vertices; recomputing these paths on
+  // every render (previously done inline in JSX) is expensive. Gated on isLoaded
+  // because Point features build a google.maps icon.
+  const geoLayerElements = useMemo(() => {
+    if (!isLoaded) return null
+    return geoLayers.filter(layer => layer.visible).map(layer => {
+      const features = layer.geojson?.features || []
+      const fillColor = layer.style?.fillColor || '#3B82F6'
+      const fillOpacity = layer.style?.fillOpacity || 0.3
+      const strokeColor = layer.style?.strokeColor || '#1E40AF'
+      const strokeWeight = layer.style?.strokeWidth || 2
+      return features.map((feature, featureIndex) => {
+        const geometry = feature.geometry
+        if (!geometry) return null
+
+        if (geometry.type === 'Polygon') {
+          const paths = geometry.coordinates[0].map((coord: number[]) => ({
+            lat: coord[1], lng: coord[0]
+          }))
+          return (
+            <PolygonF
+              key={`${layer.id}-${featureIndex}`}
+              paths={paths}
+              options={{
+                fillColor,
+                fillOpacity,
+                strokeColor,
+                strokeWeight,
+                strokeOpacity: 0.8,
+                clickable: false
+              }}
+            />
+          )
+        } else if (geometry.type === 'MultiPolygon') {
+          return geometry.coordinates.map((polygonCoords: number[][][], polyIndex: number) => {
+            const paths = polygonCoords[0].map((coord: number[]) => ({
+              lat: coord[1], lng: coord[0]
+            }))
+            return (
+              <PolygonF
+                key={`${layer.id}-${featureIndex}-${polyIndex}`}
+                paths={paths}
+                options={{
+                  fillColor,
+                  fillOpacity,
+                  strokeColor,
+                  strokeWeight,
+                  strokeOpacity: 0.8,
+                  clickable: false
+                }}
+              />
+            )
+          })
+        } else if (geometry.type === 'LineString') {
+          const path = geometry.coordinates.map((coord: number[]) => ({
+            lat: coord[1], lng: coord[0]
+          }))
+          return (
+            <PolylineF
+              key={`${layer.id}-${featureIndex}`}
+              path={path}
+              options={{
+                strokeColor,
+                strokeWeight,
+                strokeOpacity: 0.8,
+                clickable: false
+              }}
+            />
+          )
+        } else if (geometry.type === 'MultiLineString') {
+          return geometry.coordinates.map((lineCoords: number[][], lineIndex: number) => {
+            const path = lineCoords.map((coord: number[]) => ({
+              lat: coord[1], lng: coord[0]
+            }))
+            return (
+              <PolylineF
+                key={`${layer.id}-${featureIndex}-${lineIndex}`}
+                path={path}
+                options={{
+                  strokeColor,
+                  strokeWeight,
+                  strokeOpacity: 0.8,
+                  clickable: false
+                }}
+              />
+            )
+          })
+        } else if (geometry.type === 'Point') {
+          return (
+            <MarkerF
+              key={`${layer.id}-${featureIndex}`}
+              position={{ lat: geometry.coordinates[1], lng: geometry.coordinates[0] }}
+              icon={getMarkerIcon(fillColor, '', undefined, false)}
+            />
+          )
+        }
+        return null
+      })
+    })
+  }, [isLoaded, geoLayers])
+
   if (!isLoaded) {
     return (
       <div className="h-full w-full flex items-center justify-center bg-slate-50 rounded-xl">
@@ -558,31 +816,7 @@ const InteractiveMap = forwardRef<InteractiveMapRef, InteractiveMapProps>(({
         }}
         center={mapCenter}
         zoom={zoom}
-        options={{
-          mapTypeId: 'hybrid',
-          mapTypeControl: true,
-          mapTypeControlOptions: {
-            style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
-            position: google.maps.ControlPosition.TOP_RIGHT,
-          },
-          streetViewControl: false,
-          fullscreenControl: true,
-          fullscreenControlOptions: {
-            position: google.maps.ControlPosition.TOP_LEFT,
-          },
-          clickableIcons: false,
-          zoomControl: true,
-          zoomControlOptions: {
-            position: google.maps.ControlPosition.RIGHT_CENTER,
-          },
-          scaleControl: true,
-          rotateControl: false,
-          panControl: false,
-          tilt: 0,
-          gestureHandling: 'greedy',
-          maxZoom: 17,
-          minZoom: 10,
-        }}
+        options={mapOptions}
         onClick={handleMapClick}
         onLoad={onLoad}
         onUnmount={onUnmount}
@@ -601,96 +835,7 @@ const InteractiveMap = forwardRef<InteractiveMapRef, InteractiveMapProps>(({
           onPolylineComplete={handlePolylineComplete}
         />
 
-        {geoLayers.filter(layer => layer.visible).map(layer => {
-          const features = layer.geojson?.features || []
-          return features.map((feature, featureIndex) => {
-            const geometry = feature.geometry
-            if (!geometry) return null
-
-            if (geometry.type === 'Polygon') {
-              const paths = geometry.coordinates[0].map((coord: number[]) => ({
-                lat: coord[1], lng: coord[0]
-              }))
-              return (
-                <PolygonF
-                  key={`${layer.id}-${featureIndex}`}
-                  paths={paths}
-                  options={{
-                    fillColor: layer.style?.fillColor || '#3B82F6',
-                    fillOpacity: layer.style?.fillOpacity || 0.3,
-                    strokeColor: layer.style?.strokeColor || '#1E40AF',
-                    strokeWeight: layer.style?.strokeWidth || 2,
-                    strokeOpacity: 0.8,
-                    clickable: false
-                  }}
-                />
-              )
-            } else if (geometry.type === 'MultiPolygon') {
-              return geometry.coordinates.map((polygonCoords: number[][][], polyIndex: number) => {
-                const paths = polygonCoords[0].map((coord: number[]) => ({
-                  lat: coord[1], lng: coord[0]
-                }))
-                return (
-                  <PolygonF
-                    key={`${layer.id}-${featureIndex}-${polyIndex}`}
-                    paths={paths}
-                    options={{
-                      fillColor: layer.style?.fillColor || '#3B82F6',
-                      fillOpacity: layer.style?.fillOpacity || 0.3,
-                      strokeColor: layer.style?.strokeColor || '#1E40AF',
-                      strokeWeight: layer.style?.strokeWidth || 2,
-                      strokeOpacity: 0.8,
-                      clickable: false
-                    }}
-                  />
-                )
-              })
-            } else if (geometry.type === 'LineString') {
-              const path = geometry.coordinates.map((coord: number[]) => ({
-                lat: coord[1], lng: coord[0]
-              }))
-              return (
-                <PolylineF
-                  key={`${layer.id}-${featureIndex}`}
-                  path={path}
-                  options={{
-                    strokeColor: layer.style?.strokeColor || '#1E40AF',
-                    strokeWeight: layer.style?.strokeWidth || 2,
-                    strokeOpacity: 0.8,
-                    clickable: false
-                  }}
-                />
-              )
-            } else if (geometry.type === 'MultiLineString') {
-              return geometry.coordinates.map((lineCoords: number[][], lineIndex: number) => {
-                const path = lineCoords.map((coord: number[]) => ({
-                  lat: coord[1], lng: coord[0]
-                }))
-                return (
-                  <PolylineF
-                    key={`${layer.id}-${featureIndex}-${lineIndex}`}
-                    path={path}
-                    options={{
-                      strokeColor: layer.style?.strokeColor || '#1E40AF',
-                      strokeWeight: layer.style?.strokeWidth || 2,
-                      strokeOpacity: 0.8,
-                      clickable: false
-                    }}
-                  />
-                )
-              })
-            } else if (geometry.type === 'Point') {
-              return (
-                <MarkerF
-                  key={`${layer.id}-${featureIndex}`}
-                  position={{ lat: geometry.coordinates[1], lng: geometry.coordinates[0] }}
-                  icon={createMarkerIcon(layer.style?.fillColor || '#3B82F6')}
-                />
-              )
-            }
-            return null
-          })
-        })}
+        {geoLayerElements}
 
         {drawings.map(drawing => {
           if (drawing.type === 'polygon' && drawing.geometry.type === 'Polygon') {
@@ -762,13 +907,7 @@ const InteractiveMap = forwardRef<InteractiveMapRef, InteractiveMapProps>(({
           <MarkerF
             key={marker.id}
             position={{ lat: marker.latitude!, lng: marker.longitude! }}
-            icon={
-              marker.type && marker.type !== 'number' && MARKER_ICON_PATHS[marker.type]
-                ? createIconMarkerIcon(marker.color, marker.type, hoveredMarker === marker.id)
-                : marker.label && /^\d+$/.test(marker.label)
-                  ? createNumberedMarkerIcon(marker.color, marker.label, hoveredMarker === marker.id)
-                  : createMarkerIcon(marker.color, hoveredMarker === marker.id)
-            }
+            icon={getMarkerIcon(marker.color, marker.label, marker.type, hoveredMarker === marker.id)}
             onClick={() => onMarkerClick ? onMarkerClick(marker.id) : setSelectedMarker(marker.id)}
             onMouseOver={() => setHoveredMarker(marker.id)}
             onMouseOut={() => setHoveredMarker(null)}

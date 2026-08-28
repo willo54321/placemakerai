@@ -1,10 +1,14 @@
 import { prisma } from '@/lib/db'
+import { authorizeProject } from '@/lib/api-auth'
 import { NextResponse } from 'next/server'
 
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  const denied = await authorizeProject(params.id, 'CLIENT')
+  if (denied) return denied
+
   const { searchParams } = new URL(request.url)
   const status = searchParams.get('status')
   const assignedToId = searchParams.get('assignedToId')
@@ -28,6 +32,9 @@ export async function POST(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  const denied = await authorizeProject(params.id, 'ADMIN')
+  if (denied) return denied
+
   const body = await request.json()
   const enquiry = await prisma.enquiry.create({
     data: {

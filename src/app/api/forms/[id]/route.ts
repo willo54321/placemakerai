@@ -9,7 +9,7 @@ export async function GET(
     where: { id: params.id },
   })
   if (!form) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    return NextResponse.json({ error: 'Form not found' }, { status: 404 })
   }
   return NextResponse.json(form)
 }

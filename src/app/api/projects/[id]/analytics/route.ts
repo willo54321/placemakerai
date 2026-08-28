@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
+import { authorizeProject } from '@/lib/api-auth'
 import {
   runFullAnalysis,
   createFeedbackHash,
@@ -12,6 +13,9 @@ export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  const denied = await authorizeProject(params.id, 'CLIENT')
+  if (denied) return denied
+
   const projectId = params.id
 
   // Always collect feedback to get the count
@@ -49,9 +53,28 @@ export async function POST(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  const denied = await authorizeProject(params.id, 'ADMIN')
+  if (denied) return denied
+
   const projectId = params.id
 
   try {
+    // Determine whether the caller wants to force a re-run, bypassing the cache.
+    // Supported via `?force=1` query param or `{ force: true }` request body.
+    const url = new URL(request.url)
+    const forceParam = url.searchParams.get('force')
+    let force = forceParam === '1' || forceParam === 'true'
+    if (!force) {
+      try {
+        const body = await request.json()
+        if (body && typeof body === 'object' && body.force === true) {
+          force = true
+        }
+      } catch {
+        // No/invalid JSON body — treat as no force override.
+      }
+    }
+
     // Collect all feedback
     const feedbackItems = await collectFeedback(projectId)
 
@@ -62,9 +85,31 @@ export async function POST(
       })
     }
 
-    // Run full analysis
-    const analysis = await runFullAnalysis(feedbackItems)
     const feedbackHash = createFeedbackHash(feedbackItems)
+
+    // Check for an existing cached analysis. If the feedback is unchanged and
+    // the caller hasn't forced a re-run, return the cache instead of paying for
+    // a fresh (expensive) set of OpenAI calls.
+    const cached = await prisma.analysisResult.findUnique({
+      where: {
+        projectId_type: {
+          projectId,
+          type: 'full',
+        },
+      },
+    })
+
+    if (!force && cached && cached.feedbackHash === feedbackHash) {
+      return NextResponse.json({
+        analysis: cached.data as unknown as FullAnalysisResult,
+        feedbackCount: feedbackItems.length,
+        cached: true,
+        lastAnalyzed: cached.updatedAt,
+      })
+    }
+
+    // Run full analysis (hash changed or force requested)
+    const analysis = await runFullAnalysis(feedbackItems)
 
     // Store result
     await prisma.analysisResult.upsert({

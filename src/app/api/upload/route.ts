@@ -1,12 +1,18 @@
 import { NextResponse } from 'next/server'
+import { getAuth } from '@/lib/auth'
 
-// Use Edge runtime for smaller uploads (overlays, etc)
-export const runtime = 'edge'
+// Use Node.js runtime because getServerSession (via getAuth) is not supported on edge
+export const runtime = 'nodejs'
 
 // POST - upload image to Vercel Blob storage (or fallback to base64 for small files)
-// Note: Large panorama uploads use client-side upload via /api/upload/token
 export async function POST(request: Request) {
   try {
+    // Require authentication
+    const session = await getAuth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const formData = await request.formData()
     const file = formData.get('file') as File
 
@@ -61,7 +67,7 @@ export async function POST(request: Request) {
     // For files > 4MB, return error - use client-side upload instead
     if (file.size > 4 * 1024 * 1024) {
       return NextResponse.json(
-        { error: 'File too large for server upload. Use client-side upload for panoramas.' },
+        { error: 'File too large for server upload. Maximum size is 4MB.' },
         { status: 400 }
       )
     }

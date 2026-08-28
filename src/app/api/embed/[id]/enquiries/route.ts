@@ -1,7 +1,8 @@
 import { prisma } from '@/lib/db'
-import { sendNewEnquiryNotification } from '@/lib/email'
+import { sendNewEnquiryNotification, sendAutoReplyEmail } from '@/lib/email'
 import { NextResponse } from 'next/server'
 import { headers } from 'next/headers'
+import { rateLimitResponse } from '@/lib/rate-limit'
 
 // CORS headers for cross-origin form submissions
 const corsHeaders = {
@@ -19,6 +20,9 @@ export async function POST(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  const limited = rateLimitResponse(request, 'embed-enquiry', 5, 60_000)
+  if (limited) return limited
+
   // Verify project exists and has embed enabled, also get team members
   const project = await prisma.project.findUnique({
     where: { id: params.id },
@@ -28,6 +32,9 @@ export async function POST(
       name: true,
       emailFromName: true,
       emailFromAddress: true,
+      autoReplyEnabled: true,
+      autoReplySubject: true,
+      autoReplyMessage: true,
       teamMembers: {
         select: { email: true },
       },
@@ -143,6 +150,20 @@ export async function POST(
       message: body.message,
       category: body.category || 'general',
       enquiryUrl,
+      projectEmailFromName: project.emailFromName,
+      projectEmailFromAddress: project.emailFromAddress,
+    })
+  }
+
+  // Send the configured auto-reply acknowledgement to the submitter
+  if (project.autoReplyEnabled && project.autoReplySubject && project.autoReplyMessage) {
+    await sendAutoReplyEmail({
+      to: body.submitterEmail,
+      submitterName: body.submitterName,
+      originalSubject: body.subject,
+      autoReplySubject: project.autoReplySubject,
+      autoReplyMessage: project.autoReplyMessage,
+      projectName: project.name,
       projectEmailFromName: project.emailFromName,
       projectEmailFromAddress: project.emailFromAddress,
     })

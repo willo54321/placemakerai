@@ -36,11 +36,14 @@ export function FormsTab({
   forms,
   focusResponse,
   onFocusHandled,
+  guideModalOpen,
 }: {
   projectId: string
   forms: FeedbackForm[]
   focusResponse?: { formId: string; responseId: string } | null
   onFocusHandled?: () => void
+  /** Driven by guide walkthroughs: open/close the Create Form modal */
+  guideModalOpen?: boolean | null
 }) {
   const queryClient = useQueryClient()
   const { canManageForms } = usePermissions()
@@ -60,6 +63,11 @@ export function FormsTab({
     queryFn: () => fetch(`/api/projects/${projectId}/forms/${viewingResponses}`).then(r => r.json()),
     enabled: !!viewingResponses,
   })
+
+  useEffect(() => {
+    if (guideModalOpen === true) setShowForm(true)
+    if (guideModalOpen === false) setShowForm(false)
+  }, [guideModalOpen])
 
   // Deep link from the activity feed: open the right form's responses with
   // the target response expanded, then scroll to it once loaded.
@@ -296,6 +304,7 @@ export function FormsTab({
                 <button
                   type="button"
                   onClick={addField}
+                  data-tour="add-field"
                   className="w-full p-3 border-2 border-dashed border-slate-300 rounded-lg text-slate-600 hover:border-slate-400 hover:bg-slate-50 transition-colors mb-6"
                 >
                   <Plus size={18} className="inline mr-2" aria-hidden="true" />
@@ -313,6 +322,7 @@ export function FormsTab({
                   <button
                     type="submit"
                     disabled={!formName || fields.length === 0 || createForm.isPending}
+                    data-tour="save-form"
                     className="btn-primary"
                   >
                     {createForm.isPending ? (
@@ -387,6 +397,7 @@ export function FormsTab({
                 </button>
                 <button
                   onClick={() => copyFormLink(form.id)}
+                  data-tour="form-copy-link"
                   className="btn-ghost text-sm py-1.5"
                   aria-label={`Copy link for ${form.name}`}
                 >

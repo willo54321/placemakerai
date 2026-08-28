@@ -16,11 +16,13 @@ export function FormsTabWrapper({
   project,
   focusResponse,
   onFocusHandled,
+  guideModalOpen,
 }: {
   projectId: string
   project: Project
   focusResponse?: { formId: string; responseId: string } | null
   onFocusHandled?: () => void
+  guideModalOpen?: boolean | null
 }) {
   const [copiedApi, setCopiedApi] = useState(false)
 
@@ -111,6 +113,7 @@ export function FormsTabWrapper({
         forms={project.feedbackForms || []}
         focusResponse={focusResponse}
         onFocusHandled={onFocusHandled}
+        guideModalOpen={guideModalOpen}
       />
     </div>
   )

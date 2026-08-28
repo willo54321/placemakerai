@@ -124,16 +124,23 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
   // Interactive guide walkthrough (started from the How To tab)
   const [guideSteps, setGuideSteps] = useState<GuideStep[] | null>(null)
   const [guideSubTab, setGuideSubTab] = useState<'map' | 'responses' | null>(null)
+  const [guideFormsModal, setGuideFormsModal] = useState<boolean | null>(null)
+
+  const applyGuideStep = (s: GuideStep) => {
+    setActiveTab(s.tab as Tab)
+    setGuideSubTab(s.subTab ?? null)
+    setGuideFormsModal(s.formsModal ?? null)
+  }
 
   const startGuide = (steps: GuideStep[]) => {
     setGuideSteps(steps)
-    setActiveTab(steps[0].tab as Tab)
-    setGuideSubTab(steps[0].subTab ?? null)
+    applyGuideStep(steps[0])
   }
 
   const endGuide = () => {
     setGuideSteps(null)
     setGuideSubTab(null)
+    setGuideFormsModal(false)
     setActiveTab('howto')
   }
   const { data: tourStatus } = useQuery({
@@ -307,10 +314,7 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
           onFinish={endGuide}
           onStepChange={(i) => {
             const s = guideSteps[i]
-            if (s) {
-              setActiveTab(s.tab as Tab)
-              setGuideSubTab(s.subTab ?? null)
-            }
+            if (s) applyGuideStep(s)
           }}
         />
       )}
@@ -466,6 +470,7 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
               project={project}
               focusResponse={focusItem?.kind === 'response' ? focusItem : null}
               onFocusHandled={() => setFocusItem(null)}
+              guideModalOpen={guideFormsModal}
             />
           )}
           {activeTab === 'website' && (

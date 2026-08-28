@@ -219,21 +219,8 @@ async function collectFeedback(projectId: string): Promise<FeedbackItem[]> {
     })
   })
 
-  // Get enquiries
-  const enquiries = await prisma.enquiry.findMany({
-    where: { projectId },
-    orderBy: { createdAt: 'desc' },
-  })
-
-  enquiries.forEach(enquiry => {
-    feedbackItems.push({
-      id: enquiry.id,
-      type: 'enquiry',
-      content: `${enquiry.subject}: ${enquiry.message}`,
-      category: enquiry.category,
-      createdAt: enquiry.createdAt,
-    })
-  })
+  // Enquiries are collected (public embed form) but not yet part of the
+  // analysis — re-add them here when the enquiry channel is enabled.
 
   return feedbackItems
 }

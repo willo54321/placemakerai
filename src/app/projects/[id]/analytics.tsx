@@ -244,7 +244,7 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
         </div>
         <h3 className="text-xl font-semibold text-slate-900 mb-3">No feedback to analyze</h3>
         <p className="text-slate-500 mb-6 leading-relaxed">
-          Once you receive feedback from map pins, forms, or enquiries, AI analytics will be available here.
+          Once you receive feedback from map pins or forms, AI analytics will be available here.
         </p>
       </div>
     )
@@ -305,12 +305,6 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
       positive: analysis.sentiment.bySource.forms.positive,
       negative: analysis.sentiment.bySource.forms.negative,
       neutral: analysis.sentiment.bySource.forms.neutral,
-    },
-    {
-      name: 'Enquiries',
-      positive: analysis.sentiment.bySource.enquiries.positive,
-      negative: analysis.sentiment.bySource.enquiries.negative,
-      neutral: analysis.sentiment.bySource.enquiries.neutral,
     },
   ].filter(d => d.positive + d.negative + d.neutral > 0)
 

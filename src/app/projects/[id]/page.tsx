@@ -1,6 +1,7 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
+import { useSession } from 'next-auth/react'
 import { ArrowLeft, Users, MapPin, Settings, LayoutDashboard, BarChart3, Globe, Eye, FileText } from 'lucide-react'
 import Link from 'next/link'
 import { useState, Suspense } from 'react'
@@ -99,6 +100,7 @@ const tabGroups: TabGroup[] = [
 ]
 
 export default function ProjectPage({ params }: { params: { id: string } }) {
+  const { data: session } = useSession()
   const [activeTab, setActiveTab] = useState<Tab>('overview')
   const [focusItem, setFocusItem] = useState<FocusItem | null>(null)
 
@@ -236,11 +238,12 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
   const tabsMap = new Map(allTabs.map(tab => [tab.id, tab]))
 
   // Tour steps: a welcome card, then one step per tab this user can see
+  const firstName = session?.user?.name?.split(' ')[0]
   const tourSteps: TourStep[] = [
     {
       targetId: null,
-      title: `Welcome to ${project.name}`,
-      body: 'A 30-second tour of where everything lives. You can close it any time, or tick "don’t show again".',
+      title: firstName ? `Welcome to Placemaker, ${firstName}` : 'Welcome to Placemaker',
+      body: `A 30-second tour of your ${project.name} dashboard. You can close it any time, or tick "don’t show again".`,
     },
     ...allTabs
       .filter(tab => isAdmin || !tab.adminOnly)

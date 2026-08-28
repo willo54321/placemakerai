@@ -23,10 +23,12 @@ interface ProductTourProps {
  * "hole" around the current step's target via a box-shadow, and anchors an
  * explainer card beside it.
  */
+type SpotRect = { top: number; left: number; width: number; height: number }
+
 export function ProductTour({ steps, onFinish, onStepChange }: ProductTourProps) {
   const [index, setIndex] = useState(0)
   const [dontShowAgain, setDontShowAgain] = useState(false)
-  const [rect, setRect] = useState<DOMRect | null>(null)
+  const [rect, setRect] = useState<SpotRect | null>(null)
 
   const step = steps[index]
 
@@ -37,11 +39,17 @@ export function ProductTour({ steps, onFinish, onStepChange }: ProductTourProps)
   useLayoutEffect(() => {
     const measure = () => {
       if (!step?.targetId) {
-        setRect(null)
+        // Welcome/untargeted step: a zero-size spotlight at screen centre —
+        // the surrounding box-shadow dims everything, and being a real rect
+        // means the SAME element animates smoothly into the first highlight.
+        setRect({ top: window.innerHeight / 2, left: window.innerWidth / 2, width: 0, height: 0 })
         return
       }
       const el = document.getElementById(step.targetId)
-      setRect(el ? el.getBoundingClientRect() : null)
+      if (el) {
+        const r = el.getBoundingClientRect()
+        setRect({ top: r.top, left: r.left, width: r.width, height: r.height })
+      }
     }
     // Measure after the step's tab has had a frame to render
     const timer = setTimeout(measure, 60)
@@ -57,35 +65,31 @@ export function ProductTour({ steps, onFinish, onStepChange }: ProductTourProps)
   const isLast = index === steps.length - 1
 
   // Card placement: to the right of the target (sidebar lives on the left),
-  // falling back to below it, clamped to the viewport.
+  // falling back to below it, clamped to the viewport. The welcome step is
+  // centred. Always numeric top/left so position changes animate.
   const cardWidth = 340
-  let cardStyle: React.CSSProperties
-  if (rect) {
-    const vw = typeof window !== 'undefined' ? window.innerWidth : 1200
-    const vh = typeof window !== 'undefined' ? window.innerHeight : 800
-    let left = rect.right + 16
-    let top = Math.min(Math.max(rect.top - 8, 16), vh - 280)
-    if (left + cardWidth + 16 > vw) {
-      left = Math.min(Math.max(rect.left, 16), vw - cardWidth - 16)
-      top = Math.min(rect.bottom + 12, vh - 280)
-    }
-    cardStyle = { position: 'fixed', top, left, width: cardWidth }
+  const vw = typeof window !== 'undefined' ? window.innerWidth : 1200
+  const vh = typeof window !== 'undefined' ? window.innerHeight : 800
+  let cardTop: number
+  let cardLeft: number
+  if (!step.targetId || !rect) {
+    cardLeft = vw / 2 - cardWidth / 2
+    cardTop = Math.max(vh / 2 - 150, 16)
   } else {
-    cardStyle = {
-      position: 'fixed',
-      top: '50%',
-      left: '50%',
-      transform: 'translate(-50%, -50%)',
-      width: cardWidth,
+    cardLeft = rect.left + rect.width + 16
+    cardTop = Math.min(Math.max(rect.top - 8, 16), vh - 280)
+    if (cardLeft + cardWidth + 16 > vw) {
+      cardLeft = Math.min(Math.max(rect.left, 16), vw - cardWidth - 16)
+      cardTop = Math.min(rect.top + rect.height + 12, vh - 280)
     }
   }
 
   return (
     <div className="fixed inset-0 z-[100]" role="dialog" aria-modal="true" aria-label="Product tour">
-      {/* Dimmer: spotlight hole when we have a target, full dim otherwise */}
-      {rect ? (
+      {/* Spotlight dimmer: one persistent element, so moves between steps glide */}
+      {rect && (
         <div
-          className="fixed rounded-lg pointer-events-none transition-all duration-200"
+          className="fixed rounded-lg pointer-events-none transition-all duration-300 ease-in-out"
           style={{
             top: rect.top - 4,
             left: rect.left - 4,
@@ -94,12 +98,13 @@ export function ProductTour({ steps, onFinish, onStepChange }: ProductTourProps)
             boxShadow: '0 0 0 9999px rgba(15, 23, 42, 0.55)',
           }}
         />
-      ) : (
-        <div className="fixed inset-0 bg-slate-900/55" />
       )}
 
-      {/* Explainer card */}
-      <div className="bg-white rounded-xl shadow-2xl p-5 z-[101]" style={cardStyle}>
+      {/* Explainer card — numeric top/left + transition so it glides between steps */}
+      <div
+        className="bg-white rounded-xl shadow-2xl p-5 z-[101] transition-all duration-300 ease-in-out"
+        style={{ position: 'fixed', top: cardTop, left: cardLeft, width: cardWidth }}
+      >
         <div className="flex items-start justify-between gap-3 mb-2">
           <h3 className="font-semibold text-slate-900">{step.title}</h3>
           <button

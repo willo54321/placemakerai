@@ -33,6 +33,7 @@ interface User {
   name: string | null
   email: string
   systemRole: 'SUPER_ADMIN' | 'USER'
+  showTour: boolean
   createdAt: string
   projectAccess: ProjectAccess[]
 }
@@ -274,6 +275,7 @@ function UserModal({ user, projects, onClose }: UserModalProps) {
   const [email, setEmail] = useState(user?.email || '')
   const [name, setName] = useState(user?.name || '')
   const [password, setPassword] = useState('')
+  const [showTour, setShowTour] = useState(user?.showTour ?? true)
   const [systemRole, setSystemRole] = useState<'SUPER_ADMIN' | 'USER'>(
     user?.systemRole || 'USER'
   )
@@ -288,6 +290,7 @@ function UserModal({ user, projects, onClose }: UserModalProps) {
       systemRole: string
       projectAccess: { projectId: string; role: string }[]
       password?: string
+      showTour?: boolean
     }) => {
       const url = isEditing ? `/api/admin/users/${user.id}` : '/api/admin/users'
       const method = isEditing ? 'PATCH' : 'POST'
@@ -317,6 +320,7 @@ function UserModal({ user, projects, onClose }: UserModalProps) {
       name,
       systemRole,
       projectAccess,
+      showTour,
       ...(password ? { password } : {}),
     })
   }
@@ -405,6 +409,24 @@ function UserModal({ user, projects, onClose }: UserModalProps) {
                 : 'Set a password so they can log in straight away. Share it with them securely.'}
             </p>
           </div>
+
+          {/* Product tour */}
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showTour}
+              onChange={(e) => setShowTour(e.target.checked)}
+              className="mt-0.5 w-4 h-4 rounded border-slate-300 text-green-600 focus:ring-green-500"
+            />
+            <span>
+              <span className="block text-sm font-medium text-slate-700">
+                Show product tour on next sign-in
+              </span>
+              <span className="block text-xs text-slate-500">
+                A short guided walkthrough of the dashboard. Re-tick to replay it for this user.
+              </span>
+            </span>
+          </label>
 
           {/* System Role */}
           <div>

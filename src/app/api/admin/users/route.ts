@@ -29,6 +29,7 @@ export async function GET() {
         name: true,
         email: true,
         systemRole: true,
+        showTour: true,
         createdAt: true,
         projectAccess: {
           include: {
@@ -67,7 +68,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { email, name, systemRole, projectAccess, password } = body
+    const { email, name, systemRole, projectAccess, password, showTour } = body
 
     if (!email) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 })
@@ -99,6 +100,7 @@ export async function POST(request: Request) {
         name: name || null,
         password: password ? await bcrypt.hash(password, 10) : null,
         systemRole: systemRole || 'USER',
+        showTour: typeof showTour === 'boolean' ? showTour : true,
         projectAccess: projectAccess?.length
           ? {
               create: projectAccess.map((pa: { projectId: string; role: string }) => ({

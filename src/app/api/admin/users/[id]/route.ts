@@ -30,6 +30,7 @@ export async function GET(
         name: true,
         email: true,
         systemRole: true,
+        showTour: true,
         createdAt: true,
         projectAccess: {
           include: {
@@ -73,7 +74,7 @@ export async function PATCH(
     }
 
     const body = await request.json()
-    const { name, systemRole, projectAccess, password } = body
+    const { name, systemRole, projectAccess, password, showTour } = body
 
     if (password !== undefined && (typeof password !== 'string' || password.length < 8)) {
       return NextResponse.json(
@@ -89,9 +90,11 @@ export async function PATCH(
       password?: string
       passwordResetToken?: null
       passwordResetExpires?: null
+      showTour?: boolean
     } = {}
     if (name !== undefined) updateData.name = name
     if (systemRole !== undefined) updateData.systemRole = systemRole
+    if (typeof showTour === 'boolean') updateData.showTour = showTour
     if (password) {
       updateData.password = await bcrypt.hash(password, 10)
       // A directly-set password supersedes any outstanding reset/invite link.

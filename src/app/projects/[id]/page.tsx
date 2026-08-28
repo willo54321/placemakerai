@@ -9,6 +9,35 @@ import { OverviewTab } from './overview'
 import { SettingsTab } from './settings'
 import { AnalyticsTab } from './analytics'
 import UserMenu from '@/components/UserMenu'
+import { ProductTour, type TourStep } from '@/components/ProductTour'
+
+// Per-tab tour copy; steps are assembled from the tabs the user can see.
+const TOUR_COPY: Record<Tab, { title: string; body: string }> = {
+  overview: {
+    title: 'Overview & activity',
+    body: 'Your at-a-glance summary. The activity feed shows every new piece of feedback the moment residents submit it — with links straight to each item.',
+  },
+  feedback: {
+    title: 'Map feedback',
+    body: 'The interactive map and the moderation queue. Comments from the public appear here first — approve them to publish them on the map.',
+  },
+  forms: {
+    title: 'Feedback forms',
+    body: 'Build custom survey forms, share their public link, and read responses as they come in.',
+  },
+  website: {
+    title: 'Your website embed',
+    body: 'Grab the embed code to put the consultation map on any website, and customise its colours and behaviour.',
+  },
+  analytics: {
+    title: 'AI analytics',
+    body: 'AI-powered analysis of all feedback: sentiment, themes, material planning considerations, and report-ready summaries.',
+  },
+  settings: {
+    title: 'Settings',
+    body: 'Project details, location, and configuration live here. That’s the tour — you’re ready to go.',
+  },
+}
 
 // Dynamic imports for components that use Google Maps to avoid SSR/chunk issues
 const FeedbackTab = dynamic(() => import('./feedback').then(mod => ({ default: mod.FeedbackTab })), {
@@ -76,6 +105,26 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
   const navigateTo = (tab: Tab, focus?: FocusItem) => {
     setFocusItem(focus ?? null)
     setActiveTab(tab)
+  }
+
+  // Product tour: shown when the user's flag is on and not yet dismissed
+  // this session. "Don't show again" persists the opt-out.
+  const [tourDismissed, setTourDismissed] = useState(false)
+  const { data: tourStatus } = useQuery({
+    queryKey: ['tour-status'],
+    queryFn: () => fetch('/api/me/tour').then(r => r.json()),
+  })
+
+  const finishTour = (dontShowAgain: boolean) => {
+    setTourDismissed(true)
+    setActiveTab('overview')
+    if (dontShowAgain) {
+      fetch('/api/me/tour', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ showTour: false }),
+      }).catch(() => {})
+    }
   }
 
   const { data: project, isLoading, error } = useQuery({
@@ -186,8 +235,36 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
   // Create a map for easy lookup
   const tabsMap = new Map(allTabs.map(tab => [tab.id, tab]))
 
+  // Tour steps: a welcome card, then one step per tab this user can see
+  const tourSteps: TourStep[] = [
+    {
+      targetId: null,
+      title: `Welcome to ${project.name}`,
+      body: 'A 30-second tour of where everything lives. You can close it any time, or tick "don’t show again".',
+    },
+    ...allTabs
+      .filter(tab => isAdmin || !tab.adminOnly)
+      .map(tab => ({
+        targetId: `${tab.id}-tab`,
+        title: TOUR_COPY[tab.id].title,
+        body: TOUR_COPY[tab.id].body,
+      })),
+  ]
+  const showTour = Boolean(tourStatus?.showTour) && !tourDismissed
+
   return (
     <div className="flex min-h-screen bg-slate-50">
+      {showTour && (
+        <ProductTour
+          steps={tourSteps}
+          onFinish={finishTour}
+          onStepChange={(i) => {
+            // Show each feature as the tour narrates it (step 0 is the welcome card)
+            const target = tourSteps[i]?.targetId
+            if (target) setActiveTab(target.replace('-tab', '') as Tab)
+          }}
+        />
+      )}
       {/* Skip link */}
       <a href="#main-content" className="skip-link">
         Skip to main content

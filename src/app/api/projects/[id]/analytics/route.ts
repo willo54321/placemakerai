@@ -8,6 +8,10 @@ import {
   FullAnalysisResult,
 } from '@/lib/ai'
 
+// Full analysis makes several sequential Claude calls (~50s total); allow the
+// Vercel Hobby maximum instead of the 10s default.
+export const maxDuration = 60
+
 // GET - Retrieve cached analysis or return null
 export async function GET(
   request: Request,

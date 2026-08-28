@@ -31,7 +31,17 @@ const FIELD_TYPES = [
   { value: 'rating', label: 'Rating (1-5)' },
 ]
 
-export function FormsTab({ projectId, forms }: { projectId: string; forms: FeedbackForm[] }) {
+export function FormsTab({
+  projectId,
+  forms,
+  focusResponse,
+  onFocusHandled,
+}: {
+  projectId: string
+  forms: FeedbackForm[]
+  focusResponse?: { formId: string; responseId: string } | null
+  onFocusHandled?: () => void
+}) {
   const queryClient = useQueryClient()
   const { canManageForms } = usePermissions()
   const [showForm, setShowForm] = useState(false)
@@ -50,6 +60,25 @@ export function FormsTab({ projectId, forms }: { projectId: string; forms: Feedb
     queryFn: () => fetch(`/api/projects/${projectId}/forms/${viewingResponses}`).then(r => r.json()),
     enabled: !!viewingResponses,
   })
+
+  // Deep link from the activity feed: open the right form's responses with
+  // the target response expanded, then scroll to it once loaded.
+  useEffect(() => {
+    if (!focusResponse) return
+    setViewingResponses(focusResponse.formId)
+    setExpandedResponse(focusResponse.responseId)
+  }, [focusResponse])
+
+  useEffect(() => {
+    if (!focusResponse || loadingResponses || !responsesData) return
+    const timer = setTimeout(() => {
+      document
+        .getElementById(`response-${focusResponse.responseId}`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      onFocusHandled?.()
+    }, 150)
+    return () => clearTimeout(timer)
+  }, [focusResponse, loadingResponses, responsesData, onFocusHandled])
 
   // Response numbers are stable identifiers (submission order: first ever = #1,
   // never renumbered), displayed newest-first so new arrivals are on top.
@@ -623,6 +652,7 @@ export function FormsTab({ projectId, forms }: { projectId: string; forms: Feedb
                       return (
                         <div
                           key={response.id}
+                          id={`response-${response.id}`}
                           className={`bg-white rounded-xl border transition-all duration-200 ${
                             isExpanded ? 'border-blue-200 shadow-md ring-1 ring-blue-100' : 'border-slate-200 hover:border-slate-300 hover:shadow-sm'
                           }`}

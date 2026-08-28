@@ -4,9 +4,13 @@ import { MapPin, Globe, Clock, CheckCircle, ArrowRight, MessageCircle, FileText,
 
 type Tab = 'overview' | 'feedback' | 'forms' | 'website' | 'analytics' | 'settings'
 
+type FocusItem =
+  | { kind: 'pin'; id: string }
+  | { kind: 'response'; formId: string; responseId: string }
+
 interface OverviewTabProps {
   project: any
-  onNavigate: (tab: Tab) => void
+  onNavigate: (tab: Tab, focus?: FocusItem) => void
 }
 
 export function OverviewTab({ project, onNavigate }: OverviewTabProps) {
@@ -27,6 +31,7 @@ export function OverviewTab({ project, onNavigate }: OverviewTabProps) {
     pending?: boolean
     target: Tab
     targetLabel: string
+    focus?: FocusItem
   }
 
   const activity: ActivityItem[] = [
@@ -39,6 +44,7 @@ export function OverviewTab({ project, onNavigate }: OverviewTabProps) {
       pending: !pin.approved,
       target: 'feedback',
       targetLabel: 'Review',
+      focus: { kind: 'pin', id: pin.id },
     })),
     ...(project.feedbackForms || []).flatMap((form: any) =>
       (form.responses || []).map((response: any): ActivityItem => {
@@ -52,6 +58,7 @@ export function OverviewTab({ project, onNavigate }: OverviewTabProps) {
           detail: form.name,
           target: 'forms',
           targetLabel: 'View',
+          focus: { kind: 'response', formId: form.id, responseId: response.id },
         }
       })
     ),
@@ -215,7 +222,7 @@ export function OverviewTab({ project, onNavigate }: OverviewTabProps) {
                     <p className="text-sm text-slate-600 line-clamp-2 break-words">{item.detail}</p>
                   </div>
                   <button
-                    onClick={() => onNavigate(item.target)}
+                    onClick={() => onNavigate(item.target, item.focus)}
                     className="text-xs text-brand-600 hover:text-brand-700 flex items-center gap-1 shrink-0 mt-1"
                   >
                     {item.targetLabel} <ArrowRight size={12} />

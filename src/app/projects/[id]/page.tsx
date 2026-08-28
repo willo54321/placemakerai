@@ -49,6 +49,12 @@ const FormsTabWrapper = dynamic(() => import('./forms-wrapper').then(mod => ({ d
 
 type Tab = 'overview' | 'feedback' | 'forms' | 'website' | 'analytics' | 'settings'
 
+// Deep-link target passed alongside a tab switch (e.g. from the activity
+// feed): jump straight to a specific pin or form response.
+export type FocusItem =
+  | { kind: 'pin'; id: string }
+  | { kind: 'response'; formId: string; responseId: string }
+
 // Tab groups for organized navigation
 type TabGroup = {
   id: string
@@ -65,6 +71,12 @@ const tabGroups: TabGroup[] = [
 
 export default function ProjectPage({ params }: { params: { id: string } }) {
   const [activeTab, setActiveTab] = useState<Tab>('overview')
+  const [focusItem, setFocusItem] = useState<FocusItem | null>(null)
+
+  const navigateTo = (tab: Tab, focus?: FocusItem) => {
+    setFocusItem(focus ?? null)
+    setActiveTab(tab)
+  }
 
   const { data: project, isLoading, error } = useQuery({
     queryKey: ['project', params.id],
@@ -298,14 +310,24 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
         >
           {activeTab === 'overview' && (
             <div className="p-6">
-              <OverviewTab project={project} onNavigate={setActiveTab} />
+              <OverviewTab project={project} onNavigate={navigateTo} />
             </div>
           )}
           {activeTab === 'feedback' && (
-            <FeedbackTab projectId={params.id} project={project} />
+            <FeedbackTab
+              projectId={params.id}
+              project={project}
+              focusPinId={focusItem?.kind === 'pin' ? focusItem.id : null}
+              onFocusHandled={() => setFocusItem(null)}
+            />
           )}
           {activeTab === 'forms' && (
-            <FormsTabWrapper projectId={params.id} project={project} />
+            <FormsTabWrapper
+              projectId={params.id}
+              project={project}
+              focusResponse={focusItem?.kind === 'response' ? focusItem : null}
+              onFocusHandled={() => setFocusItem(null)}
+            />
           )}
           {activeTab === 'website' && (
             <div className="p-6">

@@ -11,7 +11,17 @@ interface Project {
   feedbackForms: any[]
 }
 
-export function FormsTabWrapper({ projectId, project }: { projectId: string; project: Project }) {
+export function FormsTabWrapper({
+  projectId,
+  project,
+  focusResponse,
+  onFocusHandled,
+}: {
+  projectId: string
+  project: Project
+  focusResponse?: { formId: string; responseId: string } | null
+  onFocusHandled?: () => void
+}) {
   const [copiedApi, setCopiedApi] = useState(false)
 
   const apiEndpoint = typeof window !== 'undefined'
@@ -96,7 +106,12 @@ export function FormsTabWrapper({ projectId, project }: { projectId: string; pro
       </div>
 
       {/* Existing forms component */}
-      <FormsTab projectId={projectId} forms={project.feedbackForms || []} />
+      <FormsTab
+        projectId={projectId}
+        forms={project.feedbackForms || []}
+        focusResponse={focusResponse}
+        onFocusHandled={onFocusHandled}
+      />
     </div>
   )
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { MapPin, MessageCircle, ExternalLink, Copy, Check } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
@@ -37,9 +37,24 @@ const FeedbackPinsTab = dynamic(
 
 type SubTab = 'map' | 'responses'
 
-export function FeedbackTab({ projectId, project }: { projectId: string; project: any }) {
+export function FeedbackTab({
+  projectId,
+  project,
+  focusPinId,
+  onFocusHandled,
+}: {
+  projectId: string
+  project: any
+  focusPinId?: string | null
+  onFocusHandled?: () => void
+}) {
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('map')
   const [copiedCode, setCopiedCode] = useState(false)
+
+  // Deep link from the activity feed: jump straight to the responses list
+  useEffect(() => {
+    if (focusPinId) setActiveSubTab('responses')
+  }, [focusPinId])
 
   const feedbackPinCount = project.publicPins?.length || 0
 
@@ -146,7 +161,12 @@ export function FeedbackTab({ projectId, project }: { projectId: string; project
         )}
         {activeSubTab === 'responses' && (
           <div className="p-6">
-            <FeedbackPinsTab projectId={projectId} project={project} />
+            <FeedbackPinsTab
+              projectId={projectId}
+              project={project}
+              focusPinId={focusPinId}
+              onFocusHandled={onFocusHandled}
+            />
           </div>
         )}
       </div>

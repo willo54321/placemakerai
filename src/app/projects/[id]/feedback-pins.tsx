@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
@@ -45,10 +45,39 @@ interface Project {
   publicPins: PublicPin[]
 }
 
-export function FeedbackPinsTab({ projectId, project }: { projectId: string; project: Project }) {
+export function FeedbackPinsTab({
+  projectId,
+  project,
+  focusPinId,
+  onFocusHandled,
+}: {
+  projectId: string
+  project: Project
+  focusPinId?: string | null
+  onFocusHandled?: () => void
+}) {
   const queryClient = useQueryClient()
   const [pendingApprovalId, setPendingApprovalId] = useState<string | null>(null)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
+  const [highlightedId, setHighlightedId] = useState<string | null>(null)
+
+  // Deep link from the activity feed: scroll to the pin and flash-highlight it
+  useEffect(() => {
+    if (!focusPinId) return
+    setHighlightedId(focusPinId)
+    // Defer so the list has rendered before we measure
+    const scrollTimer = setTimeout(() => {
+      document.getElementById(`pin-row-${focusPinId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 100)
+    const clearTimer = setTimeout(() => {
+      setHighlightedId(null)
+      onFocusHandled?.()
+    }, 2500)
+    return () => {
+      clearTimeout(scrollTimer)
+      clearTimeout(clearTimer)
+    }
+  }, [focusPinId, onFocusHandled])
 
   const deletePin = useMutation({
     mutationFn: async (pinId: string) => {
@@ -177,7 +206,13 @@ export function FeedbackPinsTab({ projectId, project }: { projectId: string; pro
               const config = CATEGORY_CONFIG[pin.category] || CATEGORY_CONFIG.comment
               const IconComponent = config.icon
               return (
-                <div key={pin.id} className={`px-6 py-4 hover:bg-gray-50 ${!pin.approved ? 'bg-amber-50/50' : ''}`}>
+                <div
+                  key={pin.id}
+                  id={`pin-row-${pin.id}`}
+                  className={`px-6 py-4 hover:bg-gray-50 transition-colors ${
+                    highlightedId === pin.id ? 'bg-green-50 ring-2 ring-inset ring-green-400' : !pin.approved ? 'bg-amber-50/50' : ''
+                  }`}
+                >
                   <div className="flex items-start gap-4">
                     <div
                       className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"

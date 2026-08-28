@@ -26,7 +26,19 @@ export async function GET(
         feedbackForms: {
           include: {
             _count: { select: { responses: true } },
+            // Bounded: recent responses feed the Overview activity stream
+            responses: {
+              orderBy: { submittedAt: 'desc' },
+              take: 10,
+              select: { id: true, submittedAt: true, data: true },
+            },
           },
+        },
+        // Bounded: recent enquiries feed the Overview activity stream
+        enquiries: {
+          orderBy: { createdAt: 'desc' },
+          take: 15,
+          select: { id: true, submitterName: true, subject: true, createdAt: true },
         },
         imageOverlays: {
           orderBy: { createdAt: 'asc' }

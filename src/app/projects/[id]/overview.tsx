@@ -1,6 +1,6 @@
 'use client'
 
-import { MapPin, Globe, Clock, CheckCircle, ArrowRight, MessageCircle, FileText, BarChart3 } from 'lucide-react'
+import { MapPin, Globe, Clock, CheckCircle, ArrowRight, MessageCircle, FileText, BarChart3, Mail } from 'lucide-react'
 
 type Tab = 'overview' | 'feedback' | 'forms' | 'website' | 'analytics' | 'settings'
 
@@ -17,10 +17,62 @@ export function OverviewTab({ project, onNavigate }: OverviewTabProps) {
   // Calculate pending items
   const pendingComments = project.publicPins?.filter((p: any) => !p.approved)?.length || 0
 
-  // Get recent activity
-  const recentComments = (project.publicPins || [])
-    .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 3)
+  // Unified activity feed: pins, form responses, and enquiries, newest first.
+  type ActivityItem = {
+    id: string
+    kind: 'pin' | 'form' | 'enquiry'
+    date: string
+    title: string
+    detail: string
+    pending?: boolean
+    target: Tab
+    targetLabel: string
+  }
+
+  const activity: ActivityItem[] = [
+    ...(project.publicPins || []).map((pin: any): ActivityItem => ({
+      id: `pin-${pin.id}`,
+      kind: 'pin',
+      date: pin.createdAt,
+      title: pin.name ? `Map comment from ${pin.name}` : 'Anonymous map comment',
+      detail: pin.comment,
+      pending: !pin.approved,
+      target: 'feedback',
+      targetLabel: 'Review',
+    })),
+    ...(project.feedbackForms || []).flatMap((form: any) =>
+      (form.responses || []).map((response: any): ActivityItem => {
+        const data = (response.data || {}) as Record<string, unknown>
+        const respondent = data.name || data.Name || data.fullName || data.full_name
+        return {
+          id: `form-${response.id}`,
+          kind: 'form',
+          date: response.submittedAt,
+          title: respondent ? `Form response from ${respondent}` : 'Form response',
+          detail: form.name,
+          target: 'forms',
+          targetLabel: 'View',
+        }
+      })
+    ),
+    ...(project.enquiries || []).map((enquiry: any): ActivityItem => ({
+      id: `enq-${enquiry.id}`,
+      kind: 'enquiry',
+      date: enquiry.createdAt,
+      title: `Enquiry from ${enquiry.submitterName}`,
+      detail: enquiry.subject,
+      target: 'analytics',
+      targetLabel: 'Analytics',
+    })),
+  ]
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 12)
+
+  const ACTIVITY_ICON = {
+    pin: { icon: MessageCircle, bg: 'bg-purple-50', color: 'text-purple-600' },
+    form: { icon: FileText, bg: 'bg-blue-50', color: 'text-blue-600' },
+    enquiry: { icon: Mail, bg: 'bg-slate-100', color: 'text-slate-600' },
+  } as const
 
   const metrics = [
     {
@@ -115,47 +167,67 @@ export function OverviewTab({ project, onNavigate }: OverviewTabProps) {
         })}
       </div>
 
-      {/* Recent Comments */}
+      {/* Activity Feed */}
       <div className="bg-white rounded-xl border border-slate-200">
         <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
-          <h3 className="font-medium text-slate-900">Recent Public Comments</h3>
-          <button
-            onClick={() => onNavigate('feedback')}
-            className="text-sm text-brand-600 hover:text-brand-700 flex items-center gap-1"
-          >
-            View all <ArrowRight size={14} />
-          </button>
+          <div>
+            <h3 className="font-medium text-slate-900">Activity</h3>
+            <p className="text-xs text-slate-400">Latest feedback across the map, forms, and enquiries</p>
+          </div>
+          {pendingComments > 0 && (
+            <button
+              onClick={() => onNavigate('feedback')}
+              className="text-sm text-amber-600 hover:text-amber-700 flex items-center gap-1 font-medium"
+            >
+              <Clock size={14} />
+              {pendingComments} awaiting review <ArrowRight size={14} />
+            </button>
+          )}
         </div>
-        {recentComments.length > 0 ? (
+        {activity.length > 0 ? (
           <div className="divide-y divide-slate-100">
-            {recentComments.map((comment: any) => (
-              <div key={comment.id} className="px-4 py-3">
-                <div className="flex items-center gap-2 mb-1">
-                  {comment.approved ? (
-                    <CheckCircle size={14} className="text-green-500" />
-                  ) : (
-                    <Clock size={14} className="text-amber-500" />
-                  )}
-                  <span className="text-xs text-slate-500">
-                    {new Date(comment.createdAt).toLocaleDateString('en-GB', {
-                      day: 'numeric',
-                      month: 'short',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </span>
-                  {comment.name && (
-                    <span className="text-xs font-medium text-slate-700">{comment.name}</span>
-                  )}
+            {activity.map((item) => {
+              const style = ACTIVITY_ICON[item.kind]
+              const Icon = style.icon
+              return (
+                <div key={item.id} className="px-4 py-3 flex items-start gap-3">
+                  <div className={`w-8 h-8 rounded-lg ${style.bg} flex items-center justify-center shrink-0 mt-0.5`}>
+                    <Icon size={15} className={style.color} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-medium text-slate-800">{item.title}</span>
+                      {item.pending && (
+                        <span className="text-xs font-medium px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 flex items-center gap-1">
+                          <Clock size={10} />
+                          awaiting review
+                        </span>
+                      )}
+                      <span className="text-xs text-slate-400">
+                        {new Date(item.date).toLocaleDateString('en-GB', {
+                          day: 'numeric',
+                          month: 'short',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    </div>
+                    <p className="text-sm text-slate-600 line-clamp-2 break-words">{item.detail}</p>
+                  </div>
+                  <button
+                    onClick={() => onNavigate(item.target)}
+                    className="text-xs text-brand-600 hover:text-brand-700 flex items-center gap-1 shrink-0 mt-1"
+                  >
+                    {item.targetLabel} <ArrowRight size={12} />
+                  </button>
                 </div>
-                <p className="text-sm text-slate-700 line-clamp-2">{comment.comment}</p>
-              </div>
-            ))}
+              )
+            })}
           </div>
         ) : (
           <div className="px-4 py-8 text-center">
             <MessageCircle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-            <p className="text-sm text-slate-500">No public comments yet</p>
+            <p className="text-sm text-slate-500">No feedback yet</p>
             {!project.embedEnabled && (
               <button
                 onClick={() => onNavigate('website')}

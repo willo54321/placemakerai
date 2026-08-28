@@ -205,6 +205,7 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
   const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script-embed',
     googleMapsApiKey: GOOGLE_MAPS_API_KEY,
+    version: '3.64', // DrawingManager was removed from the Maps JS API in 3.65
     libraries: LIBRARIES
   })
 

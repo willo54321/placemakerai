@@ -220,6 +220,7 @@ const InteractiveMap = forwardRef<InteractiveMapRef, InteractiveMapProps>(({
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script-embed',
     googleMapsApiKey: GOOGLE_MAPS_API_KEY,
+    version: '3.64', // DrawingManager was removed from the Maps JS API in 3.65
     libraries: LIBRARIES
   })
 

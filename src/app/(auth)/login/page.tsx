@@ -1,17 +1,28 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { MapPin, Mail, Lock, ArrowRight, Loader2 } from 'lucide-react'
 
+const REMEMBER_KEY = 'placemaker-remembered-email'
+
 export default function LoginPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [rememberMe, setRememberMe] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    const saved = localStorage.getItem(REMEMBER_KEY)
+    if (saved) {
+      setEmail(saved)
+      setRememberMe(true)
+    }
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -28,6 +39,11 @@ export default function LoginPage() {
       if (result?.error) {
         setError('Invalid email or password')
       } else {
+        if (rememberMe) {
+          localStorage.setItem(REMEMBER_KEY, email)
+        } else {
+          localStorage.removeItem(REMEMBER_KEY)
+        }
         router.push('/projects')
       }
     } catch {
@@ -92,7 +108,19 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <div className="text-right">
+          <div className="flex items-center justify-between">
+            <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => {
+                  setRememberMe(e.target.checked)
+                  if (!e.target.checked) localStorage.removeItem(REMEMBER_KEY)
+                }}
+                className="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+              />
+              Remember me
+            </label>
             <Link href="/forgot-password" className="text-sm text-brand-600 hover:text-brand-700 font-medium">
               Forgot password?
             </Link>

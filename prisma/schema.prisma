@@ -346,8 +346,12 @@ model AnalysisResult {
   id           String   @id @default(cuid())
   projectId    String
   type         String // "sentiment" | "themes" | "summary" | "full"
-  data         Json // Analysis results
+  data         Json // Analysis results (last completed analysis; {} before the first completes)
   feedbackHash String // Hash of feedback to detect changes
+  status       String   @default("complete") // "processing" | "finalizing" | "complete" | "failed"
+  batchId      String? // Anthropic Batch API id while a run is in flight
+  pending      Json? // PendingAnalysis state needed to finalize a batch
+  error        String? // Failure reason when status = "failed"
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)

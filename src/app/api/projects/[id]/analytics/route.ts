@@ -1,22 +1,29 @@
 import { NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/db'
 import { authorizeProject } from '@/lib/api-auth'
 import {
-  runFullAnalysis,
+  startFullAnalysis,
+  isAnalysisBatchReady,
+  finalizeFullAnalysis,
   createFeedbackHash,
   FeedbackItem,
   FullAnalysisResult,
+  PendingAnalysis,
 } from '@/lib/ai'
 
-// Full analysis classifies every response in batches, so wall-clock scales with
-// the size of the consultation rather than being fixed. 60s is the Vercel Hobby
-// ceiling and comfortably covers a few hundred responses; a consultation in the
-// thousands will exceed it and needs either a higher limit (Pro allows 300s) or
-// moving the run to a background job. A timeout here surfaces as a failed
-// analysis, not a partial one.
+// Analysis runs through the Batch API: POST submits the run (one taxonomy call
+// plus the batch submission, well under a minute), and GET finalizes it once
+// the batch ends (aggregation in code plus two summary calls). Neither leg
+// scales with the size of the consultation, so 60s covers both.
 export const maxDuration = 60
 
-// GET - Retrieve cached analysis or return null
+function isEmptyData(data: unknown): boolean {
+  return !data || Object.keys(data as object).length === 0
+}
+
+// GET - Retrieve the cached analysis, advancing an in-flight run if its batch
+// has finished. The frontend polls this while `processing` is true.
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }
@@ -30,7 +37,6 @@ export async function GET(
   const feedbackItems = await collectFeedback(projectId)
   const currentHash = createFeedbackHash(feedbackItems)
 
-  // Get cached analysis
   const cached = await prisma.analysisResult.findUnique({
     where: {
       projectId_type: {
@@ -48,15 +54,112 @@ export async function GET(
     })
   }
 
+  // A run is in flight — check whether its batch has finished and finalize it
+  // here if so. Finalizing on the poll avoids needing a separate worker.
+  if (cached.status === 'processing' && cached.batchId && cached.pending) {
+    try {
+      if (await isAnalysisBatchReady(cached.batchId)) {
+        // Claim the finalize step atomically so two concurrent polls can't
+        // both pay for the summary calls.
+        const claimed = await prisma.analysisResult.updateMany({
+          where: { id: cached.id, status: 'processing' },
+          data: { status: 'finalizing' },
+        })
+
+        if (claimed.count === 1) {
+          try {
+            const analysis = await finalizeFullAnalysis(
+              cached.pending as unknown as PendingAnalysis,
+              feedbackItems
+            )
+            await prisma.analysisResult.update({
+              where: { id: cached.id },
+              data: {
+                data: analysis as object,
+                status: 'complete',
+                batchId: null,
+                pending: Prisma.DbNull,
+                error: null,
+                updatedAt: new Date(),
+              },
+            })
+            return NextResponse.json({
+              analysis,
+              needsUpdate: false,
+              lastAnalyzed: new Date(),
+              feedbackCount: feedbackItems.length,
+            })
+          } catch (error) {
+            console.error('Analysis finalize error:', error)
+            await prisma.analysisResult.update({
+              where: { id: cached.id },
+              data: {
+                status: 'failed',
+                batchId: null,
+                pending: Prisma.DbNull,
+                error: 'Failed to collect analysis results',
+              },
+            })
+            return NextResponse.json({
+              analysis: isEmptyData(cached.data)
+                ? null
+                : (cached.data as unknown as FullAnalysisResult),
+              needsUpdate: true,
+              analysisFailed: true,
+              feedbackCount: feedbackItems.length,
+            })
+          }
+        }
+      }
+    } catch (error) {
+      // Batch status check failed (transient) — report still-processing and
+      // let the next poll retry.
+      console.error('Analysis status check error:', error)
+    }
+
+    return NextResponse.json({
+      analysis: isEmptyData(cached.data)
+        ? null
+        : (cached.data as unknown as FullAnalysisResult),
+      processing: true,
+      needsUpdate: false,
+      feedbackCount: feedbackItems.length,
+    })
+  }
+
+  if (cached.status === 'finalizing') {
+    // Another request is collecting the results right now. If that attempt
+    // died mid-flight (timeout/crash), re-arm the run so the next poll
+    // retries — batchId and pending are still on the row.
+    const claimAge = Date.now() - new Date(cached.updatedAt).getTime()
+    if (claimAge > 5 * 60 * 1000) {
+      await prisma.analysisResult.updateMany({
+        where: { id: cached.id, status: 'finalizing' },
+        data: { status: 'processing' },
+      })
+    }
+    return NextResponse.json({
+      analysis: isEmptyData(cached.data)
+        ? null
+        : (cached.data as unknown as FullAnalysisResult),
+      processing: true,
+      needsUpdate: false,
+      feedbackCount: feedbackItems.length,
+    })
+  }
+
   return NextResponse.json({
-    analysis: cached.data as unknown as FullAnalysisResult,
-    needsUpdate: cached.feedbackHash !== currentHash,
+    analysis: isEmptyData(cached.data)
+      ? null
+      : (cached.data as unknown as FullAnalysisResult),
+    needsUpdate: cached.feedbackHash !== currentHash || cached.status === 'failed',
+    analysisFailed: cached.status === 'failed' || undefined,
     lastAnalyzed: cached.updatedAt,
     feedbackCount: feedbackItems.length,
   })
 }
 
-// POST - Run new analysis
+// POST - Start a new analysis run (returns immediately; poll GET for results)
 export async function POST(
   request: Request,
   { params }: { params: { id: string } }
@@ -95,9 +198,6 @@ export async function POST(
 
     const feedbackHash = createFeedbackHash(feedbackItems)
 
-    // Check for an existing cached analysis. If the feedback is unchanged and
-    // the caller hasn't forced a re-run, return the cache instead of paying for
-    // a fresh (expensive) set of OpenAI calls.
     const cached = await prisma.analysisResult.findUnique({
       where: {
         projectId_type: {
@@ -107,7 +207,22 @@ export async function POST(
       },
     })
 
-    if (!force && cached && cached.feedbackHash === feedbackHash) {
+    // A run is already in flight — don't double-submit, even on force.
+    if (cached && (cached.status === 'processing' || cached.status === 'finalizing')) {
+      return NextResponse.json({
+        processing: true,
+        feedbackCount: feedbackItems.length,
+      })
+    }
+
+    // If the feedback is unchanged and the caller hasn't forced a re-run,
+    // return the cache instead of paying for a fresh run.
+    if (
+      !force &&
+      cached &&
+      cached.status === 'complete' &&
+      cached.feedbackHash === feedbackHash
+    ) {
       return NextResponse.json({
         analysis: cached.data as unknown as FullAnalysisResult,
         feedbackCount: feedbackItems.length,
@@ -116,10 +231,10 @@ export async function POST(
       })
     }
 
-    // Run full analysis (hash changed or force requested)
-    const analysis = await runFullAnalysis(feedbackItems)
+    // Submit the run: taxonomy call + batch submission. The previous result
+    // stays in `data` so the UI can keep showing it while the new run cooks.
+    const pending = await startFullAnalysis(feedbackItems)
 
-    // Store result
     await prisma.analysisResult.upsert({
       where: {
         projectId_type: {
@@ -128,26 +243,32 @@ export async function POST(
         },
       },
       update: {
-        data: analysis as object,
+        status: 'processing',
+        batchId: pending.batchId,
+        pending: pending as unknown as object,
         feedbackHash,
+        error: null,
         updatedAt: new Date(),
       },
       create: {
         projectId,
         type: 'full',
-        data: analysis as object,
+        data: {},
+        status: 'processing',
+        batchId: pending.batchId,
+        pending: pending as unknown as object,
         feedbackHash,
       },
     })
 
     return NextResponse.json({
-      analysis,
+      processing: true,
       feedbackCount: feedbackItems.length,
     })
   } catch (error) {
     console.error('Analysis error:', error)
     return NextResponse.json(
-      { error: 'Failed to run analysis' },
+      { error: 'Failed to start analysis' },
       { status: 500 }
     )
   }

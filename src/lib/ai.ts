@@ -11,9 +11,10 @@ let anthropicClient: Anthropic | null = null
 
 const MODEL = 'claude-opus-4-8'
 // Per-item classification is high-volume and mechanical — it applies a fixed
-// taxonomy rather than reasoning openly — so it is named separately from the
-// reasoning calls and can be pointed at a cheaper model without touching them.
-const CLASSIFIER_MODEL = MODEL
+// rubric rather than reasoning openly — so it runs on Haiku via the Batch API
+// (half price, no request-timeout ceiling). The judgement calls that shape the
+// report (taxonomy, campaign characterisation, summary) stay on Opus.
+const CLASSIFIER_MODEL = 'claude-haiku-4-5'
 
 function getAnthropic(): Anthropic {
   if (!process.env.ANTHROPIC_API_KEY) {
@@ -35,33 +36,24 @@ function getAnthropic(): Anthropic {
 /**
  * Run a single analysis call: system prompt + user content, with the response
  * constrained to `schema` via structured outputs, so the returned JSON always
- * matches the expected shape.
+ * matches the expected shape. Used for the synchronous Opus reasoning calls;
+ * the per-response classification goes through the Batch API instead.
  */
 async function analysisCall<T>(options: {
   system: string
   user: string
   schema: Record<string, unknown>
   effort?: 'low' | 'medium' | 'high'
-  model?: string
-  /**
-   * Cache the system block. Worth setting wherever one system prompt is reused
-   * across many calls in a single analysis — the batched classifiers send the
-   * same instructions and taxonomy every time, so caching turns a repeated
-   * prefix into a cache read instead of re-billed input.
-   */
-  cacheSystem?: boolean
 }): Promise<T> {
   const response = await getAnthropic().messages.create({
-    model: options.model || MODEL,
+    model: MODEL,
     max_tokens: 16000,
     thinking: { type: 'adaptive' },
     output_config: {
       effort: options.effort || 'low',
       format: { type: 'json_schema', schema: options.schema },
     },
-    system: options.cacheSystem
-      ? [{ type: 'text', text: options.system, cache_control: { type: 'ephemeral' } }]
-      : options.system,
+    system: options.system,
     messages: [{ role: 'user', content: options.user }],
   })
 
@@ -90,18 +82,15 @@ const MAX_ITEM_CHARS = 1000
 
 /**
  * Hard ceiling on how many responses a single analysis will classify. This is a
- * cost and wall-clock guard, not a sampling strategy — when it bites, the
- * shortfall is reported in `coverage` rather than hidden, and the subset taken
- * is spread evenly across the whole consultation rather than skewed to whoever
- * responded most recently.
+ * cost guard, not a sampling strategy — when it bites, the shortfall is
+ * reported in `coverage` rather than hidden, and the subset taken is spread
+ * evenly across the whole consultation rather than skewed to whoever responded
+ * most recently.
  */
 const MAX_ANALYSIS_ITEMS = 5000
 
-/** Responses per classification request. */
+/** Responses per classification request within the batch. */
 const CLASSIFY_BATCH_SIZE = 100
-
-/** Classification requests in flight at once. */
-const CLASSIFY_CONCURRENCY = 5
 
 /** Responses shown to the model when it proposes the theme list. */
 const TAXONOMY_SAMPLE_SIZE = 250
@@ -137,6 +126,12 @@ function evenlySpacedSample<T>(values: T[], limit: number): T[] {
   return out
 }
 
+function truncateContent(item: FeedbackItem): FeedbackItem {
+  return item.content.length > MAX_ITEM_CHARS
+    ? { ...item, content: item.content.slice(0, MAX_ITEM_CHARS) }
+    : item
+}
+
 /**
  * Choose what to analyse and record how much of the corpus that covers.
  * Ordered oldest-first so downstream time splits are meaningful.
@@ -149,11 +144,7 @@ function selectForAnalysis(feedbackItems: FeedbackItem[]): {
     (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
   )
 
-  const selected = evenlySpacedSample(chronological, MAX_ANALYSIS_ITEMS).map(item =>
-    item.content.length > MAX_ITEM_CHARS
-      ? { ...item, content: item.content.slice(0, MAX_ITEM_CHARS) }
-      : item
-  )
+  const selected = evenlySpacedSample(chronological, MAX_ANALYSIS_ITEMS).map(truncateContent)
 
   const complete = selected.length === chronological.length
 
@@ -177,30 +168,6 @@ function chunk<T>(values: T[], size: number): T[][] {
     out.push(values.slice(i, i + size))
   }
   return out
-}
-
-/**
- * Run an async mapper over a list with a bounded number of calls in flight.
- * Results keep input order. A failed chunk rejects the whole run — a partial
- * analysis silently missing a slice of responses would be worse than an error.
- */
-async function mapWithConcurrency<T, R>(
-  values: T[],
-  limit: number,
-  fn: (value: T, index: number) => Promise<R>
-): Promise<R[]> {
-  const results = new Array<R>(values.length)
-  let cursor = 0
-
-  const workers = Array.from({ length: Math.min(limit, values.length) }, async () => {
-    while (cursor < values.length) {
-      const index = cursor++
-      results[index] = await fn(values[index], index)
-    }
-  })
-
-  await Promise.all(workers)
-  return results
 }
 
 export interface SentimentResult {
@@ -258,13 +225,6 @@ export interface HeadlineStat {
 
 export interface HeadlineStatsResult {
   stats: HeadlineStat[]
-}
-
-export interface MaterialClassification {
-  classification: 'material' | 'non-material' | 'mixed'
-  materialCategories: string[]
-  nonMaterialCategories: string[]
-  confidence: number
 }
 
 export interface MaterialAnalysisResult {
@@ -357,6 +317,9 @@ const TAXONOMY_SCHEMA = {
   required: ['themes'],
 }
 
+// One merged schema per response: stance, themes and material considerations
+// are read off the same response in one pass, so the corpus is classified once
+// rather than twice.
 const CLASSIFY_SCHEMA = {
   type: 'object',
   additionalProperties: false,
@@ -375,8 +338,19 @@ const CLASSIFY_SCHEMA = {
             items: { type: 'integer' },
             description: 'Numbers of every theme that applies. Empty if none do.',
           },
+          material: { type: 'string', enum: ['material', 'non-material', 'mixed'] },
+          materialCategories: { type: 'array', items: { type: 'string' } },
+          nonMaterialCategories: { type: 'array', items: { type: 'string' } },
         },
-        required: ['id', 'sentiment', 'confidence', 'themes'],
+        required: [
+          'id',
+          'sentiment',
+          'confidence',
+          'themes',
+          'material',
+          'materialCategories',
+          'nonMaterialCategories',
+        ],
       },
     },
   },
@@ -397,6 +371,9 @@ export interface ItemAssignment {
   confidence: number
   /** Indices into the taxonomy. */
   themeIds: number[]
+  material: 'material' | 'non-material' | 'mixed'
+  materialCategories: string[]
+  nonMaterialCategories: string[]
 }
 
 export interface CorpusClassification {
@@ -443,117 +420,400 @@ Requirements:
 }
 
 /**
- * Classify every response against the taxonomy: stance plus which themes it
- * raises.
- *
- * This is the pass that makes the numbers real. Because each response is
- * classified exactly once, downstream theme counts and sentiment splits are
- * counted rather than estimated, and they can be traced back to the individual
- * responses behind them.
+ * The classifier's instructions: stance, theme assignment against the fixed
+ * taxonomy, and the material-considerations rubric — one pass per response.
  */
-export async function classifyCorpus(
-  feedbackItems: FeedbackItem[]
-): Promise<CorpusClassification> {
-  const { items, coverage } = selectForAnalysis(feedbackItems)
-
-  if (items.length === 0) {
-    return { taxonomy: [], assignments: [], items: [], coverage }
-  }
-
-  const taxonomy = await discoverThemes(items)
-  if (taxonomy.length === 0) {
-    return { taxonomy: [], assignments: [], items, coverage }
-  }
-
+function buildClassifierSystem(taxonomy: ThemeDefinition[]): string {
   const taxonomyText = taxonomy
     .map((theme, i) => `${i + 1}. ${theme.name} — ${theme.description}`)
     .join('\n')
 
-  // Identical for every batch, so it is worth caching: the taxonomy and the
-  // instructions are re-sent with each request and would otherwise be re-billed
-  // once per batch.
-  const system = `You are an expert at analysing public consultation responses on planning and development projects.
+  return `You are an expert at analysing public consultation responses on UK planning and development projects.
 
-For each response, decide two things.
+For each response, decide four things. Use the number in brackets as the response's id, and return exactly one result per response.
 
 STANCE — positive if it supports or praises, negative if it opposes or raises concerns, neutral if it only asks a question or gives information. Judge the response's position on the proposal, not the tone of its language: a politely worded objection is negative.
 
 THEMES — which of the numbered themes below the response raises. A response may raise several themes, or none. Assign a theme only when the response genuinely addresses it; do not stretch to give every response a theme.
 
 THEMES:
-${taxonomyText}
+${taxonomyText || '(no themes identified)'}
 
-Return exactly one result per response, using the number in brackets as the id.`
+MATERIAL — whether the response raises material planning considerations, non-material objections, or both ("mixed"). List the specific categories raised under materialCategories / nonMaterialCategories.
 
+MATERIAL PLANNING CONSIDERATIONS (things the planning authority CAN consider):
+- Traffic/highways impact, parking, road safety
+- Noise, air quality, light pollution
+- Design, visual impact, character of area
+- Overlooking, privacy, overshadowing
+- Ecology, wildlife, trees, biodiversity
+- Heritage, listed buildings, conservation areas
+- Flood risk, drainage, contamination
+- Infrastructure capacity (schools, healthcare, utilities)
+- Affordable housing provision
+- Economic benefits, employment
+
+NON-MATERIAL OBJECTIONS (things the planning authority CANNOT consider):
+- Property values, house prices
+- Loss of private view (not same as visual impact on area)
+- Competition between businesses
+- Construction disruption (covered by other legislation)
+- Applicant's motives or personal circumstances
+- Restrictive covenants, boundary disputes
+- Moral/political objections to developer
+- "It's not fair" or "we don't want change" without material reason`
+}
+
+const CAMPAIGN_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    campaigns: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          clusterNumber: { type: 'integer', description: 'The cluster number this campaign corresponds to' },
+          label: { type: 'string', description: 'Short name for the campaign, e.g. "Save the Meadow template letter"' },
+          stance: { type: 'string', enum: ['support', 'oppose', 'mixed', 'unclear'] },
+          templateSummary: { type: 'string', description: '1-2 sentences: what the shared template argues' },
+          personalAdditions: {
+            type: 'string',
+            description: 'What respondents personally added or changed beyond the template; empty string if members are identical copies',
+          },
+          additionalVariantNumbers: {
+            type: 'array',
+            items: { type: 'integer' },
+            description: 'Bracket numbers of UNCLUSTERED responses that are paraphrased variants of this same template',
+          },
+        },
+        required: ['clusterNumber', 'label', 'stance', 'templateSummary', 'personalAdditions', 'additionalVariantNumbers'],
+      },
+    },
+  },
+  required: ['campaigns'],
+}
+
+interface CampaignCharacterisation {
+  campaigns: Array<{
+    clusterNumber: number
+    label: string
+    stance: DetectedCampaign['stance']
+    templateSummary: string
+    personalAdditions: string
+    additionalVariantNumbers: number[]
+  }>
+}
+
+// Caps for the characterisation prompt. Clustering itself runs over ALL items
+// in code; only cluster samples and an unclustered subset reach the model.
+const MAX_CLUSTERS_TO_CHARACTERIZE = 10
+const MAX_UNCLUSTERED_FOR_VARIANT_SCAN = 120
+const CAMPAIGN_SAMPLE_CHARS = 1200
+const VARIANT_SCAN_CHARS = 300
+const MAX_STORED_MEMBER_IDS = 100
+
+const CAMPAIGN_SYSTEM = `You are an expert consultation analyst. Groups of near-identical responses have been detected in a public consultation — these are likely organised campaigns (template letters, copy-paste objections or support drives).
+
+For each cluster: give it a short label, determine its stance toward the project, summarise what the shared template argues, and describe what (if anything) individual respondents added beyond the template.
+
+Then check the UNCLUSTERED responses: if any are clearly a paraphrased or rewritten variant of one of the cluster templates (same campaign, reworded), list their bracket numbers under that campaign's additionalVariantNumbers. Only assign a response when the match is clear — genuinely independent responses that merely share a topic are NOT campaign variants. Return one entry per cluster, in cluster order.`
+
+/**
+ * State persisted between submitting an analysis batch and collecting its
+ * results. Everything needed to resolve the batch output back to real
+ * responses without re-running any model call.
+ */
+export interface PendingAnalysis {
+  batchId: string
+  taxonomy: ThemeDefinition[]
+  coverage: AnalysisCoverage
+  /** Item ids in the order they were sent, chunked per batch request. */
+  chunks: string[][]
+  campaign: {
+    clusters: Array<{ representativeId: string; memberIds: string[]; exact: boolean }>
+    /** Ids scanned for paraphrased variants, in bracket-number order. */
+    unclusteredIds: string[]
+  }
+  startedAt: string
+}
+
+/**
+ * Start a full analysis. Runs the taxonomy call (Opus) and the in-code
+ * campaign clustering synchronously, then submits one Batch API job carrying
+ * every classification chunk (Haiku) plus the campaign characterisation call
+ * (Opus). Returns the state needed to finalize once the batch ends —
+ * typically a few minutes later.
+ */
+export async function startFullAnalysis(feedbackItems: FeedbackItem[]): Promise<PendingAnalysis> {
+  const { items, coverage } = selectForAnalysis(feedbackItems)
+  if (items.length === 0) {
+    throw new Error('No feedback to analyze')
+  }
+
+  const taxonomy = await discoverThemes(items)
+  const system = buildClassifierSystem(taxonomy)
   const batches = chunk(items, CLASSIFY_BATCH_SIZE)
 
-  const batchResults = await mapWithConcurrency(batches, CLASSIFY_CONCURRENCY, async batch => {
-    const batchText = batch
-      .map((item, i) => `[${i + 1}] (${item.type}) ${item.content}`)
+  const requests: Anthropic.Messages.BatchCreateParams['requests'] = batches.map(
+    (batch, i) => ({
+      custom_id: `classify-${i}`,
+      params: {
+        model: CLASSIFIER_MODEL,
+        max_tokens: 16000,
+        system,
+        output_config: {
+          format: { type: 'json_schema', schema: CLASSIFY_SCHEMA },
+        },
+        messages: [
+          {
+            role: 'user',
+            content: `Classify these responses:\n\n${batch
+              .map((item, n) => `[${n + 1}] (${item.type}) ${item.content}`)
+              .join('\n\n')}`,
+          },
+        ],
+      },
+    })
+  )
+
+  // Campaign detection: clustering runs in code over the FULL corpus (zero
+  // token cost); characterisation of the clusters rides along in the batch.
+  const clusters = clusterResponses(
+    feedbackItems.map(item => ({ id: item.id, content: item.content }))
+  )
+  const byId = new Map(feedbackItems.map(item => [item.id, item]))
+  const clusteredIds = new Set(clusters.flatMap(c => c.memberIds))
+  const topClusters = clusters.slice(0, MAX_CLUSTERS_TO_CHARACTERIZE)
+
+  // Unclustered responses get scanned for paraphrased variants that shingle
+  // similarity can't catch. Longest first — template rewrites are rarely short.
+  const unclustered = feedbackItems
+    .filter(item => !clusteredIds.has(item.id))
+    .sort((a, b) => b.content.length - a.content.length)
+    .slice(0, MAX_UNCLUSTERED_FOR_VARIANT_SCAN)
+
+  if (topClusters.length > 0) {
+    const clusterText = topClusters
+      .map((cluster, i) => {
+        const rep = byId.get(cluster.representativeId)!
+        const variant = cluster.exact
+          ? null
+          : byId.get(cluster.memberIds[cluster.memberIds.length - 1])
+        return [
+          `CLUSTER ${i + 1} — ${cluster.memberIds.length} responses, ${cluster.exact ? 'identical copies' : 'near-identical variants'}`,
+          `Representative text: ${rep.content.slice(0, CAMPAIGN_SAMPLE_CHARS)}`,
+          variant && variant.id !== rep.id
+            ? `A variant: ${variant.content.slice(0, CAMPAIGN_SAMPLE_CHARS)}`
+            : null,
+        ]
+          .filter(Boolean)
+          .join('\n')
+      })
       .join('\n\n')
 
-    const result = await analysisCall<{
+    const unclusteredText = unclustered
+      .map((item, i) => `[${i + 1}] ${item.content.slice(0, VARIANT_SCAN_CHARS)}`)
+      .join('\n')
+
+    requests.push({
+      custom_id: 'campaigns',
+      params: {
+        model: MODEL,
+        max_tokens: 16000,
+        thinking: { type: 'adaptive' },
+        output_config: {
+          effort: 'medium',
+          format: { type: 'json_schema', schema: CAMPAIGN_SCHEMA },
+        },
+        system: CAMPAIGN_SYSTEM,
+        messages: [
+          {
+            role: 'user',
+            content: `Detected response clusters:\n\n${clusterText}\n\nUnclustered responses to scan for paraphrased variants:\n\n${unclusteredText || '(none)'}`,
+          },
+        ],
+      },
+    })
+  }
+
+  const batch = await getAnthropic().messages.batches.create({ requests })
+
+  return {
+    batchId: batch.id,
+    taxonomy,
+    coverage,
+    chunks: batches.map(b => b.map(item => item.id)),
+    campaign: {
+      clusters: clusters.map(c => ({
+        representativeId: c.representativeId,
+        memberIds: c.memberIds,
+        exact: c.exact,
+      })),
+      unclusteredIds: unclustered.map(item => item.id),
+    },
+    startedAt: new Date().toISOString(),
+  }
+}
+
+/** Whether a submitted analysis batch has finished processing. */
+export async function isAnalysisBatchReady(batchId: string): Promise<boolean> {
+  const batch = await getAnthropic().messages.batches.retrieve(batchId)
+  return batch.processing_status === 'ended'
+}
+
+/**
+ * Collect a finished batch and assemble the full analysis. All counting and
+ * statistics run here in code; the only model calls are the summary and
+ * headline stats (Opus), written from the counted figures.
+ *
+ * A failed or dropped chunk no longer kills the run — its responses are simply
+ * missing from the counts, and `coverage` reports the shortfall.
+ */
+export async function finalizeFullAnalysis(
+  pending: PendingAnalysis,
+  feedbackItems: FeedbackItem[]
+): Promise<FullAnalysisResult> {
+  const byId = new Map(feedbackItems.map(item => [item.id, truncateContent(item)]))
+
+  // The classified items, in the order they were sent. Items deleted since
+  // submission drop out here and from every count downstream.
+  const items = pending.chunks
+    .flat()
+    .map(id => byId.get(id))
+    .filter((item): item is FeedbackItem => !!item)
+
+  const assignments: ItemAssignment[] = []
+  let campaignRaw: CampaignCharacterisation | null = null
+  const seen = new Set<string>()
+
+  const results = await getAnthropic().messages.batches.results(pending.batchId)
+  for await (const entry of results) {
+    if (entry.result.type !== 'succeeded') {
+      console.warn(`finalizeFullAnalysis: request ${entry.custom_id} ${entry.result.type}`)
+      continue
+    }
+    const textBlock = entry.result.message.content.find(
+      (block): block is Anthropic.TextBlock => block.type === 'text'
+    )
+    if (!textBlock) continue
+
+    if (entry.custom_id === 'campaigns') {
+      try {
+        campaignRaw = JSON.parse(textBlock.text) as CampaignCharacterisation
+      } catch {
+        console.warn('finalizeFullAnalysis: campaign characterisation unparseable')
+      }
+      continue
+    }
+
+    const match = entry.custom_id.match(/^classify-(\d+)$/)
+    if (!match) continue
+    const chunkIds = pending.chunks[Number(match[1])]
+    if (!chunkIds) continue
+
+    let parsed: {
       items: Array<{
         id: string
         sentiment: 'positive' | 'negative' | 'neutral'
         confidence: number
         themes: number[]
+        material: 'material' | 'non-material' | 'mixed'
+        materialCategories: string[]
+        nonMaterialCategories: string[]
       }>
-    }>({
-      system,
-      user: `Classify these responses:\n\n${batchText}`,
-      schema: CLASSIFY_SCHEMA,
-      effort: 'low',
-      model: CLASSIFIER_MODEL,
-      cacheSystem: true,
-    })
+    }
+    try {
+      parsed = JSON.parse(textBlock.text)
+    } catch {
+      console.warn(`finalizeFullAnalysis: chunk ${entry.custom_id} unparseable`)
+      continue
+    }
 
     // Resolve by bracket number rather than position: the model may reorder,
     // drop, or repeat entries, and a positional read would then attribute one
     // resident's view to another.
-    const seen = new Set<string>()
-    const assignments: ItemAssignment[] = []
-
-    result.items.forEach(entry => {
-      const original = batch[parseInt(entry.id, 10) - 1]
-      if (!original || seen.has(original.id)) return
-      seen.add(original.id)
+    for (const result of parsed.items || []) {
+      const originalId = chunkIds[parseInt(result.id, 10) - 1]
+      if (!originalId || seen.has(originalId) || !byId.has(originalId)) continue
+      seen.add(originalId)
 
       assignments.push({
-        id: original.id,
-        sentiment: entry.sentiment,
-        confidence: entry.confidence,
-        themeIds: (entry.themes || [])
+        id: originalId,
+        sentiment: result.sentiment,
+        confidence: result.confidence,
+        themeIds: (result.themes || [])
           // Model-supplied indices are 1-based and can be out of range.
           .map(n => n - 1)
-          .filter(index => index >= 0 && index < taxonomy.length),
+          .filter(index => index >= 0 && index < pending.taxonomy.length),
+        material: result.material,
+        materialCategories: result.materialCategories || [],
+        nonMaterialCategories: result.nonMaterialCategories || [],
       })
-    })
-
-    if (assignments.length !== batch.length) {
-      console.warn(
-        `classifyCorpus: resolved ${assignments.length} of ${batch.length} responses in a batch`
-      )
     }
-
-    return assignments
-  })
-
-  const assignments = batchResults.flat()
+  }
 
   // Anything the model failed to return is missing from the counts, so the
-  // coverage figure has to reflect what was actually classified, not what was
-  // sent.
-  const classified: AnalysisCoverage = {
-    ...coverage,
+  // coverage figure reflects what was actually classified, not what was sent.
+  const coverage: AnalysisCoverage = {
+    ...pending.coverage,
     analyzed: assignments.length,
-    complete: coverage.complete && assignments.length === items.length,
+    complete: pending.coverage.complete && assignments.length === items.length,
   }
-  if (!classified.complete && !classified.note) {
-    classified.note = `Classified ${assignments.length} of ${coverage.total} responses.`
+  if (!coverage.complete && !coverage.note) {
+    coverage.note = `Classified ${assignments.length} of ${coverage.total} responses.`
   }
 
-  return { taxonomy, assignments, items, coverage: classified }
+  const classification: CorpusClassification = {
+    taxonomy: pending.taxonomy,
+    assignments,
+    items,
+    coverage,
+  }
+
+  const sentiment = deriveSentiment(classification)
+  const themes = deriveThemes(classification)
+  const geographic = deriveGeographic(classification)
+  const materialAnalysis = deriveMaterial(classification)
+  const campaignAnalysis = resolveCampaigns(pending.campaign, campaignRaw, feedbackItems)
+
+  // Pure computation over the assignments: exact, reproducible, no token cost.
+  const crossRef = crossReference(
+    items.map(item => ({
+      id: item.id,
+      type: item.type,
+      latitude: item.latitude,
+      longitude: item.longitude,
+      createdAt: new Date(item.createdAt),
+    })),
+    pending.taxonomy,
+    assignments
+  )
+
+  const [summary, headlineStats] = await Promise.all([
+    generateSummary(
+      feedbackItems,
+      sentiment,
+      themes,
+      crossRef.highlights.slice(0, 8).map(describeHighlight)
+    ),
+    generateHeadlineStats(feedbackItems, sentiment, themes),
+  ])
+
+  return {
+    sentiment,
+    themes,
+    summary,
+    headlineStats,
+    materialAnalysis,
+    campaignAnalysis,
+    geographic,
+    crossReference: crossRef,
+    coverage,
+    analyzedAt: new Date().toISOString(),
+    feedbackCount: feedbackItems.length,
+  }
 }
 
 /** Aggregate a classification into the sentiment shape. All counts are exact. */
@@ -678,23 +938,128 @@ export function deriveThemes(classification: CorpusClassification): ThemesResult
 }
 
 /**
- * Standalone sentiment analysis. Runs the full classification pass; prefer
- * `runFullAnalysis` when themes are wanted too, so the corpus is classified once.
+ * Aggregate material considerations from the per-response assignments. This
+ * tells a planning officer how much of the opposition a committee can lawfully
+ * weigh, so it runs over every classified response, and every category total
+ * adds up to the responses behind it.
  */
-export async function analyzeSentiment(feedbackItems: FeedbackItem[]): Promise<SentimentResult> {
-  if (feedbackItems.length === 0) {
-    return deriveSentiment({ taxonomy: [], assignments: [], items: [], coverage: { total: 0, analyzed: 0, complete: true } })
+export function deriveMaterial(classification: CorpusClassification): MaterialAnalysisResult {
+  const { assignments, items } = classification
+  const itemsById = new Map(items.map(item => [item.id, item]))
+
+  const summary = { material: 0, nonMaterial: 0, mixed: 0 }
+  assignments.forEach(a => {
+    if (a.material === 'material') summary.material++
+    else if (a.material === 'non-material') summary.nonMaterial++
+    else summary.mixed++
+  })
+
+  const tally = (pick: (a: ItemAssignment) => string[]) => {
+    const counts = new Map<string, { count: number; examples: string[] }>()
+
+    assignments.forEach(assignment => {
+      pick(assignment).forEach(name => {
+        if (!counts.has(name)) counts.set(name, { count: 0, examples: [] })
+        const entry = counts.get(name)!
+        entry.count++
+
+        if (entry.examples.length < 2) {
+          const text = itemsById.get(assignment.id)?.content?.trim()
+          if (text && text.length >= 40) {
+            entry.examples.push(
+              text.length > QUOTE_CHARS ? `${text.slice(0, QUOTE_CHARS).trimEnd()}…` : text
+            )
+          }
+        }
+      })
+    })
+
+    return Array.from(counts.entries())
+      .map(([name, entry]) => ({ name, count: entry.count, examples: entry.examples }))
+      .sort((a, b) => b.count - a.count)
   }
-  return deriveSentiment(await classifyCorpus(feedbackItems))
+
+  return {
+    summary,
+    categories: {
+      material: tally(a => a.materialCategories),
+      nonMaterial: tally(a => a.nonMaterialCategories),
+    },
+    items: assignments.map(a => ({
+      id: a.id,
+      classification: a.material,
+      materialCategories: a.materialCategories,
+      nonMaterialCategories: a.nonMaterialCategories,
+    })),
+  }
 }
 
 /**
- * Standalone theme extraction. Runs the full classification pass; prefer
- * `runFullAnalysis` when sentiment is wanted too, so the corpus is classified once.
+ * Assemble the campaign result from the in-code clustering (done at submit
+ * time) and the model's characterisation of each cluster (from the batch).
  */
-export async function extractThemes(feedbackItems: FeedbackItem[]): Promise<ThemesResult> {
-  if (feedbackItems.length === 0) return { themes: [], totalFeedback: 0 }
-  return deriveThemes(await classifyCorpus(feedbackItems))
+function resolveCampaigns(
+  campaignState: PendingAnalysis['campaign'],
+  characterisation: CampaignCharacterisation | null,
+  feedbackItems: FeedbackItem[]
+): CampaignAnalysisResult {
+  const total = feedbackItems.length
+  const { clusters, unclusteredIds } = campaignState
+
+  const empty: CampaignAnalysisResult = {
+    totalAnalyzed: total,
+    templatedCount: 0,
+    uniqueCount: total,
+    campaigns: [],
+  }
+  if (clusters.length === 0) return empty
+
+  const byId = new Map(feedbackItems.map(item => [item.id, item]))
+  const topClusters = clusters.slice(0, MAX_CLUSTERS_TO_CHARACTERIZE)
+
+  const campaigns: DetectedCampaign[] = []
+  const variantIds = new Set<string>()
+
+  topClusters.forEach((cluster, i) => {
+    const characterized = characterisation?.campaigns.find(c => c.clusterNumber === i + 1)
+    const rep = byId.get(cluster.representativeId)
+
+    // Resolve variant bracket numbers to real items, ignoring out-of-range or
+    // already-claimed ids so counts can't double-book a response.
+    const extraIds: string[] = []
+    for (const num of characterized?.additionalVariantNumbers || []) {
+      const id = unclusteredIds[num - 1]
+      if (id && !variantIds.has(id) && byId.has(id)) {
+        variantIds.add(id)
+        extraIds.push(id)
+      }
+    }
+
+    const memberIds = [...cluster.memberIds, ...extraIds]
+    campaigns.push({
+      label: characterized?.label || `Template group ${i + 1}`,
+      count: memberIds.length,
+      stance: characterized?.stance || 'unclear',
+      templateSummary: characterized?.templateSummary || '',
+      personalAdditions: characterized?.personalAdditions || '',
+      exact: cluster.exact && extraIds.length === 0,
+      sampleQuote: rep ? rep.content.slice(0, 220) : '',
+      memberIds: memberIds.slice(0, MAX_STORED_MEMBER_IDS),
+    })
+  })
+
+  // Clusters beyond the characterisation cap still count toward the totals.
+  const uncharacterized = clusters.slice(MAX_CLUSTERS_TO_CHARACTERIZE)
+  const templatedCount =
+    campaigns.reduce((sum, c) => sum + c.count, 0) +
+    uncharacterized.reduce((sum, c) => sum + c.memberIds.length, 0)
+
+  return {
+    totalAnalyzed: total,
+    templatedCount,
+    uniqueCount: Math.max(0, total - templatedCount),
+    campaigns: campaigns.sort((a, b) => b.count - a.count),
+  }
 }
 
 const SUMMARY_SCHEMA = {
@@ -825,378 +1190,6 @@ export function deriveGeographic(
   })
 
   return { clusters: clusterResults.sort((a, b) => b.count - a.count) }
-}
-
-/**
- * Standalone geographic analysis. Runs the classification pass; prefer
- * `runFullAnalysis`, which classifies the corpus once and reuses it.
- */
-export async function analyzeGeographic(
-  feedbackItems: FeedbackItem[]
-): Promise<FullAnalysisResult['geographic']> {
-  const located = feedbackItems.filter(item => item.latitude != null && item.longitude != null)
-  if (located.length < 3) return undefined
-
-  return deriveGeographic(await classifyCorpus(feedbackItems))
-}
-
-const CAMPAIGN_SCHEMA = {
-  type: 'object',
-  additionalProperties: false,
-  properties: {
-    campaigns: {
-      type: 'array',
-      items: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          clusterNumber: { type: 'integer', description: 'The cluster number this campaign corresponds to' },
-          label: { type: 'string', description: 'Short name for the campaign, e.g. "Save the Meadow template letter"' },
-          stance: { type: 'string', enum: ['support', 'oppose', 'mixed', 'unclear'] },
-          templateSummary: { type: 'string', description: '1-2 sentences: what the shared template argues' },
-          personalAdditions: {
-            type: 'string',
-            description: 'What respondents personally added or changed beyond the template; empty string if members are identical copies',
-          },
-          additionalVariantNumbers: {
-            type: 'array',
-            items: { type: 'integer' },
-            description: 'Bracket numbers of UNCLUSTERED responses that are paraphrased variants of this same template',
-          },
-        },
-        required: ['clusterNumber', 'label', 'stance', 'templateSummary', 'personalAdditions', 'additionalVariantNumbers'],
-      },
-    },
-  },
-  required: ['campaigns'],
-}
-
-// Caps for the characterisation prompt. Clustering itself runs over ALL items
-// in code; only cluster samples and an unclustered subset reach the model.
-const MAX_CLUSTERS_TO_CHARACTERIZE = 10
-const MAX_UNCLUSTERED_FOR_VARIANT_SCAN = 120
-const CAMPAIGN_SAMPLE_CHARS = 1200
-const VARIANT_SCAN_CHARS = 300
-const MAX_STORED_MEMBER_IDS = 100
-
-/**
- * Detect organised campaigns and duplicate responses. Near-identical texts are
- * clustered in code (zero token cost, full corpus); Claude then characterises
- * each cluster and scans a sample of unclustered responses for paraphrased
- * variants of the same templates.
- */
-export async function analyzeCampaigns(
-  feedbackItems: FeedbackItem[]
-): Promise<CampaignAnalysisResult> {
-  const total = feedbackItems.length
-  const empty: CampaignAnalysisResult = {
-    totalAnalyzed: total,
-    templatedCount: 0,
-    uniqueCount: total,
-    campaigns: [],
-  }
-  if (total < 2) return empty
-
-  const clusters = clusterResponses(
-    feedbackItems.map(item => ({ id: item.id, content: item.content }))
-  )
-  if (clusters.length === 0) return empty
-
-  const byId = new Map(feedbackItems.map(item => [item.id, item]))
-  const clusteredIds = new Set(clusters.flatMap(c => c.memberIds))
-  const topClusters = clusters.slice(0, MAX_CLUSTERS_TO_CHARACTERIZE)
-
-  const clusterText = topClusters
-    .map((cluster, i) => {
-      const rep = byId.get(cluster.representativeId)!
-      const variant = cluster.exact
-        ? null
-        : byId.get(cluster.memberIds[cluster.memberIds.length - 1])
-      return [
-        `CLUSTER ${i + 1} — ${cluster.memberIds.length} responses, ${cluster.exact ? 'identical copies' : 'near-identical variants'}`,
-        `Representative text: ${rep.content.slice(0, CAMPAIGN_SAMPLE_CHARS)}`,
-        variant && variant.id !== rep.id
-          ? `A variant: ${variant.content.slice(0, CAMPAIGN_SAMPLE_CHARS)}`
-          : null,
-      ]
-        .filter(Boolean)
-        .join('\n')
-    })
-    .join('\n\n')
-
-  // Unclustered responses get scanned for paraphrased variants that shingle
-  // similarity can't catch. Longest first — template rewrites are rarely short.
-  const unclustered = feedbackItems
-    .filter(item => !clusteredIds.has(item.id))
-    .sort((a, b) => b.content.length - a.content.length)
-    .slice(0, MAX_UNCLUSTERED_FOR_VARIANT_SCAN)
-  const unclusteredText = unclustered
-    .map((item, i) => `[${i + 1}] ${item.content.slice(0, VARIANT_SCAN_CHARS)}`)
-    .join('\n')
-
-  const result = await analysisCall<{
-    campaigns: Array<{
-      clusterNumber: number
-      label: string
-      stance: DetectedCampaign['stance']
-      templateSummary: string
-      personalAdditions: string
-      additionalVariantNumbers: number[]
-    }>
-  }>({
-    system: `You are an expert consultation analyst. Groups of near-identical responses have been detected in a public consultation — these are likely organised campaigns (template letters, copy-paste objections or support drives).
-
-For each cluster: give it a short label, determine its stance toward the project, summarise what the shared template argues, and describe what (if anything) individual respondents added beyond the template.
-
-Then check the UNCLUSTERED responses: if any are clearly a paraphrased or rewritten variant of one of the cluster templates (same campaign, reworded), list their bracket numbers under that campaign's additionalVariantNumbers. Only assign a response when the match is clear — genuinely independent responses that merely share a topic are NOT campaign variants. Return one entry per cluster, in cluster order.`,
-    user: `Detected response clusters:\n\n${clusterText}\n\nUnclustered responses to scan for paraphrased variants:\n\n${unclusteredText || '(none)'}`,
-    schema: CAMPAIGN_SCHEMA,
-    effort: 'medium',
-  })
-
-  const campaigns: DetectedCampaign[] = []
-  const variantIds = new Set<string>()
-
-  topClusters.forEach((cluster, i) => {
-    const characterized = result.campaigns.find(c => c.clusterNumber === i + 1)
-    const rep = byId.get(cluster.representativeId)!
-
-    // Resolve variant bracket numbers to real items, ignoring out-of-range or
-    // already-claimed ids so counts can't double-book a response.
-    const extraIds: string[] = []
-    for (const num of characterized?.additionalVariantNumbers || []) {
-      const item = unclustered[num - 1]
-      if (item && !variantIds.has(item.id)) {
-        variantIds.add(item.id)
-        extraIds.push(item.id)
-      }
-    }
-
-    const memberIds = [...cluster.memberIds, ...extraIds]
-    campaigns.push({
-      label: characterized?.label || `Template group ${i + 1}`,
-      count: memberIds.length,
-      stance: characterized?.stance || 'unclear',
-      templateSummary: characterized?.templateSummary || '',
-      personalAdditions: characterized?.personalAdditions || '',
-      exact: cluster.exact && extraIds.length === 0,
-      sampleQuote: rep.content.slice(0, 220),
-      memberIds: memberIds.slice(0, MAX_STORED_MEMBER_IDS),
-    })
-  })
-
-  // Clusters beyond the characterisation cap still count toward the totals.
-  const uncharacterized = clusters.slice(MAX_CLUSTERS_TO_CHARACTERIZE)
-  const templatedCount =
-    campaigns.reduce((sum, c) => sum + c.count, 0) +
-    uncharacterized.reduce((sum, c) => sum + c.memberIds.length, 0)
-
-  return {
-    totalAnalyzed: total,
-    templatedCount,
-    uniqueCount: Math.max(0, total - templatedCount),
-    campaigns: campaigns.sort((a, b) => b.count - a.count),
-  }
-}
-
-export async function runFullAnalysis(feedbackItems: FeedbackItem[]): Promise<FullAnalysisResult> {
-  // One classification pass feeds sentiment, themes, geography and the
-  // cross-tabs. Running them as separate passes would cost several times as
-  // much and — worse — let the same response be counted differently in each.
-  const [classification, materialAnalysis, campaignAnalysis] = await Promise.all([
-    classifyCorpus(feedbackItems),
-    classifyMaterialConsiderations(feedbackItems),
-    analyzeCampaigns(feedbackItems),
-  ])
-
-  const sentiment = deriveSentiment(classification)
-  const themes = deriveThemes(classification)
-  const geographic = deriveGeographic(classification)
-
-  // Pure computation over the assignments: exact, reproducible, no token cost.
-  const crossRef = crossReference(
-    classification.items.map(item => ({
-      id: item.id,
-      type: item.type,
-      latitude: item.latitude,
-      longitude: item.longitude,
-      createdAt: new Date(item.createdAt),
-    })),
-    classification.taxonomy,
-    classification.assignments
-  )
-
-  const [summary, headlineStats] = await Promise.all([
-    generateSummary(
-      feedbackItems,
-      sentiment,
-      themes,
-      crossRef.highlights.slice(0, 8).map(describeHighlight)
-    ),
-    generateHeadlineStats(feedbackItems, sentiment, themes),
-  ])
-
-  return {
-    sentiment,
-    themes,
-    summary,
-    headlineStats,
-    materialAnalysis,
-    campaignAnalysis,
-    geographic,
-    crossReference: crossRef,
-    coverage: classification.coverage,
-    analyzedAt: new Date().toISOString(),
-    feedbackCount: feedbackItems.length,
-  }
-}
-
-const MATERIAL_ITEMS_SCHEMA = {
-  type: 'object',
-  additionalProperties: false,
-  properties: {
-    items: {
-      type: 'array',
-      items: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          id: { type: 'string', description: 'The bracket number of the response' },
-          classification: { type: 'string', enum: ['material', 'non-material', 'mixed'] },
-          materialCategories: { type: 'array', items: { type: 'string' } },
-          nonMaterialCategories: { type: 'array', items: { type: 'string' } },
-        },
-        required: ['id', 'classification', 'materialCategories', 'nonMaterialCategories'],
-      },
-    },
-  },
-  required: ['items'],
-}
-
-/**
- * Sort responses into material planning considerations and non-material
- * objections.
- *
- * Runs over every response rather than a sample: this output tells a planning
- * officer how much of the opposition a committee can lawfully weigh, and a
- * figure derived from a subset would misstate that. Category totals are tallied
- * from the per-response results, so they add up to the responses behind them.
- */
-export async function classifyMaterialConsiderations(
-  feedbackItems: FeedbackItem[]
-): Promise<MaterialAnalysisResult> {
-  const empty: MaterialAnalysisResult = {
-    summary: { material: 0, nonMaterial: 0, mixed: 0 },
-    categories: { material: [], nonMaterial: [] },
-    items: [],
-  }
-  if (feedbackItems.length === 0) return empty
-
-  const { items } = selectForAnalysis(feedbackItems)
-  if (items.length === 0) return empty
-
-  const system = `You are a UK planning expert. Classify each consultation response by whether it raises material planning considerations or non-material objections. Use the number in brackets as each response's id, and return exactly one result per response.
-
-MATERIAL PLANNING CONSIDERATIONS (things the planning authority CAN consider):
-- Traffic/highways impact, parking, road safety
-- Noise, air quality, light pollution
-- Design, visual impact, character of area
-- Overlooking, privacy, overshadowing
-- Ecology, wildlife, trees, biodiversity
-- Heritage, listed buildings, conservation areas
-- Flood risk, drainage, contamination
-- Infrastructure capacity (schools, healthcare, utilities)
-- Affordable housing provision
-- Economic benefits, employment
-
-NON-MATERIAL OBJECTIONS (things the planning authority CANNOT consider):
-- Property values, house prices
-- Loss of private view (not same as visual impact on area)
-- Competition between businesses
-- Construction disruption (covered by other legislation)
-- Applicant's motives or personal circumstances
-- Restrictive covenants, boundary disputes
-- Moral/political objections to developer
-- "It's not fair" or "we don't want change" without material reason`
-
-  const batches = chunk(items, CLASSIFY_BATCH_SIZE)
-
-  const batchResults = await mapWithConcurrency(batches, CLASSIFY_CONCURRENCY, async batch => {
-    const batchText = batch.map((item, i) => `[${i + 1}] ${item.content}`).join('\n\n')
-
-    const result = await analysisCall<{ items: MaterialAnalysisResult['items'] }>({
-      system,
-      user: `Classify these responses:\n\n${batchText}`,
-      schema: MATERIAL_ITEMS_SCHEMA,
-      effort: 'medium',
-      model: CLASSIFIER_MODEL,
-      cacheSystem: true,
-    })
-
-    // Resolve by bracket number, not position — see classifyCorpus.
-    const seen = new Set<string>()
-    const resolved: MaterialAnalysisResult['items'] = []
-
-    ;(result.items || []).forEach(entry => {
-      const original = batch[parseInt(entry.id, 10) - 1]
-      if (!original || seen.has(original.id)) return
-      seen.add(original.id)
-
-      resolved.push({
-        id: original.id,
-        classification: entry.classification,
-        materialCategories: entry.materialCategories || [],
-        nonMaterialCategories: entry.nonMaterialCategories || [],
-      })
-    })
-
-    return resolved
-  })
-
-  const classified = batchResults.flat()
-  const itemsById = new Map(items.map(item => [item.id, item]))
-
-  const summary = { material: 0, nonMaterial: 0, mixed: 0 }
-  classified.forEach(item => {
-    if (item.classification === 'material') summary.material++
-    else if (item.classification === 'non-material') summary.nonMaterial++
-    else summary.mixed++
-  })
-
-  // Tally categories from the per-response results so every count is traceable.
-  const tally = (pick: (item: MaterialAnalysisResult['items'][number]) => string[]) => {
-    const counts = new Map<string, { count: number; examples: string[] }>()
-
-    classified.forEach(item => {
-      pick(item).forEach(name => {
-        if (!counts.has(name)) counts.set(name, { count: 0, examples: [] })
-        const entry = counts.get(name)!
-        entry.count++
-
-        if (entry.examples.length < 2) {
-          const text = itemsById.get(item.id)?.content?.trim()
-          if (text && text.length >= 40) {
-            entry.examples.push(
-              text.length > QUOTE_CHARS ? `${text.slice(0, QUOTE_CHARS).trimEnd()}…` : text
-            )
-          }
-        }
-      })
-    })
-
-    return Array.from(counts.entries())
-      .map(([name, entry]) => ({ name, count: entry.count, examples: entry.examples }))
-      .sort((a, b) => b.count - a.count)
-  }
-
-  return {
-    summary,
-    categories: {
-      material: tally(item => item.materialCategories),
-      nonMaterial: tally(item => item.nonMaterialCategories),
-    },
-    items: classified,
-  }
 }
 
 const HEADLINE_STATS_SCHEMA = {

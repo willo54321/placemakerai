@@ -239,11 +239,12 @@ export function crossReference(
   // --- segments -----------------------------------------------------------
   // A segment is a named subset of the classified corpus. Every dimension
   // reduces to the same shape, so one test loop covers all of them.
-  const segments: Array<{
+  interface Segment {
     dimension: CrossTab['dimension']
     label: string
     ids: Set<string>
-  }> = []
+  }
+  const segments: Segment[] = []
 
   // Source
   const bySource = new Map<CrossRefItem['type'], Set<string>>()
@@ -295,46 +296,83 @@ export function crossReference(
   const totalClassified = classified.length
   const candidates: Candidate[] = []
 
-  themeIndices.forEach(themeId => {
+  const candidateFor = (themeId: number, segment: Segment): Candidate | null => {
     const themeIds = idsByTheme.get(themeId)!
     const themeTotal = themeIds.size
-    if (themeTotal === 0) return
+    if (themeTotal === 0) return null
 
-    segments.forEach(segment => {
-      const segmentTotal = segment.ids.size
-      if (segmentTotal < opts.minSegmentSize) return
+    const segmentTotal = segment.ids.size
+    if (segmentTotal < opts.minSegmentSize) return null
 
-      let inSegment = 0
-      segment.ids.forEach(id => {
-        if (themeIds.has(id)) inSegment++
-      })
-      if (inSegment < opts.minCount) return
+    let inSegment = 0
+    segment.ids.forEach(id => {
+      if (themeIds.has(id)) inSegment++
+    })
+    if (inSegment < opts.minCount) return null
 
-      const outsideTotal = totalClassified - segmentTotal
-      const outsideCount = themeTotal - inSegment
-      if (outsideTotal <= 0) return
+    const outsideTotal = totalClassified - segmentTotal
+    const outsideCount = themeTotal - inSegment
+    if (outsideTotal <= 0) return null
 
-      const segmentShare = inSegment / segmentTotal
-      const baselineShare = outsideCount / outsideTotal
-      // A theme raised by nobody outside the segment has no meaningful ratio.
-      // Lift is left at 0 and `baselineShare === 0` is the signal to describe it
-      // as exclusive rather than as a multiple — quoting a made-up multiplier in
-      // a committee report would be worse than saying "only here".
-      const lift = baselineShare > 0 ? segmentShare / baselineShare : 0
+    const segmentShare = inSegment / segmentTotal
+    const baselineShare = outsideCount / outsideTotal
+    // A theme raised by nobody outside the segment has no meaningful ratio.
+    // Lift is left at 0 and `baselineShare === 0` is the signal to describe it
+    // as exclusive rather than as a multiple — quoting a made-up multiplier in
+    // a committee report would be worse than saying "only here".
+    const lift = baselineShare > 0 ? segmentShare / baselineShare : 0
 
-      candidates.push({
-        tab: {
-          theme: themeNames[themeId],
-          dimension: segment.dimension,
-          segment: segment.label,
-          count: inSegment,
-          segmentTotal,
-          segmentShare,
-          baselineShare,
-          lift,
-        },
-        pValue: twoProportionPValue(inSegment, segmentTotal, outsideCount, outsideTotal),
-      })
+    return {
+      tab: {
+        theme: themeNames[themeId],
+        dimension: segment.dimension,
+        segment: segment.label,
+        count: inSegment,
+        segmentTotal,
+        segmentShare,
+        baselineShare,
+        lift,
+      },
+      pValue: twoProportionPValue(inSegment, segmentTotal, outsideCount, outsideTotal),
+    }
+  }
+
+  // When a dimension's two segments partition the corpus (early/late, or
+  // exactly two sources), each side's test is the other's mirror: identical
+  // p-values, a doubled correction family, and the same finding reported from
+  // both directions. Test such pairs once, from the over-represented side.
+  const byDimension = new Map<CrossTab['dimension'], Segment[]>()
+  segments.forEach(segment => {
+    const list = byDimension.get(segment.dimension) || []
+    list.push(segment)
+    byDimension.set(segment.dimension, list)
+  })
+
+  byDimension.forEach(dimSegments => {
+    const partitioned =
+      dimSegments.length === 2 &&
+      dimSegments[0].ids.size + dimSegments[1].ids.size === totalClassified
+
+    themeIndices.forEach(themeId => {
+      if (partitioned) {
+        const themeIds = idsByTheme.get(themeId)!
+        const shares = dimSegments.map(segment => {
+          let count = 0
+          segment.ids.forEach(id => {
+            if (themeIds.has(id)) count++
+          })
+          return segment.ids.size > 0 ? count / segment.ids.size : 0
+        })
+        if (shares[0] === shares[1]) return
+        const reporting = shares[0] > shares[1] ? dimSegments[0] : dimSegments[1]
+        const candidate = candidateFor(themeId, reporting)
+        if (candidate) candidates.push(candidate)
+      } else {
+        dimSegments.forEach(segment => {
+          const candidate = candidateFor(themeId, segment)
+          if (candidate) candidates.push(candidate)
+        })
+      }
     })
   })
 

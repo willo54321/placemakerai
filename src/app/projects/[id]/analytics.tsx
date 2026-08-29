@@ -174,12 +174,17 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
 
   // Fetch existing analysis. fetchJson throws on non-2xx so genuine server
   // errors surface via the query's `error` state instead of silently resolving.
+  // While a run is in flight the server reports `processing: true` and this
+  // query polls until the batch completes (the GET also finalizes it).
   const { data, isLoading, error } = useQuery({
     queryKey: ['analytics', projectId],
     queryFn: () => fetchJson(`/api/projects/${projectId}/analytics`),
+    refetchInterval: (query) =>
+      (query.state.data as { processing?: boolean } | undefined)?.processing ? 5000 : false,
   })
 
-  // Run new analysis. Pass `force: true` to bypass the server-side cache check.
+  // Start a new analysis run. Pass `force: true` to bypass the server-side
+  // cache check. The POST returns immediately; results arrive via polling.
   const runAnalysis = useMutation({
     mutationFn: ({ force }: { force?: boolean } = {}) =>
       fetchJson(`/api/projects/${projectId}/analytics`, {
@@ -187,9 +192,13 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ force: force ?? false }),
       }),
-    onSuccess: () => {
+    onSuccess: (result: { processing?: boolean; cached?: boolean }) => {
       queryClient.invalidateQueries({ queryKey: ['analytics', projectId] })
-      toast.success('Analysis complete!')
+      if (result?.processing) {
+        toast.success('Analysis started — results in a few minutes')
+      } else {
+        toast.success('Analysis complete!')
+      }
     },
     onError: (err) => {
       toast.error(err instanceof Error ? err.message : 'Failed to run analysis')
@@ -199,12 +208,23 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
   const analysis: AnalysisData | null = data?.analysis
   const needsUpdate = data?.needsUpdate
   const feedbackCount = data?.feedbackCount || 0
+  const processing = Boolean(data?.processing)
+  const analysisFailed = Boolean(data?.analysisFailed)
+
+  // Toast once when a polled run lands.
+  const wasProcessing = useRef(false)
+  useEffect(() => {
+    if (wasProcessing.current && !processing && analysis) {
+      toast.success('Analysis complete!')
+    }
+    wasProcessing.current = processing
+  }, [processing, analysis])
 
   // Auto-run analysis at most once when needed and there's feedback. The latch
   // and the `isError` bail prevent the infinite-retry loop on POST failure.
   // Deps are scalar values only (no mutation-object identity) so the effect
   // doesn't re-fire on every render.
-  const canAutoRun = Boolean(needsUpdate) && feedbackCount > 0 && !analysis
+  const canAutoRun = Boolean(needsUpdate) && feedbackCount > 0 && !analysis && !processing && !analysisFailed
   useEffect(() => {
     if (
       canAutoRun &&
@@ -253,6 +273,20 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
     )
   }
 
+  if (!analysis && processing) {
+    return (
+      <div className="card p-12 text-center max-w-lg mx-auto">
+        <div className="w-20 h-20 bg-brand-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
+          <Spinner size="lg" />
+        </div>
+        <h3 className="text-xl font-semibold text-slate-900 mb-3">Analysing your feedback</h3>
+        <p className="text-slate-500 leading-relaxed">
+          Classifying every one of <span className="font-semibold text-slate-700">{feedbackCount}</span> responses — sentiment, themes, material planning considerations and campaign detection. Results typically arrive within a few minutes. You can leave this page and come back.
+        </p>
+      </div>
+    )
+  }
+
   if (!analysis) {
     return (
       <div className="card p-12 text-center max-w-lg mx-auto">
@@ -260,6 +294,11 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
           <Sparkles className="w-10 h-10 text-brand-600" />
         </div>
         <h3 className="text-xl font-semibold text-slate-900 mb-3">AI Analytics</h3>
+        {analysisFailed && (
+          <p className="text-sm text-red-600 bg-red-50 rounded-lg px-4 py-2 mb-4">
+            The last analysis didn&apos;t complete — try running it again.
+          </p>
+        )}
         <p className="text-slate-500 mb-8 leading-relaxed">
           Analyze <span className="font-semibold text-slate-700">{feedbackCount}</span> pieces of feedback using AI to extract insights, sentiment, and themes.
         </p>
@@ -333,7 +372,18 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
           </p>
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
-          {needsUpdate && (
+          {processing && (
+            <span className="text-sm text-brand-700 bg-brand-50 px-3 py-1.5 rounded-full flex items-center gap-1.5">
+              <span className="w-2 h-2 bg-brand-500 rounded-full animate-pulse" />
+              Re-analysis in progress — showing previous results
+            </span>
+          )}
+          {!processing && analysisFailed && (
+            <span className="text-sm text-red-600 bg-red-50 px-3 py-1.5 rounded-full">
+              Last analysis failed — try again
+            </span>
+          )}
+          {!processing && !analysisFailed && needsUpdate && (
             <span className="text-sm text-amber-600 bg-amber-50 px-3 py-1.5 rounded-full flex items-center gap-1.5">
               <span className="w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
               New feedback available
@@ -341,11 +391,11 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
           )}
           <button
             onClick={() => runAnalysis.mutate({ force: true })}
-            disabled={runAnalysis.isPending}
+            disabled={runAnalysis.isPending || processing}
             data-tour="run-analysis"
             className="btn-secondary"
           >
-            {runAnalysis.isPending ? (
+            {runAnalysis.isPending || processing ? (
               <>
                 <Spinner size="sm" />
                 Analyzing...

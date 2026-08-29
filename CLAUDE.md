@@ -6,6 +6,15 @@ Placemaker.ai is a public consultation platform for planning projects. It focuse
 
 **Domain:** placemakerai.io
 
+**Key differentiator — embed-first, no design system lock-in:** Placemaker works *with* an
+organisation's existing consultation website rather than replacing it. The map, forms and enquiry
+capture are embeds (`/embed/{projectId}`, `/forms/{formId}`) that drop into the client's own site
+and inherit their branding via per-project styling (`embedPrimaryColor`, `embedFontFamily`,
+`embedHideStreetLabels`, etc.). Competitors (Commonplace, Go Vocal/CitizenLab) are *destination*
+platforms: the whole consultation site is hosted on their domain, so every project is forced into
+their page templates and design system. Placemaker deliberately does not do this — the client's
+site stays the client's site, on their domain, in their brand.
+
 **Scope note (2026-08-28):** The product was deliberately descoped to the three core features above. Stakeholder CRM, guided tours, construction issues mode, email campaigns, mailing lists/subscribers, panoramas, and the enquiry inbox/messaging workflow were all removed (recoverable from git history if ever needed). Public enquiry *submission* remains as a data-collection channel feeding AI analysis — there is no inbox UI or reply workflow.
 
 ## Tech Stack
@@ -154,6 +163,9 @@ Requires `embedEnabled: true` on the project.
 - Pin comments limited to 2000 characters
 - Geographic clustering uses 3 decimal places (~100m precision)
 - Dynamic imports for heavy components (FeedbackTab, EmbedSettingsTab)
+- **Embed-first:** the client's own website is the CMS. Do not build a page builder, homepage
+  builder, or general content management surface — content that needs to be authored in Placemaker
+  belongs in structured, themeable fields on the project, not a freeform canvas.
 
 ## Testing
 

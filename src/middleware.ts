@@ -13,8 +13,32 @@ const publicRoutes = [
   '/api/embed',
 ]
 
+// The bare domain serves only the public holding page; the product lives on
+// the platform subdomain. Preview deploys and localhost behave as platform.
+const MARKETING_HOSTS = ['placemakerai.io', 'www.placemakerai.io']
+const PLATFORM_ORIGIN = 'https://platform.placemakerai.io'
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
+
+  const host = (req.headers.get('host') || '').toLowerCase().split(':')[0]
+  if (MARKETING_HOSTS.includes(host)) {
+    if (pathname.startsWith('/_next') || pathname.includes('.')) {
+      return NextResponse.next()
+    }
+    if (pathname === '/' || pathname === '/holding') {
+      return NextResponse.rewrite(new URL('/holding', req.url))
+    }
+    if (pathname === '/privacy') {
+      return NextResponse.next()
+    }
+    // Any product link shared before the split (logins, embeds, forms, API)
+    // keeps working: 308 preserves method and body for POSTed submissions.
+    return NextResponse.redirect(
+      new URL(`${pathname}${req.nextUrl.search}`, PLATFORM_ORIGIN),
+      308
+    )
+  }
 
   // Allow public routes
   if (publicRoutes.some((route) => pathname.startsWith(route))) {

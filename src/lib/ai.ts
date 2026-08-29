@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { clusterResponses } from './campaign-detection'
 
 // Lazy-load Anthropic client to avoid build-time errors
 let anthropicClient: Anthropic | null = null
@@ -170,12 +171,37 @@ export interface MaterialAnalysisResult {
   }>
 }
 
+export interface DetectedCampaign {
+  label: string
+  count: number
+  stance: 'support' | 'oppose' | 'mixed' | 'unclear'
+  /** What the shared template says, in 1-2 sentences */
+  templateSummary: string
+  /** What respondents added or changed beyond the template, if anything */
+  personalAdditions: string
+  /** Whether members are identical copies or edited variants */
+  exact: boolean
+  sampleQuote: string
+  /** Ids of the responses in this campaign (capped) */
+  memberIds: string[]
+}
+
+export interface CampaignAnalysisResult {
+  totalAnalyzed: number
+  /** Responses that are part of a template/campaign cluster */
+  templatedCount: number
+  /** Responses with no detected duplicate or template relationship */
+  uniqueCount: number
+  campaigns: DetectedCampaign[]
+}
+
 export interface FullAnalysisResult {
   sentiment: SentimentResult
   themes: ThemesResult
   summary: SummaryResult
   headlineStats?: HeadlineStatsResult
   materialAnalysis?: MaterialAnalysisResult
+  campaignAnalysis?: CampaignAnalysisResult
   geographic?: {
     clusters: Array<{
       latitude: number
@@ -487,12 +513,172 @@ export async function analyzeGeographic(
   return { clusters: clusterResults }
 }
 
+const CAMPAIGN_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    campaigns: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          clusterNumber: { type: 'integer', description: 'The cluster number this campaign corresponds to' },
+          label: { type: 'string', description: 'Short name for the campaign, e.g. "Save the Meadow template letter"' },
+          stance: { type: 'string', enum: ['support', 'oppose', 'mixed', 'unclear'] },
+          templateSummary: { type: 'string', description: '1-2 sentences: what the shared template argues' },
+          personalAdditions: {
+            type: 'string',
+            description: 'What respondents personally added or changed beyond the template; empty string if members are identical copies',
+          },
+          additionalVariantNumbers: {
+            type: 'array',
+            items: { type: 'integer' },
+            description: 'Bracket numbers of UNCLUSTERED responses that are paraphrased variants of this same template',
+          },
+        },
+        required: ['clusterNumber', 'label', 'stance', 'templateSummary', 'personalAdditions', 'additionalVariantNumbers'],
+      },
+    },
+  },
+  required: ['campaigns'],
+}
+
+// Caps for the characterisation prompt. Clustering itself runs over ALL items
+// in code; only cluster samples and an unclustered subset reach the model.
+const MAX_CLUSTERS_TO_CHARACTERIZE = 10
+const MAX_UNCLUSTERED_FOR_VARIANT_SCAN = 120
+const CAMPAIGN_SAMPLE_CHARS = 1200
+const VARIANT_SCAN_CHARS = 300
+const MAX_STORED_MEMBER_IDS = 100
+
+/**
+ * Detect organised campaigns and duplicate responses. Near-identical texts are
+ * clustered in code (zero token cost, full corpus); Claude then characterises
+ * each cluster and scans a sample of unclustered responses for paraphrased
+ * variants of the same templates.
+ */
+export async function analyzeCampaigns(
+  feedbackItems: FeedbackItem[]
+): Promise<CampaignAnalysisResult> {
+  const total = feedbackItems.length
+  const empty: CampaignAnalysisResult = {
+    totalAnalyzed: total,
+    templatedCount: 0,
+    uniqueCount: total,
+    campaigns: [],
+  }
+  if (total < 2) return empty
+
+  const clusters = clusterResponses(
+    feedbackItems.map(item => ({ id: item.id, content: item.content }))
+  )
+  if (clusters.length === 0) return empty
+
+  const byId = new Map(feedbackItems.map(item => [item.id, item]))
+  const clusteredIds = new Set(clusters.flatMap(c => c.memberIds))
+  const topClusters = clusters.slice(0, MAX_CLUSTERS_TO_CHARACTERIZE)
+
+  const clusterText = topClusters
+    .map((cluster, i) => {
+      const rep = byId.get(cluster.representativeId)!
+      const variant = cluster.exact
+        ? null
+        : byId.get(cluster.memberIds[cluster.memberIds.length - 1])
+      return [
+        `CLUSTER ${i + 1} — ${cluster.memberIds.length} responses, ${cluster.exact ? 'identical copies' : 'near-identical variants'}`,
+        `Representative text: ${rep.content.slice(0, CAMPAIGN_SAMPLE_CHARS)}`,
+        variant && variant.id !== rep.id
+          ? `A variant: ${variant.content.slice(0, CAMPAIGN_SAMPLE_CHARS)}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join('\n')
+    })
+    .join('\n\n')
+
+  // Unclustered responses get scanned for paraphrased variants that shingle
+  // similarity can't catch. Longest first — template rewrites are rarely short.
+  const unclustered = feedbackItems
+    .filter(item => !clusteredIds.has(item.id))
+    .sort((a, b) => b.content.length - a.content.length)
+    .slice(0, MAX_UNCLUSTERED_FOR_VARIANT_SCAN)
+  const unclusteredText = unclustered
+    .map((item, i) => `[${i + 1}] ${item.content.slice(0, VARIANT_SCAN_CHARS)}`)
+    .join('\n')
+
+  const result = await analysisCall<{
+    campaigns: Array<{
+      clusterNumber: number
+      label: string
+      stance: DetectedCampaign['stance']
+      templateSummary: string
+      personalAdditions: string
+      additionalVariantNumbers: number[]
+    }>
+  }>({
+    system: `You are an expert consultation analyst. Groups of near-identical responses have been detected in a public consultation — these are likely organised campaigns (template letters, copy-paste objections or support drives).
+
+For each cluster: give it a short label, determine its stance toward the project, summarise what the shared template argues, and describe what (if anything) individual respondents added beyond the template.
+
+Then check the UNCLUSTERED responses: if any are clearly a paraphrased or rewritten variant of one of the cluster templates (same campaign, reworded), list their bracket numbers under that campaign's additionalVariantNumbers. Only assign a response when the match is clear — genuinely independent responses that merely share a topic are NOT campaign variants. Return one entry per cluster, in cluster order.`,
+    user: `Detected response clusters:\n\n${clusterText}\n\nUnclustered responses to scan for paraphrased variants:\n\n${unclusteredText || '(none)'}`,
+    schema: CAMPAIGN_SCHEMA,
+    effort: 'medium',
+  })
+
+  const campaigns: DetectedCampaign[] = []
+  const variantIds = new Set<string>()
+
+  topClusters.forEach((cluster, i) => {
+    const characterized = result.campaigns.find(c => c.clusterNumber === i + 1)
+    const rep = byId.get(cluster.representativeId)!
+
+    // Resolve variant bracket numbers to real items, ignoring out-of-range or
+    // already-claimed ids so counts can't double-book a response.
+    const extraIds: string[] = []
+    for (const num of characterized?.additionalVariantNumbers || []) {
+      const item = unclustered[num - 1]
+      if (item && !variantIds.has(item.id)) {
+        variantIds.add(item.id)
+        extraIds.push(item.id)
+      }
+    }
+
+    const memberIds = [...cluster.memberIds, ...extraIds]
+    campaigns.push({
+      label: characterized?.label || `Template group ${i + 1}`,
+      count: memberIds.length,
+      stance: characterized?.stance || 'unclear',
+      templateSummary: characterized?.templateSummary || '',
+      personalAdditions: characterized?.personalAdditions || '',
+      exact: cluster.exact && extraIds.length === 0,
+      sampleQuote: rep.content.slice(0, 220),
+      memberIds: memberIds.slice(0, MAX_STORED_MEMBER_IDS),
+    })
+  })
+
+  // Clusters beyond the characterisation cap still count toward the totals.
+  const uncharacterized = clusters.slice(MAX_CLUSTERS_TO_CHARACTERIZE)
+  const templatedCount =
+    campaigns.reduce((sum, c) => sum + c.count, 0) +
+    uncharacterized.reduce((sum, c) => sum + c.memberIds.length, 0)
+
+  return {
+    totalAnalyzed: total,
+    templatedCount,
+    uniqueCount: Math.max(0, total - templatedCount),
+    campaigns: campaigns.sort((a, b) => b.count - a.count),
+  }
+}
+
 export async function runFullAnalysis(feedbackItems: FeedbackItem[]): Promise<FullAnalysisResult> {
   // Run analyses in parallel where possible
-  const [sentiment, themes, materialAnalysis] = await Promise.all([
+  const [sentiment, themes, materialAnalysis, campaignAnalysis] = await Promise.all([
     analyzeSentiment(feedbackItems),
     extractThemes(feedbackItems),
     classifyMaterialConsiderations(feedbackItems),
+    analyzeCampaigns(feedbackItems),
   ])
 
   // Summary and headline stats depend on sentiment and themes - run in parallel
@@ -510,6 +696,7 @@ export async function runFullAnalysis(feedbackItems: FeedbackItem[]): Promise<Fu
     summary,
     headlineStats,
     materialAnalysis,
+    campaignAnalysis,
     geographic,
     analyzedAt: new Date().toISOString(),
     feedbackCount: feedbackItems.length,

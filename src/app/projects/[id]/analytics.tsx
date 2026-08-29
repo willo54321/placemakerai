@@ -19,7 +19,9 @@ import {
   ThemeBarChart,
   ThemeWithSentiment,
   HeadlineStats,
-  MaterialClassification
+  MaterialClassification,
+  CampaignDetection,
+  CampaignAnalysis
 } from '@/components/analytics'
 
 const SentimentHeatmap = dynamic(
@@ -108,6 +110,7 @@ interface AnalysisData {
     stats: HeadlineStat[]
   }
   materialAnalysis?: MaterialAnalysis
+  campaignAnalysis?: CampaignAnalysis
   geographic?: {
     clusters: Array<{
       latitude: number
@@ -473,6 +476,13 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
           <p className="text-xs text-slate-400 mt-1.5">{negativePercent}% of responses</p>
         </div>
       </div>
+
+      {/* Campaign & Duplicate Detection */}
+      {analysis.campaignAnalysis && (
+        <div className="card p-6" data-tour="campaign-detection">
+          <CampaignDetection analysis={analysis.campaignAnalysis} />
+        </div>
+      )}
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

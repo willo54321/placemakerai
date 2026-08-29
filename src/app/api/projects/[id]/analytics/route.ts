@@ -8,8 +8,12 @@ import {
   FullAnalysisResult,
 } from '@/lib/ai'
 
-// Full analysis makes several sequential Claude calls (~50s total); allow the
-// Vercel Hobby maximum instead of the 10s default.
+// Full analysis classifies every response in batches, so wall-clock scales with
+// the size of the consultation rather than being fixed. 60s is the Vercel Hobby
+// ceiling and comfortably covers a few hundred responses; a consultation in the
+// thousands will exceed it and needs either a higher limit (Pro allows 300s) or
+// moving the run to a background job. A timeout here surfaces as a failed
+// analysis, not a partial one.
 export const maxDuration = 60
 
 // GET - Retrieve cached analysis or return null

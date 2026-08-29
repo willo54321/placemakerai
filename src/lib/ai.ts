@@ -1,10 +1,19 @@
 import Anthropic from '@anthropic-ai/sdk'
+import {
+  crossReference,
+  describeHighlight,
+  type CrossReferenceResult,
+} from '@/lib/cross-reference'
 import { clusterResponses } from './campaign-detection'
 
 // Lazy-load Anthropic client to avoid build-time errors
 let anthropicClient: Anthropic | null = null
 
 const MODEL = 'claude-opus-4-8'
+// Per-item classification is high-volume and mechanical — it applies a fixed
+// taxonomy rather than reasoning openly — so it is named separately from the
+// reasoning calls and can be pointed at a cheaper model without touching them.
+const CLASSIFIER_MODEL = MODEL
 
 function getAnthropic(): Anthropic {
   if (!process.env.ANTHROPIC_API_KEY) {
@@ -33,16 +42,26 @@ async function analysisCall<T>(options: {
   user: string
   schema: Record<string, unknown>
   effort?: 'low' | 'medium' | 'high'
+  model?: string
+  /**
+   * Cache the system block. Worth setting wherever one system prompt is reused
+   * across many calls in a single analysis — the batched classifiers send the
+   * same instructions and taxonomy every time, so caching turns a repeated
+   * prefix into a cache read instead of re-billed input.
+   */
+  cacheSystem?: boolean
 }): Promise<T> {
   const response = await getAnthropic().messages.create({
-    model: MODEL,
+    model: options.model || MODEL,
     max_tokens: 16000,
     thinking: { type: 'adaptive' },
     output_config: {
       effort: options.effort || 'low',
       format: { type: 'json_schema', schema: options.schema },
     },
-    system: options.system,
+    system: options.cacheSystem
+      ? [{ type: 'text', text: options.system, cache_control: { type: 'ephemeral' } }]
+      : options.system,
     messages: [{ role: 'user', content: options.user }],
   })
 
@@ -65,28 +84,123 @@ export interface FeedbackItem {
   createdAt: Date
 }
 
-// Input caps to protect against context-window blowups and unbounded cost.
-// We analyze at most the MAX_ITEMS most recent items, and truncate each item's
-// text to MAX_ITEM_CHARS before it's placed into any prompt.
-const MAX_ITEMS = 400
+// Each item's text is truncated before it reaches a prompt. Themes and stance
+// are almost always apparent in the opening lines, so this costs little.
 const MAX_ITEM_CHARS = 1000
 
 /**
- * Cap the feedback set for LLM analysis: keep at most MAX_ITEMS of the most
- * recent items (by createdAt, newest first) and truncate each item's content to
- * MAX_ITEM_CHARS. Returns a new array; input is left untouched. If the input was
- * larger than the caps we simply analyze the capped subset (no throw).
+ * Hard ceiling on how many responses a single analysis will classify. This is a
+ * cost and wall-clock guard, not a sampling strategy — when it bites, the
+ * shortfall is reported in `coverage` rather than hidden, and the subset taken
+ * is spread evenly across the whole consultation rather than skewed to whoever
+ * responded most recently.
  */
-function capFeedbackForAnalysis(feedbackItems: FeedbackItem[]): FeedbackItem[] {
-  const recent = [...feedbackItems]
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, MAX_ITEMS)
+const MAX_ANALYSIS_ITEMS = 5000
 
-  return recent.map(item =>
+/** Responses per classification request. */
+const CLASSIFY_BATCH_SIZE = 100
+
+/** Classification requests in flight at once. */
+const CLASSIFY_CONCURRENCY = 5
+
+/** Responses shown to the model when it proposes the theme list. */
+const TAXONOMY_SAMPLE_SIZE = 250
+
+/** How much of a response to quote back in a report. */
+const QUOTE_CHARS = 160
+
+export interface AnalysisCoverage {
+  /** Responses available. */
+  total: number
+  /** Responses actually classified. */
+  analyzed: number
+  /** True when every response was classified. */
+  complete: boolean
+  /** Present only when `complete` is false — say this out loud in the UI. */
+  note?: string
+}
+
+/**
+ * Take an evenly spaced subset across the whole array. Used only when a corpus
+ * exceeds MAX_ANALYSIS_ITEMS: sampling across the full range keeps early and
+ * late responses proportionally represented, where taking the newest N would
+ * hand the entire summary to whoever organised the most recent push.
+ */
+function evenlySpacedSample<T>(values: T[], limit: number): T[] {
+  if (values.length <= limit) return values
+
+  const step = values.length / limit
+  const out: T[] = []
+  for (let i = 0; i < limit; i++) {
+    out.push(values[Math.floor(i * step)])
+  }
+  return out
+}
+
+/**
+ * Choose what to analyse and record how much of the corpus that covers.
+ * Ordered oldest-first so downstream time splits are meaningful.
+ */
+function selectForAnalysis(feedbackItems: FeedbackItem[]): {
+  items: FeedbackItem[]
+  coverage: AnalysisCoverage
+} {
+  const chronological = [...feedbackItems].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  )
+
+  const selected = evenlySpacedSample(chronological, MAX_ANALYSIS_ITEMS).map(item =>
     item.content.length > MAX_ITEM_CHARS
       ? { ...item, content: item.content.slice(0, MAX_ITEM_CHARS) }
       : item
   )
+
+  const complete = selected.length === chronological.length
+
+  return {
+    items: selected,
+    coverage: {
+      total: chronological.length,
+      analyzed: selected.length,
+      complete,
+      note: complete
+        ? undefined
+        : `Analysed an evenly spaced sample of ${selected.length} of ${chronological.length} responses.`,
+    },
+  }
+}
+
+/** Split into fixed-size chunks. */
+function chunk<T>(values: T[], size: number): T[][] {
+  const out: T[][] = []
+  for (let i = 0; i < values.length; i += size) {
+    out.push(values.slice(i, i + size))
+  }
+  return out
+}
+
+/**
+ * Run an async mapper over a list with a bounded number of calls in flight.
+ * Results keep input order. A failed chunk rejects the whole run — a partial
+ * analysis silently missing a slice of responses would be worse than an error.
+ */
+async function mapWithConcurrency<T, R>(
+  values: T[],
+  limit: number,
+  fn: (value: T, index: number) => Promise<R>
+): Promise<R[]> {
+  const results = new Array<R>(values.length)
+  let cursor = 0
+
+  const workers = Array.from({ length: Math.min(limit, values.length) }, async () => {
+    while (cursor < values.length) {
+      const index = cursor++
+      results[index] = await fn(values[index], index)
+    }
+  })
+
+  await Promise.all(workers)
+  return results
 }
 
 export interface SentimentResult {
@@ -211,126 +325,15 @@ export interface FullAnalysisResult {
       themes: string[]
     }>
   }
+  /** Statistically tested theme × segment patterns. */
+  crossReference?: CrossReferenceResult
+  /** How much of the corpus this analysis actually covers. Surface it. */
+  coverage?: AnalysisCoverage
   analyzedAt: string
   feedbackCount: number
 }
 
-const SENTIMENT_SCHEMA = {
-  type: 'object',
-  additionalProperties: false,
-  properties: {
-    overall: { type: 'string', enum: ['positive', 'negative', 'neutral', 'mixed'] },
-    score: { type: 'number', description: 'From -1 (very negative) to 1 (very positive)' },
-    items: {
-      type: 'array',
-      items: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          id: { type: 'string', description: 'The bracket number of the feedback item' },
-          sentiment: { type: 'string', enum: ['positive', 'negative', 'neutral'] },
-          confidence: { type: 'number', description: '0 to 1' },
-        },
-        required: ['id', 'sentiment', 'confidence'],
-      },
-    },
-  },
-  required: ['overall', 'score', 'items'],
-}
-
-export async function analyzeSentiment(feedbackItems: FeedbackItem[]): Promise<SentimentResult> {
-  if (feedbackItems.length === 0) {
-    return {
-      overall: 'neutral',
-      score: 0,
-      breakdown: { positive: 0, negative: 0, neutral: 0 },
-      bySource: {
-        pins: { positive: 0, negative: 0, neutral: 0 },
-        forms: { positive: 0, negative: 0, neutral: 0 },
-        enquiries: { positive: 0, negative: 0, neutral: 0 },
-      },
-      items: [],
-    }
-  }
-
-  const capped = capFeedbackForAnalysis(feedbackItems)
-
-  const feedbackText = capped.map((item, i) =>
-    `[${i + 1}] (${item.type}) ${item.content}`
-  ).join('\n\n')
-
-  const result = await analysisCall<{
-    overall: SentimentResult['overall']
-    score: number
-    items: Array<{ id: string; sentiment: 'positive' | 'negative' | 'neutral'; confidence: number }>
-  }>({
-    system: `You are an expert at analyzing public feedback sentiment for planning and development projects.
-Analyze the sentiment of each piece of feedback.
-
-For each feedback item, determine if it's positive (supportive), negative (concerned/opposed), or neutral (informational/question). Return one item result per feedback item, using the number in brackets as the id.
-
-Be accurate and consider the context of planning/development projects. Opposition or concerns = negative. Support or praise = positive.`,
-    user: `Analyze the sentiment of this feedback:\n\n${feedbackText}`,
-    schema: SENTIMENT_SCHEMA,
-    effort: 'low',
-  })
-
-  // Map results back to original items, resolving each returned item to the
-  // original feedback item by the bracket number (1-based index into `capped`).
-  // We capture the resolved original alongside the mapped result so the
-  // by-source aggregation attributes sentiment by the *actual* item — not by a
-  // positional index, which breaks if the model reorders, drops, or adds items.
-  const mapped = result.items.map(item => {
-    const original = capped[parseInt(item.id) - 1]
-    return {
-      original,
-      result: {
-        id: original?.id || item.id,
-        sentiment: item.sentiment,
-        confidence: item.confidence,
-      },
-    }
-  })
-
-  const itemResults = mapped.map(m => m.result)
-
-  // Guard: the model may not return exactly one result per input item. We don't
-  // throw — we just aggregate over whatever resolved items we got.
-  if (itemResults.length !== capped.length) {
-    console.warn(
-      `analyzeSentiment: model returned ${itemResults.length} items for ${capped.length} inputs`
-    )
-  }
-
-  // Calculate breakdowns
-  const breakdown = { positive: 0, negative: 0, neutral: 0 }
-  const bySource = {
-    pins: { positive: 0, negative: 0, neutral: 0 },
-    forms: { positive: 0, negative: 0, neutral: 0 },
-    enquiries: { positive: 0, negative: 0, neutral: 0 },
-  }
-
-  mapped.forEach(({ original, result: item }) => {
-    // Skip results that didn't resolve to a real item so counts stay correct.
-    if (!original) return
-
-    breakdown[item.sentiment]++
-
-    if (original.type === 'pin') bySource.pins[item.sentiment]++
-    else if (original.type === 'form') bySource.forms[item.sentiment]++
-    else if (original.type === 'enquiry') bySource.enquiries[item.sentiment]++
-  })
-
-  return {
-    overall: result.overall,
-    score: result.score,
-    breakdown,
-    bySource,
-    items: itemResults,
-  }
-}
-
-const THEMES_SCHEMA = {
+const TAXONOMY_SCHEMA = {
   type: 'object',
   additionalProperties: false,
   properties: {
@@ -340,66 +343,358 @@ const THEMES_SCHEMA = {
         type: 'object',
         additionalProperties: false,
         properties: {
-          name: { type: 'string', description: 'Short theme name, e.g. "Traffic Concerns"' },
-          count: { type: 'integer', description: 'Number of feedback items mentioning this theme' },
-          sentiment: { type: 'string', enum: ['positive', 'negative', 'neutral', 'mixed'] },
-          sentimentBreakdown: {
-            type: 'object',
-            additionalProperties: false,
-            properties: {
-              positive: { type: 'integer' },
-              negative: { type: 'integer' },
-              neutral: { type: 'integer' },
-            },
-            required: ['positive', 'negative', 'neutral'],
+          name: { type: 'string', description: 'Short theme name, e.g. "Traffic and highways"' },
+          description: {
+            type: 'string',
+            description: 'One sentence defining exactly what belongs under this theme',
           },
           keywords: { type: 'array', items: { type: 'string' }, description: '3-5 keywords' },
-          sampleQuotes: {
-            type: 'array',
-            items: { type: 'string' },
-            description: '1-2 short quotes (max 100 chars) exemplifying this theme',
-          },
         },
-        required: ['name', 'count', 'sentiment', 'sentimentBreakdown', 'keywords', 'sampleQuotes'],
+        required: ['name', 'description', 'keywords'],
       },
     },
   },
   required: ['themes'],
 }
 
-export async function extractThemes(feedbackItems: FeedbackItem[]): Promise<ThemesResult> {
-  if (feedbackItems.length === 0) {
-    return { themes: [], totalFeedback: 0 }
-  }
+const CLASSIFY_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    items: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          id: { type: 'string', description: 'The bracket number of the response' },
+          sentiment: { type: 'string', enum: ['positive', 'negative', 'neutral'] },
+          confidence: { type: 'number', description: '0 to 1' },
+          themes: {
+            type: 'array',
+            items: { type: 'integer' },
+            description: 'Numbers of every theme that applies. Empty if none do.',
+          },
+        },
+        required: ['id', 'sentiment', 'confidence', 'themes'],
+      },
+    },
+  },
+  required: ['items'],
+}
 
-  const capped = capFeedbackForAnalysis(feedbackItems)
+/** A theme in the taxonomy the whole corpus is classified against. */
+export interface ThemeDefinition {
+  name: string
+  description: string
+  keywords: string[]
+}
 
-  const feedbackText = capped.map((item, i) =>
-    `[${i + 1}] ${item.content}`
-  ).join('\n\n')
+export interface ItemAssignment {
+  /** The original FeedbackItem id. */
+  id: string
+  sentiment: 'positive' | 'negative' | 'neutral'
+  confidence: number
+  /** Indices into the taxonomy. */
+  themeIds: number[]
+}
 
-  const result = await analysisCall<{ themes: Required<Theme>[] }>({
-    system: `You are an expert at identifying themes in public feedback for planning and development projects.
-Analyze the feedback and extract the main themes/topics being discussed.
+export interface CorpusClassification {
+  taxonomy: ThemeDefinition[]
+  assignments: ItemAssignment[]
+  /** The items actually classified, post-truncation. */
+  items: FeedbackItem[]
+  coverage: AnalysisCoverage
+}
 
-Identify 5-10 main themes. Be specific to planning/development contexts (traffic, parking, design, environment, community, housing, safety, etc.).
-The sentimentBreakdown should reflect the actual split of positive/negative/neutral responses for that specific theme.`,
-    user: `Extract themes from this feedback:\n\n${feedbackText}`,
-    schema: THEMES_SCHEMA,
+/**
+ * Propose the theme list the whole corpus will then be classified against.
+ *
+ * Only a sample reaches the model here, because naming the themes is a
+ * judgement about the shape of the debate rather than a count — but the sample
+ * is spread evenly across the consultation's full timespan, so a late campaign
+ * cannot invent a theme that nobody raised in the first three weeks.
+ */
+export async function discoverThemes(items: FeedbackItem[]): Promise<ThemeDefinition[]> {
+  if (items.length === 0) return []
+
+  const sample = evenlySpacedSample(items, TAXONOMY_SAMPLE_SIZE)
+  const sampleText = sample.map((item, i) => `[${i + 1}] ${item.content}`).join('\n\n')
+
+  const result = await analysisCall<{ themes: ThemeDefinition[] }>({
+    system: `You are an expert at identifying themes in public feedback on planning and development projects.
+
+Propose a set of themes that the full body of responses can then be sorted into. Aim for 6 to 12 themes.
+
+Requirements:
+- Themes must be specific to planning and development (traffic, parking, design, environment, housing mix, safety, construction impact, and so on) rather than generic sentiment labels.
+- Themes must not overlap. Every theme needs a one-sentence description precise enough that two people sorting the same response would put it in the same place.
+- Cover the substance of what is actually raised. Do not invent themes to be comprehensive, and do not collapse genuinely distinct concerns into one broad theme.`,
+    user: `Propose themes for this consultation. This is a representative sample of the responses:\n\n${sampleText}`,
+    schema: TAXONOMY_SCHEMA,
     effort: 'medium',
   })
 
-  return {
-    themes: result.themes.map(theme => ({
-      name: theme.name,
-      count: theme.count || 1,
-      sentiment: theme.sentiment || 'neutral',
-      sentimentBreakdown: theme.sentimentBreakdown || { positive: 0, negative: 0, neutral: theme.count || 1 },
-      keywords: theme.keywords || [],
-      sampleQuotes: (theme.sampleQuotes || []).slice(0, 2),
-    })),
-    totalFeedback: capped.length,
+  return result.themes.map(theme => ({
+    name: theme.name,
+    description: theme.description || '',
+    keywords: theme.keywords || [],
+  }))
+}
+
+/**
+ * Classify every response against the taxonomy: stance plus which themes it
+ * raises.
+ *
+ * This is the pass that makes the numbers real. Because each response is
+ * classified exactly once, downstream theme counts and sentiment splits are
+ * counted rather than estimated, and they can be traced back to the individual
+ * responses behind them.
+ */
+export async function classifyCorpus(
+  feedbackItems: FeedbackItem[]
+): Promise<CorpusClassification> {
+  const { items, coverage } = selectForAnalysis(feedbackItems)
+
+  if (items.length === 0) {
+    return { taxonomy: [], assignments: [], items: [], coverage }
   }
+
+  const taxonomy = await discoverThemes(items)
+  if (taxonomy.length === 0) {
+    return { taxonomy: [], assignments: [], items, coverage }
+  }
+
+  const taxonomyText = taxonomy
+    .map((theme, i) => `${i + 1}. ${theme.name} — ${theme.description}`)
+    .join('\n')
+
+  // Identical for every batch, so it is worth caching: the taxonomy and the
+  // instructions are re-sent with each request and would otherwise be re-billed
+  // once per batch.
+  const system = `You are an expert at analysing public consultation responses on planning and development projects.
+
+For each response, decide two things.
+
+STANCE — positive if it supports or praises, negative if it opposes or raises concerns, neutral if it only asks a question or gives information. Judge the response's position on the proposal, not the tone of its language: a politely worded objection is negative.
+
+THEMES — which of the numbered themes below the response raises. A response may raise several themes, or none. Assign a theme only when the response genuinely addresses it; do not stretch to give every response a theme.
+
+THEMES:
+${taxonomyText}
+
+Return exactly one result per response, using the number in brackets as the id.`
+
+  const batches = chunk(items, CLASSIFY_BATCH_SIZE)
+
+  const batchResults = await mapWithConcurrency(batches, CLASSIFY_CONCURRENCY, async batch => {
+    const batchText = batch
+      .map((item, i) => `[${i + 1}] (${item.type}) ${item.content}`)
+      .join('\n\n')
+
+    const result = await analysisCall<{
+      items: Array<{
+        id: string
+        sentiment: 'positive' | 'negative' | 'neutral'
+        confidence: number
+        themes: number[]
+      }>
+    }>({
+      system,
+      user: `Classify these responses:\n\n${batchText}`,
+      schema: CLASSIFY_SCHEMA,
+      effort: 'low',
+      model: CLASSIFIER_MODEL,
+      cacheSystem: true,
+    })
+
+    // Resolve by bracket number rather than position: the model may reorder,
+    // drop, or repeat entries, and a positional read would then attribute one
+    // resident's view to another.
+    const seen = new Set<string>()
+    const assignments: ItemAssignment[] = []
+
+    result.items.forEach(entry => {
+      const original = batch[parseInt(entry.id, 10) - 1]
+      if (!original || seen.has(original.id)) return
+      seen.add(original.id)
+
+      assignments.push({
+        id: original.id,
+        sentiment: entry.sentiment,
+        confidence: entry.confidence,
+        themeIds: (entry.themes || [])
+          // Model-supplied indices are 1-based and can be out of range.
+          .map(n => n - 1)
+          .filter(index => index >= 0 && index < taxonomy.length),
+      })
+    })
+
+    if (assignments.length !== batch.length) {
+      console.warn(
+        `classifyCorpus: resolved ${assignments.length} of ${batch.length} responses in a batch`
+      )
+    }
+
+    return assignments
+  })
+
+  const assignments = batchResults.flat()
+
+  // Anything the model failed to return is missing from the counts, so the
+  // coverage figure has to reflect what was actually classified, not what was
+  // sent.
+  const classified: AnalysisCoverage = {
+    ...coverage,
+    analyzed: assignments.length,
+    complete: coverage.complete && assignments.length === items.length,
+  }
+  if (!classified.complete && !classified.note) {
+    classified.note = `Classified ${assignments.length} of ${coverage.total} responses.`
+  }
+
+  return { taxonomy, assignments, items, coverage: classified }
+}
+
+/** Aggregate a classification into the sentiment shape. All counts are exact. */
+export function deriveSentiment(classification: CorpusClassification): SentimentResult {
+  const empty: SentimentResult = {
+    overall: 'neutral',
+    score: 0,
+    breakdown: { positive: 0, negative: 0, neutral: 0 },
+    bySource: {
+      pins: { positive: 0, negative: 0, neutral: 0 },
+      forms: { positive: 0, negative: 0, neutral: 0 },
+      enquiries: { positive: 0, negative: 0, neutral: 0 },
+    },
+    items: [],
+  }
+
+  if (classification.assignments.length === 0) return empty
+
+  const itemsById = new Map(classification.items.map(item => [item.id, item]))
+  const breakdown = { positive: 0, negative: 0, neutral: 0 }
+  const bySource = {
+    pins: { positive: 0, negative: 0, neutral: 0 },
+    forms: { positive: 0, negative: 0, neutral: 0 },
+    enquiries: { positive: 0, negative: 0, neutral: 0 },
+  }
+
+  classification.assignments.forEach(assignment => {
+    breakdown[assignment.sentiment]++
+
+    const item = itemsById.get(assignment.id)
+    if (!item) return
+    if (item.type === 'pin') bySource.pins[assignment.sentiment]++
+    else if (item.type === 'form') bySource.forms[assignment.sentiment]++
+    else if (item.type === 'enquiry') bySource.enquiries[assignment.sentiment]++
+  })
+
+  const total = classification.assignments.length
+  const score = (breakdown.positive - breakdown.negative) / total
+
+  // "Mixed" is a real finding in consultation — a genuinely divided response is
+  // different from an indifferent one, and collapsing the two hides the split.
+  const divided =
+    breakdown.positive / total >= 0.25 && breakdown.negative / total >= 0.25
+
+  let overall: SentimentResult['overall']
+  if (divided) overall = 'mixed'
+  else if (breakdown.positive > breakdown.negative && breakdown.positive >= breakdown.neutral)
+    overall = 'positive'
+  else if (breakdown.negative > breakdown.positive && breakdown.negative >= breakdown.neutral)
+    overall = 'negative'
+  else overall = 'neutral'
+
+  return {
+    overall,
+    score,
+    breakdown,
+    bySource,
+    items: classification.assignments.map(a => ({
+      id: a.id,
+      sentiment: a.sentiment,
+      confidence: a.confidence,
+    })),
+  }
+}
+
+/**
+ * Aggregate a classification into themes.
+ *
+ * Counts and sentiment splits are tallied from the per-response assignments,
+ * and the quotes are the actual text of responses filed under each theme —
+ * so a quote in a report can always be traced to the person who wrote it.
+ */
+export function deriveThemes(classification: CorpusClassification): ThemesResult {
+  const { taxonomy, assignments, items } = classification
+  if (taxonomy.length === 0 || assignments.length === 0) {
+    return { themes: [], totalFeedback: assignments.length }
+  }
+
+  const itemsById = new Map(items.map(item => [item.id, item]))
+
+  const themes: Theme[] = taxonomy.map((definition, themeId) => {
+    const members = assignments.filter(a => a.themeIds.includes(themeId))
+    const sentimentBreakdown = { positive: 0, negative: 0, neutral: 0 }
+    members.forEach(member => sentimentBreakdown[member.sentiment]++)
+
+    // Prefer quotes with enough substance to stand alone, shortest first so
+    // they read cleanly in a report.
+    const sampleQuotes = members
+      .map(member => itemsById.get(member.id)?.content?.trim())
+      .filter((text): text is string => !!text && text.length >= 40)
+      .sort((a, b) => a.length - b.length)
+      .slice(0, 2)
+      .map(text => (text.length > QUOTE_CHARS ? `${text.slice(0, QUOTE_CHARS).trimEnd()}…` : text))
+
+    const count = members.length
+    const divided =
+      count > 0 &&
+      sentimentBreakdown.positive / count >= 0.25 &&
+      sentimentBreakdown.negative / count >= 0.25
+
+    let sentiment: Theme['sentiment']
+    if (divided) sentiment = 'mixed'
+    else if (sentimentBreakdown.negative > sentimentBreakdown.positive) sentiment = 'negative'
+    else if (sentimentBreakdown.positive > sentimentBreakdown.negative) sentiment = 'positive'
+    else sentiment = 'neutral'
+
+    return {
+      name: definition.name,
+      count,
+      sentiment,
+      sentimentBreakdown,
+      keywords: definition.keywords,
+      sampleQuotes,
+    }
+  })
+
+  return {
+    // Themes nobody actually raised are noise in a report.
+    themes: themes.filter(theme => theme.count > 0).sort((a, b) => b.count - a.count),
+    totalFeedback: assignments.length,
+  }
+}
+
+/**
+ * Standalone sentiment analysis. Runs the full classification pass; prefer
+ * `runFullAnalysis` when themes are wanted too, so the corpus is classified once.
+ */
+export async function analyzeSentiment(feedbackItems: FeedbackItem[]): Promise<SentimentResult> {
+  if (feedbackItems.length === 0) {
+    return deriveSentiment({ taxonomy: [], assignments: [], items: [], coverage: { total: 0, analyzed: 0, complete: true } })
+  }
+  return deriveSentiment(await classifyCorpus(feedbackItems))
+}
+
+/**
+ * Standalone theme extraction. Runs the full classification pass; prefer
+ * `runFullAnalysis` when sentiment is wanted too, so the corpus is classified once.
+ */
+export async function extractThemes(feedbackItems: FeedbackItem[]): Promise<ThemesResult> {
+  if (feedbackItems.length === 0) return { themes: [], totalFeedback: 0 }
+  return deriveThemes(await classifyCorpus(feedbackItems))
 }
 
 const SUMMARY_SCHEMA = {
@@ -418,7 +713,13 @@ const SUMMARY_SCHEMA = {
 export async function generateSummary(
   feedbackItems: FeedbackItem[],
   sentiment: SentimentResult,
-  themes: ThemesResult
+  themes: ThemesResult,
+  /**
+   * Pre-tested cross-reference findings. Passed in as statements rather than
+   * raw data so the model reports patterns that survived significance testing
+   * instead of inferring its own from a sample.
+   */
+  highlights: string[] = []
 ): Promise<SummaryResult> {
   if (feedbackItems.length === 0) {
     return {
@@ -445,7 +746,11 @@ Total responses: ${feedbackItems.length}
 Overall sentiment: ${sentiment.overall} (score: ${sentiment.score.toFixed(2)})
 Sentiment breakdown: ${sentiment.breakdown.positive} positive, ${sentiment.breakdown.negative} negative, ${sentiment.breakdown.neutral} neutral
 Top themes: ${topThemes}
-
+${
+  highlights.length > 0
+    ? `\nVerified patterns (already significance-tested — treat these as established fact and do not restate them as uncertain):\n${highlights.map(h => `- ${h}`).join('\n')}\n`
+    : ''
+}
 Sample feedback:
 ${feedbackSample}`,
     schema: SUMMARY_SCHEMA,
@@ -453,64 +758,86 @@ ${feedbackSample}`,
   })
 }
 
-export async function analyzeGeographic(
-  feedbackItems: FeedbackItem[]
-): Promise<FullAnalysisResult['geographic']> {
-  // Filter items with location data
-  const locatedItems = feedbackItems.filter(
+/**
+ * Group located responses and describe each cluster.
+ *
+ * Sentiment here comes from the classification pass rather than the pin's
+ * `category` field: the category is what the visitor picked from a dropdown,
+ * which is often not what they went on to write. Themes are the ones actually
+ * raised in that cluster, which is what makes "objections concentrate on the
+ * northern boundary" a statement a map can show.
+ */
+export function deriveGeographic(
+  classification: CorpusClassification
+): FullAnalysisResult['geographic'] {
+  const located = classification.items.filter(
     item => item.latitude != null && item.longitude != null
   )
+  if (located.length < 3) return undefined
 
-  if (locatedItems.length < 3) {
-    return undefined
-  }
+  const assignmentsById = new Map(classification.assignments.map(a => [a.id, a]))
 
-  // Group by approximate location (round to 3 decimal places ~100m precision)
+  // ~100m precision, matching the clustering convention used elsewhere.
   const clusters = new Map<string, FeedbackItem[]>()
-
-  locatedItems.forEach(item => {
+  located.forEach(item => {
     const key = `${item.latitude!.toFixed(3)},${item.longitude!.toFixed(3)}`
-    if (!clusters.has(key)) {
-      clusters.set(key, [])
-    }
+    if (!clusters.has(key)) clusters.set(key, [])
     clusters.get(key)!.push(item)
   })
 
-  // Analyze each cluster
   const clusterResults: NonNullable<FullAnalysisResult['geographic']>['clusters'] = []
 
-  for (const [key, items] of Array.from(clusters.entries())) {
-    if (items.length < 1) continue
+  Array.from(clusters.entries()).forEach(([key, items]) => {
+    const [latitude, longitude] = key.split(',').map(Number)
 
-    const [lat, lng] = key.split(',').map(Number)
-
-    // Simple sentiment count for cluster
     const sentiments = { positive: 0, negative: 0, neutral: 0 }
+    const themeCounts = new Map<number, number>()
 
-    // Use category as proxy for sentiment if available
     items.forEach(item => {
-      if (item.category === 'positive' || item.category === 'support') {
-        sentiments.positive++
-      } else if (item.category === 'negative' || item.category === 'concern') {
-        sentiments.negative++
-      } else {
-        sentiments.neutral++
-      }
+      const assignment = assignmentsById.get(item.id)
+      if (!assignment) return
+
+      sentiments[assignment.sentiment]++
+      assignment.themeIds.forEach(themeId => {
+        themeCounts.set(themeId, (themeCounts.get(themeId) || 0) + 1)
+      })
     })
 
-    const dominant = Object.entries(sentiments).sort((a, b) => b[1] - a[1])[0][0] as 'positive' | 'negative' | 'neutral'
-    const isMixed = sentiments.positive > 0 && sentiments.negative > 0
+    const dominant = (Object.entries(sentiments).sort((a, b) => b[1] - a[1])[0][0]) as
+      | 'positive'
+      | 'negative'
+      | 'neutral'
+    const mixed = sentiments.positive > 0 && sentiments.negative > 0
+
+    const themes = Array.from(themeCounts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([themeId]) => classification.taxonomy[themeId]?.name)
+      .filter((name): name is string => !!name)
 
     clusterResults.push({
-      latitude: lat,
-      longitude: lng,
-      sentiment: isMixed ? 'mixed' : dominant,
+      latitude,
+      longitude,
+      sentiment: mixed ? 'mixed' : dominant,
       count: items.length,
-      themes: [], // Would need theme extraction per cluster for this
+      themes,
     })
-  }
+  })
 
-  return { clusters: clusterResults }
+  return { clusters: clusterResults.sort((a, b) => b.count - a.count) }
+}
+
+/**
+ * Standalone geographic analysis. Runs the classification pass; prefer
+ * `runFullAnalysis`, which classifies the corpus once and reuses it.
+ */
+export async function analyzeGeographic(
+  feedbackItems: FeedbackItem[]
+): Promise<FullAnalysisResult['geographic']> {
+  const located = feedbackItems.filter(item => item.latitude != null && item.longitude != null)
+  if (located.length < 3) return undefined
+
+  return deriveGeographic(await classifyCorpus(feedbackItems))
 }
 
 const CAMPAIGN_SCHEMA = {
@@ -673,22 +1000,41 @@ Then check the UNCLUSTERED responses: if any are clearly a paraphrased or rewrit
 }
 
 export async function runFullAnalysis(feedbackItems: FeedbackItem[]): Promise<FullAnalysisResult> {
-  // Run analyses in parallel where possible
-  const [sentiment, themes, materialAnalysis, campaignAnalysis] = await Promise.all([
-    analyzeSentiment(feedbackItems),
-    extractThemes(feedbackItems),
+  // One classification pass feeds sentiment, themes, geography and the
+  // cross-tabs. Running them as separate passes would cost several times as
+  // much and — worse — let the same response be counted differently in each.
+  const [classification, materialAnalysis, campaignAnalysis] = await Promise.all([
+    classifyCorpus(feedbackItems),
     classifyMaterialConsiderations(feedbackItems),
     analyzeCampaigns(feedbackItems),
   ])
 
-  // Summary and headline stats depend on sentiment and themes - run in parallel
+  const sentiment = deriveSentiment(classification)
+  const themes = deriveThemes(classification)
+  const geographic = deriveGeographic(classification)
+
+  // Pure computation over the assignments: exact, reproducible, no token cost.
+  const crossRef = crossReference(
+    classification.items.map(item => ({
+      id: item.id,
+      type: item.type,
+      latitude: item.latitude,
+      longitude: item.longitude,
+      createdAt: new Date(item.createdAt),
+    })),
+    classification.taxonomy,
+    classification.assignments
+  )
+
   const [summary, headlineStats] = await Promise.all([
-    generateSummary(feedbackItems, sentiment, themes),
+    generateSummary(
+      feedbackItems,
+      sentiment,
+      themes,
+      crossRef.highlights.slice(0, 8).map(describeHighlight)
+    ),
     generateHeadlineStats(feedbackItems, sentiment, themes),
   ])
-
-  // Geographic analysis
-  const geographic = await analyzeGeographic(feedbackItems)
 
   return {
     sentiment,
@@ -698,65 +1044,24 @@ export async function runFullAnalysis(feedbackItems: FeedbackItem[]): Promise<Fu
     materialAnalysis,
     campaignAnalysis,
     geographic,
+    crossReference: crossRef,
+    coverage: classification.coverage,
     analyzedAt: new Date().toISOString(),
     feedbackCount: feedbackItems.length,
   }
 }
 
-const MATERIAL_SCHEMA = {
+const MATERIAL_ITEMS_SCHEMA = {
   type: 'object',
   additionalProperties: false,
   properties: {
-    summary: {
-      type: 'object',
-      additionalProperties: false,
-      properties: {
-        material: { type: 'integer' },
-        nonMaterial: { type: 'integer' },
-        mixed: { type: 'integer' },
-      },
-      required: ['material', 'nonMaterial', 'mixed'],
-    },
-    categories: {
-      type: 'object',
-      additionalProperties: false,
-      properties: {
-        material: {
-          type: 'array',
-          items: {
-            type: 'object',
-            additionalProperties: false,
-            properties: {
-              name: { type: 'string' },
-              count: { type: 'integer' },
-              examples: { type: 'array', items: { type: 'string' }, description: 'Short quotes' },
-            },
-            required: ['name', 'count', 'examples'],
-          },
-        },
-        nonMaterial: {
-          type: 'array',
-          items: {
-            type: 'object',
-            additionalProperties: false,
-            properties: {
-              name: { type: 'string' },
-              count: { type: 'integer' },
-              examples: { type: 'array', items: { type: 'string' }, description: 'Short quotes' },
-            },
-            required: ['name', 'count', 'examples'],
-          },
-        },
-      },
-      required: ['material', 'nonMaterial'],
-    },
     items: {
       type: 'array',
       items: {
         type: 'object',
         additionalProperties: false,
         properties: {
-          id: { type: 'string', description: 'The bracket number of the feedback item' },
+          id: { type: 'string', description: 'The bracket number of the response' },
           classification: { type: 'string', enum: ['material', 'non-material', 'mixed'] },
           materialCategories: { type: 'array', items: { type: 'string' } },
           nonMaterialCategories: { type: 'array', items: { type: 'string' } },
@@ -765,28 +1070,32 @@ const MATERIAL_SCHEMA = {
       },
     },
   },
-  required: ['summary', 'categories', 'items'],
+  required: ['items'],
 }
 
+/**
+ * Sort responses into material planning considerations and non-material
+ * objections.
+ *
+ * Runs over every response rather than a sample: this output tells a planning
+ * officer how much of the opposition a committee can lawfully weigh, and a
+ * figure derived from a subset would misstate that. Category totals are tallied
+ * from the per-response results, so they add up to the responses behind them.
+ */
 export async function classifyMaterialConsiderations(
   feedbackItems: FeedbackItem[]
 ): Promise<MaterialAnalysisResult> {
-  if (feedbackItems.length === 0) {
-    return {
-      summary: { material: 0, nonMaterial: 0, mixed: 0 },
-      categories: { material: [], nonMaterial: [] },
-      items: [],
-    }
+  const empty: MaterialAnalysisResult = {
+    summary: { material: 0, nonMaterial: 0, mixed: 0 },
+    categories: { material: [], nonMaterial: [] },
+    items: [],
   }
+  if (feedbackItems.length === 0) return empty
 
-  const capped = capFeedbackForAnalysis(feedbackItems)
+  const { items } = selectForAnalysis(feedbackItems)
+  if (items.length === 0) return empty
 
-  const feedbackText = capped.map((item, i) =>
-    `[${i + 1}] ${item.content}`
-  ).join('\n\n')
-
-  const result = await analysisCall<MaterialAnalysisResult>({
-    system: `You are a UK planning expert. Classify each consultation response based on whether it raises material planning considerations or non-material objections. Use the number in brackets as each item's id.
+  const system = `You are a UK planning expert. Classify each consultation response by whether it raises material planning considerations or non-material objections. Use the number in brackets as each response's id, and return exactly one result per response.
 
 MATERIAL PLANNING CONSIDERATIONS (things the planning authority CAN consider):
 - Traffic/highways impact, parking, road safety
@@ -808,24 +1117,85 @@ NON-MATERIAL OBJECTIONS (things the planning authority CANNOT consider):
 - Applicant's motives or personal circumstances
 - Restrictive covenants, boundary disputes
 - Moral/political objections to developer
-- "It's not fair" or "we don't want change" without material reason`,
-    user: `Classify these consultation responses:\n\n${feedbackText}`,
-    schema: MATERIAL_SCHEMA,
-    effort: 'medium',
+- "It's not fair" or "we don't want change" without material reason`
+
+  const batches = chunk(items, CLASSIFY_BATCH_SIZE)
+
+  const batchResults = await mapWithConcurrency(batches, CLASSIFY_CONCURRENCY, async batch => {
+    const batchText = batch.map((item, i) => `[${i + 1}] ${item.content}`).join('\n\n')
+
+    const result = await analysisCall<{ items: MaterialAnalysisResult['items'] }>({
+      system,
+      user: `Classify these responses:\n\n${batchText}`,
+      schema: MATERIAL_ITEMS_SCHEMA,
+      effort: 'medium',
+      model: CLASSIFIER_MODEL,
+      cacheSystem: true,
+    })
+
+    // Resolve by bracket number, not position — see classifyCorpus.
+    const seen = new Set<string>()
+    const resolved: MaterialAnalysisResult['items'] = []
+
+    ;(result.items || []).forEach(entry => {
+      const original = batch[parseInt(entry.id, 10) - 1]
+      if (!original || seen.has(original.id)) return
+      seen.add(original.id)
+
+      resolved.push({
+        id: original.id,
+        classification: entry.classification,
+        materialCategories: entry.materialCategories || [],
+        nonMaterialCategories: entry.nonMaterialCategories || [],
+      })
+    })
+
+    return resolved
   })
 
-  // Map item IDs (bracket numbers, 1-based into `capped`) back to actual feedback item IDs
-  const items = result.items.map(item => ({
-    id: capped[parseInt(item.id) - 1]?.id || item.id,
-    classification: item.classification,
-    materialCategories: item.materialCategories || [],
-    nonMaterialCategories: item.nonMaterialCategories || [],
-  }))
+  const classified = batchResults.flat()
+  const itemsById = new Map(items.map(item => [item.id, item]))
+
+  const summary = { material: 0, nonMaterial: 0, mixed: 0 }
+  classified.forEach(item => {
+    if (item.classification === 'material') summary.material++
+    else if (item.classification === 'non-material') summary.nonMaterial++
+    else summary.mixed++
+  })
+
+  // Tally categories from the per-response results so every count is traceable.
+  const tally = (pick: (item: MaterialAnalysisResult['items'][number]) => string[]) => {
+    const counts = new Map<string, { count: number; examples: string[] }>()
+
+    classified.forEach(item => {
+      pick(item).forEach(name => {
+        if (!counts.has(name)) counts.set(name, { count: 0, examples: [] })
+        const entry = counts.get(name)!
+        entry.count++
+
+        if (entry.examples.length < 2) {
+          const text = itemsById.get(item.id)?.content?.trim()
+          if (text && text.length >= 40) {
+            entry.examples.push(
+              text.length > QUOTE_CHARS ? `${text.slice(0, QUOTE_CHARS).trimEnd()}…` : text
+            )
+          }
+        }
+      })
+    })
+
+    return Array.from(counts.entries())
+      .map(([name, entry]) => ({ name, count: entry.count, examples: entry.examples }))
+      .sort((a, b) => b.count - a.count)
+  }
 
   return {
-    summary: result.summary,
-    categories: result.categories,
-    items,
+    summary,
+    categories: {
+      material: tally(item => item.materialCategories),
+      nonMaterial: tally(item => item.nonMaterialCategories),
+    },
+    items: classified,
   }
 }
 

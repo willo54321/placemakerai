@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { MapPin } from 'lucide-react'
+import { MapPin, ArrowRight } from 'lucide-react'
 
 // Served on placemakerai.io / www while the marketing site is being built.
 // The product lives on platform.placemakerai.io (see middleware).
@@ -20,15 +20,24 @@ export default function HoldingPage() {
           </h1>
           <p className="text-slate-400 text-lg mb-10">
             Interactive map feedback, custom feedback forms, and AI-powered
-            analysis — all in one place. We&apos;re currently in private alpha.
+            analysis — all in one place. Our full website is coming soon.
           </p>
 
-          <a
-            href="mailto:william.neale@secnewgate.co.uk?subject=Placemaker%20enquiry"
-            className="inline-block bg-brand-600 hover:bg-brand-700 text-white font-medium px-6 py-3 rounded-lg transition-colors"
-          >
-            Get in touch
-          </a>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <a
+              href="https://platform.placemakerai.io"
+              className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white font-medium px-6 py-3 rounded-lg transition-colors"
+            >
+              Go to the platform
+              <ArrowRight className="w-4 h-4" />
+            </a>
+            <a
+              href="mailto:william.neale@secnewgate.co.uk?subject=Placemaker%20enquiry"
+              className="inline-block text-slate-300 hover:text-white font-medium px-6 py-3 rounded-lg border border-slate-700 hover:border-slate-500 transition-colors"
+            >
+              Get in touch
+            </a>
+          </div>
         </div>
       </main>
 

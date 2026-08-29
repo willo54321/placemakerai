@@ -15,6 +15,9 @@ platforms: the whole consultation site is hosted on their domain, so every proje
 their page templates and design system. Placemaker deliberately does not do this — the client's
 site stays the client's site, on their domain, in their brand.
 
+See `MARKETING.md` for the competitor teardown (Go Vocal, Commonplace), positioning, messaging and
+the marketing-site build plan.
+
 **Scope note (2026-08-28):** The product was deliberately descoped to the three core features above. Stakeholder CRM, guided tours, construction issues mode, email campaigns, mailing lists/subscribers, panoramas, and the enquiry inbox/messaging workflow were all removed (recoverable from git history if ever needed). Public enquiry *submission* remains as a data-collection channel feeding AI analysis — there is no inbox UI or reply workflow.
 
 ## Tech Stack

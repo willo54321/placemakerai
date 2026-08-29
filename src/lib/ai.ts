@@ -3,8 +3,10 @@ import {
   crossReference,
   describeHighlight,
   type CrossReferenceResult,
+  type CrossTab,
 } from '@/lib/cross-reference'
 import { clusterResponses } from './campaign-detection'
+import { areaLabel, siteContext, type SiteContext } from './spatial'
 
 // Lazy-load Anthropic client to avoid build-time errors
 let anthropicClient: Anthropic | null = null
@@ -269,6 +271,35 @@ export interface CampaignAnalysisResult {
   campaigns: DetectedCampaign[]
 }
 
+/**
+ * A significance-tested geographic finding, pinned to a place and named in
+ * plain language. The headline is model-written but grounded exclusively in
+ * the counted figures and verbatim quotes from inside the area.
+ */
+export interface SpatialInsight {
+  latitude: number
+  longitude: number
+  /** Plain-language place, e.g. "the north-east corner of the site". */
+  areaLabel: string
+  theme: string
+  /** One report-ready sentence about what this area concentrates on. */
+  headline: string
+  /** A verbatim quote from a response inside the area (may be empty). */
+  quote: string
+  /** Responses in this area raising the theme. */
+  count: number
+  /** Classified responses in this area. */
+  areaTotal: number
+  share: number
+  baselineShare: number
+  lift: number
+  pValue: number
+  /** Stance across ALL classified responses in the area, not just the theme's. */
+  dominantSentiment: 'positive' | 'negative' | 'neutral' | 'mixed'
+  /** Ids of the responses behind `count` (capped). */
+  responseIds: string[]
+}
+
 export interface FullAnalysisResult {
   sentiment: SentimentResult
   themes: ThemesResult
@@ -287,6 +318,15 @@ export interface FullAnalysisResult {
   }
   /** Statistically tested theme × segment patterns. */
   crossReference?: CrossReferenceResult
+  /** Area findings named and characterised for the map. */
+  spatialInsights?: SpatialInsight[]
+  /** The theme taxonomy `assignments[].themeIds` index into. */
+  taxonomy?: ThemeDefinition[]
+  /**
+   * Per-response classifications — the layer every aggregate above is counted
+   * from, persisted so the workspace can filter and trace responses.
+   */
+  assignments?: ItemAssignment[]
   /** How much of the corpus this analysis actually covers. Surface it. */
   coverage?: AnalysisCoverage
   analyzedAt: string
@@ -657,6 +697,174 @@ export async function startFullAnalysis(feedbackItems: FeedbackItem[]): Promise<
   }
 }
 
+const SPATIAL_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    insights: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          area: { type: 'integer', description: 'The AREA number this insight is for' },
+          headline: {
+            type: 'string',
+            description:
+              'One report-ready sentence (under 25 words) about what responses in this area concentrate on',
+          },
+          quoteNumber: {
+            type: 'integer',
+            description: 'The number of the single most representative quote provided for this area',
+          },
+        },
+        required: ['area', 'headline', 'quoteNumber'],
+      },
+    },
+  },
+  required: ['insights'],
+}
+
+/** At most this many area findings are characterised for the map. */
+const MAX_SPATIAL_INSIGHTS = 6
+const MAX_SPATIAL_QUOTES = 4
+const MAX_SPATIAL_RESPONSE_IDS = 200
+
+/** Grid key matching the cross-reference area dimension (2dp ≈ 1km). */
+function areaCellKey(latitude: number, longitude: number): string {
+  return `${latitude.toFixed(2)},${longitude.toFixed(2)}`
+}
+
+/**
+ * Turn the significance-tested area findings into map-ready insights: name
+ * each cell relative to the site boundary, gather the responses behind the
+ * number, and have Opus write one grounded headline per area. The counts,
+ * quotes, and statistics all come from code — the model only phrases them.
+ */
+async function generateSpatialInsights(
+  crossRef: CrossReferenceResult,
+  classification: CorpusClassification,
+  boundaryGeojson: unknown | null
+): Promise<SpatialInsight[] | undefined> {
+  const areaFindings = crossRef.highlights
+    .filter(h => h.dimension === 'area')
+    .slice(0, MAX_SPATIAL_INSIGHTS)
+  if (areaFindings.length === 0) return undefined
+
+  const located = classification.items.filter(
+    item => item.latitude != null && item.longitude != null
+  )
+  const site: SiteContext | null = siteContext(
+    boundaryGeojson,
+    located.map(item => ({ latitude: item.latitude!, longitude: item.longitude! }))
+  )
+  if (!site) return undefined
+
+  const assignmentsById = new Map(classification.assignments.map(a => [a.id, a]))
+  const themeIndexByName = new Map(classification.taxonomy.map((t, i) => [t.name, i]))
+
+  const prepared = areaFindings.map((finding: CrossTab) => {
+    const [latitude, longitude] = finding.segment.split(',').map(Number)
+    const cellKey = finding.segment
+    const themeId = themeIndexByName.get(finding.theme)
+
+    const cellItems = located.filter(
+      item => areaCellKey(item.latitude!, item.longitude!) === cellKey
+    )
+
+    const sentiments = { positive: 0, negative: 0, neutral: 0 }
+    const memberIds: string[] = []
+    const quotes: string[] = []
+
+    cellItems.forEach(item => {
+      const assignment = assignmentsById.get(item.id)
+      if (!assignment) return
+      sentiments[assignment.sentiment]++
+      if (themeId != null && assignment.themeIds.includes(themeId)) {
+        memberIds.push(item.id)
+        const text = item.content.trim()
+        if (quotes.length < MAX_SPATIAL_QUOTES && text.length >= 40) {
+          quotes.push(text.length > 400 ? `${text.slice(0, 400).trimEnd()}…` : text)
+        }
+      }
+    })
+
+    const dominant = (Object.entries(sentiments).sort((a, b) => b[1] - a[1])[0][0]) as
+      | 'positive'
+      | 'negative'
+      | 'neutral'
+    const mixed = sentiments.positive > 0 && sentiments.negative > 0
+
+    return {
+      finding,
+      latitude,
+      longitude,
+      label: areaLabel({ latitude, longitude }, site),
+      sentiments,
+      dominantSentiment: mixed ? ('mixed' as const) : dominant,
+      memberIds,
+      quotes,
+    }
+  })
+
+  // One small Opus call phrases every area at once. The deterministic
+  // fallback below means a failed call degrades wording, never data.
+  let phrased: { insights: Array<{ area: number; headline: string; quoteNumber: number }> } | null =
+    null
+  try {
+    const areaText = prepared
+      .map((area, i) => {
+        const f = area.finding
+        return [
+          `AREA ${i + 1} — ${area.label}`,
+          `"${f.theme}" is raised by ${f.count} of the ${f.segmentTotal} responses here (${Math.round(f.segmentShare * 100)}%), against ${Math.round(f.baselineShare * 100)}% elsewhere.`,
+          `Stance in this area: ${area.sentiments.positive} positive / ${area.sentiments.negative} negative / ${area.sentiments.neutral} neutral.`,
+          `Quotes from responses here that raise the theme:`,
+          ...(area.quotes.length > 0
+            ? area.quotes.map((q, n) => `[${n + 1}] ${q}`)
+            : ['(none long enough to quote)']),
+        ].join('\n')
+      })
+      .join('\n\n')
+
+    phrased = await analysisCall({
+      system: `You are an expert consultation analyst. For each AREA below, write one report-ready headline sentence: what the responses in that area concentrate on and what they are asking for, grounded ONLY in the figures and quotes provided. Under 25 words, plain English, no coordinates, no invented numbers — the exact statistics are displayed alongside your sentence. Also pick the single most representative quote by its number (use 0 if no quotes were provided). Return one entry per area, in area order.`,
+      user: `Characterise these areas:\n\n${areaText}`,
+      schema: SPATIAL_SCHEMA,
+      effort: 'low',
+    })
+  } catch (error) {
+    console.warn('generateSpatialInsights: characterisation call failed', error)
+  }
+
+  return prepared.map((area, i) => {
+    const entry = phrased?.insights.find(insight => insight.area === i + 1)
+    const quote =
+      entry && entry.quoteNumber >= 1 && entry.quoteNumber <= area.quotes.length
+        ? area.quotes[entry.quoteNumber - 1]
+        : area.quotes[0] || ''
+
+    return {
+      latitude: area.latitude,
+      longitude: area.longitude,
+      areaLabel: area.label,
+      theme: area.finding.theme,
+      headline:
+        entry?.headline ||
+        `"${area.finding.theme}" is raised in ${Math.round(area.finding.segmentShare * 100)}% of responses around ${area.label}, against ${Math.round(area.finding.baselineShare * 100)}% elsewhere.`,
+      quote: quote.length > QUOTE_CHARS * 2 ? `${quote.slice(0, QUOTE_CHARS * 2).trimEnd()}…` : quote,
+      count: area.finding.count,
+      areaTotal: area.finding.segmentTotal,
+      share: area.finding.segmentShare,
+      baselineShare: area.finding.baselineShare,
+      lift: area.finding.lift,
+      pValue: area.finding.pValue,
+      dominantSentiment: area.dominantSentiment,
+      responseIds: area.memberIds.slice(0, MAX_SPATIAL_RESPONSE_IDS),
+    }
+  })
+}
+
 /** Whether a submitted analysis batch has finished processing. */
 export async function isAnalysisBatchReady(batchId: string): Promise<boolean> {
   const batch = await getAnthropic().messages.batches.retrieve(batchId)
@@ -673,7 +881,11 @@ export async function isAnalysisBatchReady(batchId: string): Promise<boolean> {
  */
 export async function finalizeFullAnalysis(
   pending: PendingAnalysis,
-  feedbackItems: FeedbackItem[]
+  feedbackItems: FeedbackItem[],
+  options?: {
+    /** The project's boundary layer, used to name spatial findings. */
+    boundaryGeojson?: unknown | null
+  }
 ): Promise<FullAnalysisResult> {
   const byId = new Map(feedbackItems.map(item => [item.id, truncateContent(item)]))
 
@@ -791,7 +1003,7 @@ export async function finalizeFullAnalysis(
     assignments
   )
 
-  const [summary, headlineStats] = await Promise.all([
+  const [summary, headlineStats, spatialInsights] = await Promise.all([
     generateSummary(
       feedbackItems,
       sentiment,
@@ -799,6 +1011,7 @@ export async function finalizeFullAnalysis(
       crossRef.highlights.slice(0, 8).map(describeHighlight)
     ),
     generateHeadlineStats(feedbackItems, sentiment, themes),
+    generateSpatialInsights(crossRef, classification, options?.boundaryGeojson ?? null),
   ])
 
   return {
@@ -810,6 +1023,9 @@ export async function finalizeFullAnalysis(
     campaignAnalysis,
     geographic,
     crossReference: crossRef,
+    spatialInsights,
+    taxonomy: pending.taxonomy,
+    assignments,
     coverage,
     analyzedAt: new Date().toISOString(),
     feedbackCount: feedbackItems.length,

@@ -798,8 +798,8 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
         </div>
       )}
 
-      {/* All responses, filterable by theme */}
-      <ResponsesExplorer projectId={projectId} />
+      {/* All responses, filterable by theme; a theme clicked in the chart above jumps here */}
+      <ResponsesExplorer projectId={projectId} focusTheme={selectedTheme?.name ?? null} />
     </div>
   )
 }

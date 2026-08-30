@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { MessageSquare } from 'lucide-react'
 import { fetchJson } from '@/lib/fetch-json'
@@ -45,9 +45,17 @@ const PAGE_SIZE = 20
  * taxonomy and membership from the per-response assignments, so the counts
  * here match the charts above exactly.
  */
-export function ResponsesExplorer({ projectId }: { projectId: string }) {
+export function ResponsesExplorer({
+  projectId,
+  focusTheme,
+}: {
+  projectId: string
+  /** Theme name selected elsewhere (e.g. the theme chart) — filters and scrolls here. */
+  focusTheme?: string | null
+}) {
   const [themeFilter, setThemeFilter] = useState<number | null>(null)
   const [limit, setLimit] = useState(PAGE_SIZE)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   const { data } = useQuery<WorkspacePayload>({
     queryKey: ['analytics-workspace', projectId],
@@ -77,6 +85,19 @@ export function ResponsesExplorer({ projectId }: { projectId: string }) {
     [taxonomy, assignments]
   )
 
+  // A theme clicked elsewhere on the page filters this section and brings it
+  // into view.
+  const taxonomyKey = taxonomy.map(t => t.name).join('|')
+  useEffect(() => {
+    if (!focusTheme) return
+    const index = taxonomy.findIndex(t => t.name === focusTheme)
+    if (index === -1) return
+    setThemeFilter(index)
+    setLimit(PAGE_SIZE)
+    containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusTheme, taxonomyKey])
+
   const filtered = useMemo(() => {
     const sorted = [...items].sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -90,7 +111,7 @@ export function ResponsesExplorer({ projectId }: { projectId: string }) {
   if (items.length === 0) return null
 
   return (
-    <div className="card p-6">
+    <div className="card p-6 scroll-mt-6" ref={containerRef}>
       <div className="mb-4">
         <h3 className="font-semibold text-slate-900 flex items-center gap-2">
           <MessageSquare size={18} className="text-brand-600" />
@@ -103,6 +124,11 @@ export function ResponsesExplorer({ projectId }: { projectId: string }) {
         </p>
       </div>
 
+      {themeChips.length === 0 && (
+        <p className="text-xs text-slate-400 bg-slate-50 rounded-lg px-3 py-2 mb-4">
+          Theme filtering unlocks after the next analysis run — hit Re-analyze above.
+        </p>
+      )}
       {themeChips.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-4">
           <button

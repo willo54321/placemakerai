@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Star, TrendingUp, ChevronDown } from 'lucide-react'
 import { fetchJson } from '@/lib/fetch-json'
@@ -65,6 +65,45 @@ export function AutoInsights({
   onViewTheme: (themeName: string) => void
 }) {
   const [showAll, setShowAll] = useState(false)
+
+  // One fixed-position tooltip for the whole matrix. CSS hover tooltips get
+  // clipped by the table's overflow container; a fixed element doesn't. A
+  // short grace timer lets the pointer travel from cell to tooltip so the
+  // "View responses" button stays clickable.
+  const [tip, setTip] = useState<{
+    x: number
+    y: number
+    statement: string
+    count: number
+    theme: string
+  } | null>(null)
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const showTip = (
+    event: React.MouseEvent<HTMLElement>,
+    content: { statement: string; count: number; theme: string }
+  ) => {
+    if (hideTimer.current) clearTimeout(hideTimer.current)
+    const rect = event.currentTarget.getBoundingClientRect()
+    setTip({ x: rect.left + rect.width / 2, y: rect.top, ...content })
+  }
+
+  const scheduleHide = () => {
+    if (hideTimer.current) clearTimeout(hideTimer.current)
+    hideTimer.current = setTimeout(() => setTip(null), 160)
+  }
+
+  const cancelHide = () => {
+    if (hideTimer.current) clearTimeout(hideTimer.current)
+  }
+
+  // A stale fixed tooltip floats over the wrong thing once the page scrolls.
+  useEffect(() => {
+    if (!tip) return
+    const hide = () => setTip(null)
+    window.addEventListener('scroll', hide, { passive: true, capture: true })
+    return () => window.removeEventListener('scroll', hide, { capture: true })
+  }, [tip])
 
   const { data } = useQuery<WorkspacePayload>({
     queryKey: ['analytics-workspace', projectId],
@@ -278,25 +317,16 @@ export function AutoInsights({
                       ? describeHighlight(cell.significant)
                       : `“${row.name}” appears in ${Math.round(cell.share * 100)}% of ${column.segmentLabel} (${cell.count} of ${cell.segmentTotal}) vs ${Math.round(cell.baseline * 100)}% elsewhere. Not statistically significant.`
                     return (
-                      <td key={column.key} className="relative group p-0">
+                      <td key={column.key} className="p-0">
                         <div
                           className="w-11 h-8 rounded-md flex items-center justify-center cursor-default"
                           style={{ backgroundColor: background }}
+                          onMouseEnter={(event) =>
+                            showTip(event, { statement, count: cell.count, theme: row.name })
+                          }
+                          onMouseLeave={scheduleHide}
                         >
                           {cell.significant && <Star size={11} className="text-white fill-white drop-shadow-sm" />}
-                        </div>
-                        {/* Hover tooltip with the counted statement */}
-                        <div className="hidden group-hover:block absolute z-20 bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-64 bg-slate-900 text-white rounded-lg p-3 shadow-xl">
-                          <p className="text-xs leading-relaxed">{statement}</p>
-                          <p className="text-[11px] text-slate-400 mt-1 tabular-nums">
-                            {cell.count} instance{cell.count === 1 ? '' : 's'} of this combination
-                          </p>
-                          <button
-                            onClick={() => onViewTheme(row.name)}
-                            className="mt-2 text-[11px] font-medium bg-white/10 hover:bg-white/20 rounded-md px-2 py-1 transition-colors"
-                          >
-                            View responses
-                          </button>
                         </div>
                       </td>
                     )
@@ -310,6 +340,30 @@ export function AutoInsights({
             = statistically significant (p ≤ 0.05, corrected for multiple comparisons). Colour shows direction and
             strength vs the rest of the responses.
           </p>
+        </div>
+      )}
+
+      {/* The one matrix tooltip, fixed so no overflow container can clip it */}
+      {tip && (
+        <div
+          className="fixed z-50 w-64 bg-slate-900 text-white rounded-lg p-3 shadow-xl"
+          style={{ left: tip.x, top: tip.y - 8, transform: 'translate(-50%, -100%)' }}
+          onMouseEnter={cancelHide}
+          onMouseLeave={scheduleHide}
+        >
+          <p className="text-xs leading-relaxed">{tip.statement}</p>
+          <p className="text-[11px] text-slate-400 mt-1 tabular-nums">
+            {tip.count} instance{tip.count === 1 ? '' : 's'} of this combination
+          </p>
+          <button
+            onClick={() => {
+              setTip(null)
+              onViewTheme(tip.theme)
+            }}
+            className="mt-2 text-[11px] font-medium bg-white/10 hover:bg-white/20 rounded-md px-2 py-1 transition-colors"
+          >
+            View responses
+          </button>
         </div>
       )}
     </div>

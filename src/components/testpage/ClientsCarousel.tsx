@@ -22,7 +22,7 @@ export default function ClientsCarousel() {
           transition={{ duration: 0.6 }}
           className="text-center text-sm text-gray-500 font-medium mb-8"
         >
-          Trusted by leading developers and energy companies
+          Trusted by leading developers and renewable energy developers
         </motion.p>
       </div>
 

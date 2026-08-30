@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ArrowRight } from 'lucide-react';
+import { X, ArrowRight, Check } from 'lucide-react';
 import MapPinDemo from './MapPinDemo';
 import FeedbackFlowDemo from './FeedbackFlowDemo';
 import FormBuilderDemo from './FormBuilderDemo';
@@ -21,26 +21,16 @@ const services = [
       { name: 'Layers & Overlays', detail: 'Add site boundaries, planning zones, and architectural renders. Rotate, resize, and toggle visibility.' },
     ],
     modal: {
+      headline: 'Feedback, pinned to the places it’s about',
       intro:
         'The map is where residents already think about your project — in streets, junctions, footpaths and boundaries. placemaker.ai turns that spatial instinct into structured, analysable feedback.',
-      sections: [
-        {
-          title: 'Every kind of spatial feedback',
-          body: 'Visitors drop pins for a spot, draw lines for routes and desire paths, or outline whole areas. Each submission carries a category — positive, negative, question or comment — plus a written comment of up to 2,000 characters, with area and distance calculated automatically for drawn shapes.',
-        },
-        {
-          title: 'Moderation before anything goes public',
-          body: 'Nothing appears on the public map until you approve it. Submissions queue for review, and once live, residents can upvote the feedback they agree with — so the strength of feeling around an issue is visible, not guessed.',
-        },
-        {
-          title: 'Your site plan, in context',
-          body: 'Upload GeoJSON boundaries and planning zones, overlay architectural renders or masterplans, and rotate, resize and toggle them. Street labels can be hidden for cleaner presentation, and the whole embed inherits your colours and typography.',
-        },
-        {
-          title: 'It lives on your website',
-          body: 'The map embeds into your existing site with a single line of code — no separate consultation portal, no new domain, nothing for residents to learn. Every pin then feeds the same AI analysis as your forms and enquiries.',
-        },
+      bullets: [
+        'Collect pins, drawn routes and outlined areas — each categorised, with distances and areas calculated automatically',
+        'Moderate every submission before it goes public, then let residents upvote what they agree with',
+        'Overlay site boundaries, planning zones and architectural renders in your own branding',
+        'Embeds into the website you already have with a single line of code — every pin feeds the same AI analysis as your forms and enquiries',
       ],
+      footnote: 'No separate consultation portal, no new domain, nothing for residents to learn.',
     },
   },
   {
@@ -205,11 +195,11 @@ export default function Services() {
             onClick={() => setOpenModal(null)}
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.96, y: 16 }}
+              initial={{ opacity: 0, scale: 0.97, y: 18 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.97, y: 10 }}
-              transition={{ duration: 0.35, ease: [0.19, 1, 0.22, 1] }}
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto relative"
+              exit={{ opacity: 0, scale: 0.98, y: 12 }}
+              transition={{ duration: 0.4, ease: [0.19, 1, 0.22, 1] }}
+              className="bg-white rounded-3xl shadow-2xl w-full max-w-6xl max-h-[92vh] overflow-y-auto relative"
               onClick={(event) => event.stopPropagation()}
               role="dialog"
               aria-modal="true"
@@ -217,38 +207,57 @@ export default function Services() {
             >
               <button
                 onClick={() => setOpenModal(null)}
-                className="absolute top-4 right-4 p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                className="absolute top-5 right-5 sm:top-7 sm:right-7 p-2.5 rounded-xl border border-slate-200 text-slate-500 hover:text-slate-800 hover:border-slate-300 hover:bg-slate-50 transition-colors z-10"
                 aria-label="Close"
               >
                 <X className="w-5 h-5" />
               </button>
 
-              <div className="p-8 sm:p-10">
-                <span className="text-sm font-medium text-[#16A34A] uppercase tracking-wider">
-                  {open.number}
-                </span>
-                <h3 className="text-2xl sm:text-3xl font-semibold text-[#0B2818] mt-1 mb-2 tracking-tight">
-                  {open.title}
-                </h3>
-                <p className="text-slate-600 leading-relaxed mb-8">{open.modal.intro}</p>
-
-                <div className="space-y-6">
-                  {open.modal.sections.map((section) => (
-                    <div key={section.title} className="border-t border-slate-100 pt-5">
-                      <h4 className="font-semibold text-[#0B2818] mb-1.5">{section.title}</h4>
-                      <p className="text-sm text-slate-600 leading-relaxed">{section.body}</p>
+              <div className="p-8 sm:p-12 lg:p-14">
+                {/* Header: headline + CTAs left, benefit checklist right */}
+                <div className="grid lg:grid-cols-[1.15fr_1fr] gap-10 lg:gap-16 items-start pr-10 sm:pr-14">
+                  <div>
+                    <h3 className="font-heading text-3xl sm:text-4xl font-bold text-[#0B2818] tracking-[-0.02em] leading-[1.1] mb-4">
+                      {open.modal.headline}
+                    </h3>
+                    <p className="text-lg text-slate-600 leading-relaxed mb-8 max-w-xl">
+                      {open.modal.intro}
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <a href="#contact" onClick={() => setOpenModal(null)} className="btn-primary text-sm justify-center">
+                        Get in Touch
+                        <ArrowRight className="w-4 h-4" />
+                      </a>
+                      <button onClick={() => setOpenModal(null)} className="btn-secondary text-sm justify-center">
+                        Close
+                      </button>
                     </div>
-                  ))}
+                    <p className="text-sm text-slate-400 mt-6">{open.modal.footnote}</p>
+                  </div>
+
+                  <ul className="space-y-4 lg:mt-2">
+                    {open.modal.bullets.map((bullet) => (
+                      <li key={bullet} className="flex items-start gap-3">
+                        <span className="w-5 h-5 rounded-full bg-[#DCFCE7] flex items-center justify-center shrink-0 mt-0.5">
+                          <Check className="w-3 h-3 text-[#16A34A]" strokeWidth={3} />
+                        </span>
+                        <span className="text-[15px] text-slate-700 leading-relaxed">{bullet}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
 
-                <div className="mt-9 flex flex-col sm:flex-row gap-3">
-                  <a href="#contact" onClick={() => setOpenModal(null)} className="btn-primary text-sm justify-center">
-                    Get in Touch
-                    <ArrowRight className="w-4 h-4" />
-                  </a>
-                  <button onClick={() => setOpenModal(null)} className="btn-secondary text-sm justify-center">
-                    Close
-                  </button>
+                {/* Product visual on a soft gradient, Stripe-style */}
+                <div
+                  className="mt-10 sm:mt-12 rounded-2xl overflow-hidden px-6 pt-8 sm:px-14 sm:pt-12"
+                  style={{
+                    background:
+                      'linear-gradient(115deg, #ECFDF5 0%, #F0FDF4 35%, #FFFFFF 60%, #D1FAE5 100%)',
+                  }}
+                >
+                  <div className="max-w-2xl mx-auto -mb-2 sm:-mb-3 rounded-t-xl overflow-hidden shadow-2xl">
+                    {open.number === '01' && <MapPinDemo />}
+                  </div>
                 </div>
               </div>
             </motion.div>

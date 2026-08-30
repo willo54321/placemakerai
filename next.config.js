@@ -3,6 +3,11 @@ const { withSentryConfig } = require('@sentry/nextjs')
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  images: {
+    // The /testpage marketing starter serves local SVG logos via next/image;
+    // the optimizer blocks SVGs, and nothing else in the app uses next/image.
+    unoptimized: true,
+  },
   env: {
     // Baked at build time: package version + the commit Vercel built from
     NEXT_PUBLIC_APP_VERSION: require('./package.json').version,

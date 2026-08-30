@@ -4,7 +4,12 @@ import './globals.css'
 import { Providers } from './providers'
 import CookieConsent from '@/components/CookieConsent'
 
-const dmSans = DM_Sans({ subsets: ['latin'], weight: ['400', '500', '600', '700'] })
+const dmSans = DM_Sans({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  // Exposed as a CSS variable too — the /testpage stylesheet references it.
+  variable: '--font-dm-sans',
+})
 
 export const metadata: Metadata = {
   title: 'Placemaker.ai',
@@ -18,7 +23,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={dmSans.className}>
+      <body className={`${dmSans.className} ${dmSans.variable}`}>
         <Providers>{children}</Providers>
         <CookieConsent />
       </body>

@@ -25,6 +25,7 @@
     "bcryptjs": "^3.0.3",
     "date-fns": "^3.3.0",
     "eslint-config-next": "^14.2.35",
+    "framer-motion": "^13.1.1",
     "html2canvas": "^1.4.1",
     "leaflet": "^1.9.4",
     "leaflet.heat": "^0.2.0",

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ArrowRight, Check } from 'lucide-react';
 import MapPinDemo from './MapPinDemo';
+import ModerationDemo from './ModerationDemo';
 import FeedbackFlowDemo from './FeedbackFlowDemo';
 import FormBuilderDemo from './FormBuilderDemo';
 
@@ -14,12 +15,6 @@ const services = [
     subtitle: 'Location linked feedback with visual context',
     description: 'placemaker.ai enables communities to provide feedback directly linked to specific locations, creating a visual way to understand how concerns, ideas, and support relate to physical places within your project.',
     secondaryDescription: '',
-    
-    features: [
-      { name: 'Pins, Lines & Polygons', detail: 'Respondents drop pins, draw routes, or outline areas. Each submission is categorised with automatic area and distance calculations.' },
-      { name: 'Community Voting & Moderation', detail: 'The public upvotes feedback they agree with, surfacing what matters most. Approve submissions before they go live.' },
-      { name: 'Layers & Overlays', detail: 'Add site boundaries, planning zones, and architectural renders. Rotate, resize, and toggle visibility.' },
-    ],
     modal: {
       headline: 'Feedback, pinned to the places it’s about',
       intro:
@@ -31,6 +26,11 @@ const services = [
         'Embeds into the website you already have with a single line of code — every pin feeds the same AI analysis as your forms and enquiries',
       ],
       footnote: 'No separate consultation portal, no new domain, nothing for residents to learn.',
+      featureCards: [
+        { name: 'Pins, Lines & Polygons', detail: 'Respondents drop pins, draw routes, or outline areas. Each submission is categorised with automatic area and distance calculations.' },
+        { name: 'Community Voting & Moderation', detail: 'The public upvotes feedback they agree with, surfacing what matters most. Approve submissions before they go live.' },
+        { name: 'Layers & Overlays', detail: 'Add site boundaries, planning zones, and architectural renders. Rotate, resize, and toggle visibility.' },
+      ],
     },
   },
   {
@@ -247,7 +247,7 @@ export default function Services() {
                   </ul>
                 </div>
 
-                {/* Product visual on a soft gradient, Stripe-style */}
+                {/* Product visual on a soft gradient, Stripe-style: the real approval flow */}
                 <div
                   className="mt-10 sm:mt-12 rounded-2xl overflow-hidden px-6 pt-8 sm:px-14 sm:pt-12"
                   style={{
@@ -255,9 +255,19 @@ export default function Services() {
                       'linear-gradient(115deg, #ECFDF5 0%, #F0FDF4 35%, #FFFFFF 60%, #D1FAE5 100%)',
                   }}
                 >
-                  <div className="max-w-2xl mx-auto -mb-2 sm:-mb-3 rounded-t-xl overflow-hidden shadow-2xl">
-                    {open.number === '01' && <MapPinDemo />}
+                  <div className="max-w-2xl mx-auto -mb-2 sm:-mb-3 rounded-t-xl overflow-hidden shadow-2xl border border-slate-200/70 border-b-0">
+                    {open.number === '01' && <ModerationDemo />}
                   </div>
+                </div>
+
+                {/* Further features */}
+                <div className="mt-10 sm:mt-12 grid sm:grid-cols-3 gap-5">
+                  {open.modal.featureCards.map((feature) => (
+                    <div key={feature.name} className="rounded-xl border border-slate-100 bg-slate-50/50 p-5">
+                      <h4 className="text-[15px] font-semibold text-[#0B2818] mb-1.5">{feature.name}</h4>
+                      <p className="text-sm text-slate-600 leading-relaxed">{feature.detail}</p>
+                    </div>
+                  ))}
                 </div>
               </div>
             </motion.div>

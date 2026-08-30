@@ -5,7 +5,23 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, ArrowRight, Check } from 'lucide-react';
 import MapPinDemo from './MapPinDemo';
 import ModerationDemo from './ModerationDemo';
-import { MiniShapesDemo, MiniVotingDemo, MiniLayersDemo } from './MiniFeatureDemos';
+import {
+  MiniShapesDemo,
+  MiniVotingDemo,
+  MiniLayersDemo,
+  MiniApiDemo,
+  MiniComplianceDemo,
+  MiniResponsesDemo,
+} from './MiniFeatureDemos';
+
+const MINI_DEMOS: Record<string, () => JSX.Element> = {
+  'Pins, Lines & Polygons': MiniShapesDemo,
+  'Community Voting & Moderation': MiniVotingDemo,
+  'Layers & Overlays': MiniLayersDemo,
+  'API Integration': MiniApiDemo,
+  'Built-In Compliance': MiniComplianceDemo,
+  'Smart Responses': MiniResponsesDemo,
+};
 import FeedbackFlowDemo from './FeedbackFlowDemo';
 import FormBuilderDemo from './FormBuilderDemo';
 
@@ -40,12 +56,23 @@ const services = [
     subtitle: 'Build bespoke forms without writing code',
     description: 'placemaker.ai lets you build bespoke consultation forms without writing code. Create unlimited forms, connect external websites via API, and collect responses with GDPR consent tracked automatically on every submission.',
     secondaryDescription: '',
-    features: [
-      { name: 'Drag-and-Drop Builder', detail: 'Eight field types including text, dropdowns, checkboxes, and ratings. Reorder fields, mark as required, and preview instantly.' },
-      { name: 'API Integration', detail: 'Connect any website with a single endpoint. Auto-detects field names and builds the schema on the fly.' },
-      { name: 'Built-In Compliance', detail: 'GDPR consent mandatory on every submission. Timestamps recorded automatically, mailing opt-in kept separate.' },
-      { name: 'Smart Responses', detail: 'View submissions in expandable cards with automatic name and email detection. Click any email to start a conversation.' },
-    ],
+    modal: {
+      headline: 'Build bespoke forms without writing code',
+      intro:
+        'placemaker.ai lets you build bespoke consultation forms without writing code. Create unlimited forms, connect external websites via API, and collect responses with GDPR consent tracked automatically on every submission.',
+      bullets: [
+        'Eight field types — text, dropdowns, checkboxes and ratings — with drag-and-drop reordering and instant preview',
+        'Connect any website with a single endpoint that auto-detects field names and builds the schema on the fly',
+        'GDPR consent mandatory on every submission — timestamps recorded automatically, mailing opt-in kept separate',
+        'Responses land in expandable cards with automatic name and email detection — click any email to start a conversation',
+      ],
+      footnote: 'Every form lives at its own shareable link — or posts in from your existing website.',
+      featureCards: [
+        { name: 'API Integration', detail: 'Connect any website with a single endpoint. Auto-detects field names and builds the schema on the fly.' },
+        { name: 'Built-In Compliance', detail: 'GDPR consent mandatory on every submission. Timestamps recorded automatically, mailing opt-in kept separate.' },
+        { name: 'Smart Responses', detail: 'View submissions in expandable cards with automatic name and email detection. Click any email to start a conversation.' },
+      ],
+    },
   },
   {
     number: '03',
@@ -257,7 +284,7 @@ export default function Services() {
                   }}
                 >
                   <div className="max-w-2xl mx-auto -mb-2 sm:-mb-3 rounded-t-xl overflow-hidden shadow-2xl border border-slate-200/70 border-b-0">
-                    {open.number === '01' && <ModerationDemo />}
+                    {open.number === '01' ? <ModerationDemo /> : <FormBuilderDemo />}
                   </div>
                 </div>
 
@@ -267,21 +294,18 @@ export default function Services() {
                     More to discover
                   </h4>
                   <div className="grid sm:grid-cols-3 gap-6 lg:gap-8">
-                    {open.modal.featureCards.map((feature) => (
-                      <div key={feature.name}>
-                        <div className="rounded-xl bg-slate-50 border border-slate-100 overflow-hidden aspect-[4/3] mb-4">
-                          {feature.name === 'Pins, Lines & Polygons' ? (
-                            <MiniShapesDemo />
-                          ) : feature.name === 'Community Voting & Moderation' ? (
-                            <MiniVotingDemo />
-                          ) : (
-                            <MiniLayersDemo />
-                          )}
+                    {open.modal.featureCards.map((feature) => {
+                      const MiniDemo = MINI_DEMOS[feature.name];
+                      return (
+                        <div key={feature.name}>
+                          <div className="rounded-xl bg-slate-50 border border-slate-100 overflow-hidden aspect-[4/3] mb-4">
+                            {MiniDemo && <MiniDemo />}
+                          </div>
+                          <h5 className="text-[15px] font-semibold text-[#0B2818] mb-1.5">{feature.name}</h5>
+                          <p className="text-sm text-slate-600 leading-relaxed">{feature.detail}</p>
                         </div>
-                        <h5 className="text-[15px] font-semibold text-[#0B2818] mb-1.5">{feature.name}</h5>
-                        <p className="text-sm text-slate-600 leading-relaxed">{feature.detail}</p>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </div>

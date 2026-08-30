@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { ThumbsUp, X, Eye, Upload, Image as ImageIcon, Layers, ChevronLeft } from 'lucide-react'
+import { ThumbsUp, X, Eye, Upload, Image as ImageIcon, Layers, ChevronLeft, ChevronDown, ChevronUp, CheckCircle } from 'lucide-react'
 
 /**
  * Three miniature looping product demos for the modal's "More to discover"
@@ -366,6 +366,260 @@ export function MiniLayersDemo() {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* 02 — API Integration                                                */
+/* ------------------------------------------------------------------ */
+
+const API_LINES = [
+  { text: 'POST /api/projects/{id}/feedback', color: '#7DD3FC' },
+  { text: '{', color: '#94A3B8' },
+  { text: '  "name": "Tom Wilson",', color: '#E2E8F0' },
+  { text: '  "email": "tom@example.com",', color: '#E2E8F0' },
+  { text: '  "rating": 4,', color: '#E2E8F0' },
+  { text: '  "gdprConsent": true', color: '#E2E8F0' },
+  { text: '}', color: '#94A3B8' },
+]
+
+export function MiniApiDemo() {
+  // phase = lines revealed; 8 = schema detected
+  const phase = useLoop(
+    [
+      { at: 500, phase: 1 },
+      { at: 1000, phase: 2 },
+      { at: 1400, phase: 3 },
+      { at: 1800, phase: 4 },
+      { at: 2200, phase: 5 },
+      { at: 2600, phase: 6 },
+      { at: 3000, phase: 7 },
+      { at: 3900, phase: 8 },
+    ],
+    8800,
+    8
+  )
+
+  return (
+    <div className="relative w-full h-full flex items-center justify-center px-4 select-none" aria-label="Demo: an external website posting a form submission to the API, fields detected automatically">
+      <div className="w-full max-w-[240px]">
+        {/* Code panel */}
+        <div className="bg-[#0F172A] rounded-lg p-3 shadow-xl font-mono text-[8.5px] leading-[1.7]">
+          {API_LINES.map((line, index) => (
+            <p
+              key={index}
+              style={{
+                color: line.color,
+                opacity: phase >= index + 1 ? 1 : 0,
+                transition: `opacity 0.3s ${EASE}`,
+                whiteSpace: 'pre',
+              }}
+            >
+              {line.text}
+            </p>
+          ))}
+        </div>
+
+        {/* Auto-detected schema */}
+        <div
+          className="mt-2 bg-white rounded-lg border border-slate-200 shadow-md px-2.5 py-2"
+          style={{
+            opacity: phase >= 8 ? 1 : 0,
+            transform: phase >= 8 ? 'translateY(0)' : 'translateY(5px)',
+            transition: `opacity 0.5s ${EASE}, transform 0.5s ${EASE}`,
+          }}
+        >
+          <p className="text-[8.5px] font-semibold text-slate-700 flex items-center gap-1 mb-1">
+            <CheckCircle size={9} className="text-[#16A34A]" /> 4 fields detected — schema built
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {['name', 'email', 'rating', 'gdprConsent'].map(field => (
+              <span key={field} className="text-[8px] font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
+                {field}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* 02 — Built-In Compliance                                            */
+/* ------------------------------------------------------------------ */
+
+export function MiniComplianceDemo() {
+  // 1 consent ticked · 2 submit enabled+pressed · 3 recorded
+  const phase = useLoop(
+    [
+      { at: 1100, phase: 1 },
+      { at: 2300, phase: 2 },
+      { at: 3400, phase: 3 },
+    ],
+    8400,
+    3
+  )
+  const ticked = phase >= 1
+
+  return (
+    <div className="relative w-full h-full flex items-center justify-center px-5 select-none" aria-label="Demo: GDPR consent required before submitting, with the consent timestamp recorded">
+      {/* The public form's GDPR footer, faithfully */}
+      <div className="w-full max-w-[230px] bg-white rounded-xl shadow-xl p-3">
+        <div className="flex items-start gap-2 pt-1">
+          <span
+            className="w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 mt-0.5"
+            style={{
+              borderColor: ticked ? '#2563EB' : '#D1D5DB',
+              backgroundColor: ticked ? '#2563EB' : '#FFFFFF',
+              transition: `background-color 0.3s ${EASE}, border-color 0.3s ${EASE}`,
+            }}
+          >
+            <svg width="8" height="8" viewBox="0 0 10 10" style={{ opacity: ticked ? 1 : 0, transition: `opacity 0.2s ${EASE}` }}>
+              <path d="M1.5 5.5 L4 8 L8.5 2.5" stroke="#fff" strokeWidth="1.8" fill="none" strokeLinecap="round" />
+            </svg>
+          </span>
+          <p className="text-[8.5px] text-gray-600 leading-relaxed">
+            I consent to my data being processed to respond to my feedback. <span className="text-red-500">*</span>{' '}
+            <span className="text-blue-600 underline">Privacy Policy</span>
+          </p>
+        </div>
+
+        <span
+          className="mt-2.5 w-full flex items-center justify-center bg-blue-600 text-white text-[9px] font-medium py-1.5 rounded-lg"
+          style={{
+            opacity: ticked ? 1 : 0.5,
+            transform: phase === 2 ? 'scale(0.97)' : 'scale(1)',
+            transition: `opacity 0.4s ${EASE}, transform 0.25s ${EASE}`,
+          }}
+        >
+          Submit feedback
+        </span>
+
+        {/* Recorded automatically */}
+        <div
+          className="mt-2.5 space-y-1 border-t border-gray-100 pt-2"
+          style={{
+            opacity: phase >= 3 ? 1 : 0,
+            transform: phase >= 3 ? 'translateY(0)' : 'translateY(4px)',
+            transition: `opacity 0.5s ${EASE}, transform 0.5s ${EASE}`,
+          }}
+        >
+          <p className="text-[8px] text-gray-500 flex items-center gap-1">
+            <CheckCircle size={8} className="text-[#16A34A] shrink-0" /> Consent recorded — Sat 30 Aug 2026, 14:32
+          </p>
+          <p className="text-[8px] text-gray-400 flex items-center gap-1">
+            <span className="w-2 h-2 rounded-sm border border-gray-300 shrink-0" /> Mailing list opt-in — kept separate
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* 02 — Smart Responses                                                */
+/* ------------------------------------------------------------------ */
+
+export function MiniResponsesDemo() {
+  // 1 card expands · 2 email highlighted
+  const phase = useLoop(
+    [
+      { at: 1400, phase: 1 },
+      { at: 3400, phase: 2 },
+      { at: 6200, phase: 0 },
+    ],
+    8600,
+    2
+  )
+  const expanded = phase >= 1
+
+  return (
+    <div className="relative w-full h-full flex items-center justify-center px-5 select-none" aria-label="Demo: a form response card expanding, with name and email detected automatically">
+      {/* The Responses tab card, faithfully */}
+      <div
+        className="w-full max-w-[240px] bg-white rounded-xl border"
+        style={{
+          borderColor: expanded ? '#BFDBFE' : '#E2E8F0',
+          boxShadow: expanded
+            ? '0 4px 6px -1px rgba(0,0,0,0.1), 0 0 0 1px rgba(219,234,254,1)'
+            : '0 1px 2px rgba(0,0,0,0.05)',
+          transition: `border-color 0.4s ${EASE}, box-shadow 0.4s ${EASE}`,
+        }}
+      >
+        <div className="w-full p-2.5 flex items-start gap-2">
+          <span
+            className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 font-semibold text-[10px]"
+            style={{
+              backgroundColor: expanded ? '#DBEAFE' : '#F1F5F9',
+              color: expanded ? '#1D4ED8' : '#475569',
+              transition: `background-color 0.4s ${EASE}, color 0.4s ${EASE}`,
+            }}
+          >
+            T
+          </span>
+          <span className="flex-1 min-w-0">
+            <span className="flex items-center gap-1.5 flex-wrap">
+              <span className="font-semibold text-[10px] text-slate-900">Tom Wilson</span>
+              <span
+                className="text-[8.5px] text-blue-600"
+                style={{
+                  textDecoration: phase >= 2 ? 'underline' : 'none',
+                  transition: `all 0.3s ${EASE}`,
+                }}
+              >
+                tom@example.com
+              </span>
+            </span>
+            <span className="block text-[8px] text-slate-400 mt-0.5">Sat, 30 Aug 2026, 10:02</span>
+            {!expanded && (
+              <span className="block text-[8.5px] text-slate-500 mt-1 truncate">
+                <span className="text-slate-400">Your View:</span> The four-storey block would…
+              </span>
+            )}
+          </span>
+          <span
+            className="p-1 rounded-lg shrink-0"
+            style={{
+              backgroundColor: expanded ? '#DBEAFE' : '#F1F5F9',
+              transition: `background-color 0.4s ${EASE}`,
+            }}
+          >
+            {expanded ? (
+              <ChevronUp size={11} className="text-blue-600" />
+            ) : (
+              <ChevronDown size={11} className="text-slate-400" />
+            )}
+          </span>
+        </div>
+
+        {/* Expanded fields */}
+        <div
+          className="overflow-hidden"
+          style={{
+            maxHeight: expanded ? 110 : 0,
+            opacity: expanded ? 1 : 0,
+            transition: `max-height 0.55s ${EASE}, opacity 0.45s ${EASE}`,
+          }}
+        >
+          <div className="px-2.5 pb-2.5 space-y-1.5">
+            <div className="bg-slate-50 rounded-lg px-2 py-1.5">
+              <p className="text-[7.5px] font-medium text-slate-400 uppercase tracking-wide">Your view</p>
+              <p className="text-[8.5px] text-slate-700 leading-snug">
+                The four-storey block would overshadow every garden on Elm Grove.
+              </p>
+            </div>
+            <div className="bg-slate-50 rounded-lg px-2 py-1.5">
+              <p className="text-[7.5px] font-medium text-slate-400 uppercase tracking-wide">Attend the exhibition?</p>
+              <p className="text-[8.5px] text-slate-700">Yes — Saturday session</p>
+            </div>
+            <p className="text-[7.5px] text-slate-400 flex items-center gap-1">
+              <CheckCircle size={7} className="text-[#16A34A]" /> GDPR consent recorded
+            </p>
           </div>
         </div>
       </div>

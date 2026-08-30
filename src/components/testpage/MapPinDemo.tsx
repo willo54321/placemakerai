@@ -157,15 +157,19 @@ export default function MapPinDemo() {
   const pinDown = formOpen || phase === 'thanks' || phase === 'rest'
   const positiveSelected = ['typing', 'naming', 'submitting', 'thanks', 'rest'].includes(phase)
 
-  // Cursor waypoints per phase, on the 480x360 stage.
+  // Cursor waypoints per phase, on the 480x360 stage. The form sits at
+  // right:14 width:200 → content x 278-454. Rows from the top: title (~y47),
+  // category chips row 1 (y~47-66: question | negative), row 2 (y~70-90:
+  // POSITIVE | comment), comment box (y~98-153), name (y~159-177),
+  // submit (y~186-206). The cursor tip is the transform origin.
   const cursor: Record<Phase, { x: number; y: number; visible: boolean }> = {
     idle: { x: 450, y: 344, visible: true },
     moving: { x: PIN.x + 4, y: PIN.y + 4, visible: true },
     dropped: { x: PIN.x + 4, y: PIN.y + 4, visible: true },
-    category: { x: 386, y: 78, visible: true },
-    typing: { x: 398, y: 132, visible: true },
-    naming: { x: 386, y: 196, visible: true },
-    submitting: { x: 400, y: 232, visible: true },
+    category: { x: 316, y: 78, visible: true }, // centre of the Positive chip
+    typing: { x: 336, y: 118, visible: true },
+    naming: { x: 330, y: 166, visible: true },
+    submitting: { x: 362, y: 194, visible: true },
     thanks: { x: 440, y: 335, visible: false },
     rest: { x: 440, y: 335, visible: false },
   }

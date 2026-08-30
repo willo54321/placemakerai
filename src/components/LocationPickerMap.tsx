@@ -4,7 +4,9 @@ import { useCallback, useState } from 'react'
 import { GoogleMap, useJsApiLoader, MarkerF } from '@react-google-maps/api'
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''
-const LIBRARIES: ("drawing" | "geometry")[] = ['drawing', 'geometry']
+// 'visualization' powers the sentiment heatmap; loader options must be
+// identical across every map component, so it is declared everywhere.
+const LIBRARIES: ("drawing" | "geometry" | "visualization")[] = ['drawing', 'geometry', 'visualization']
 
 interface LocationPickerMapProps {
   latitude: number | null

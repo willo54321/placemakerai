@@ -3,12 +3,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { fetchJson } from '@/lib/fetch-json'
-import Link from 'next/link'
 import {
   BarChart3, TrendingUp, TrendingDown, Minus, RefreshCw,
   MessageSquare, AlertCircle, CheckCircle,
-  ThumbsUp, ThumbsDown, Sparkles, MapPin, ChevronRight,
-  Map as MapIcon
+  ThumbsUp, ThumbsDown, Sparkles, MapPin, ChevronRight
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Spinner } from '@/components/Spinner'
@@ -432,10 +430,6 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
                 : 'Feedback has changed since this analysis'}
             </span>
           )}
-          <Link href={`/projects/${projectId}/analysis`} className="btn-secondary">
-            <MapIcon size={16} />
-            Open workspace
-          </Link>
           <button
             onClick={() => runAnalysis.mutate({ force: true })}
             disabled={runAnalysis.isPending || processing}

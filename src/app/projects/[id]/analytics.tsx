@@ -484,6 +484,9 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
                 {analysis.sentiment.overall}
               </p>
               <p className="text-sm text-slate-500 mt-0.5">Overall Sentiment</p>
+              <p className="text-xs text-slate-400 mt-0.5 tabular-nums">
+                {positivePercent}% support · {negativePercent}% object · {neutralPercent}% neutral
+              </p>
             </div>
           </div>
         </div>

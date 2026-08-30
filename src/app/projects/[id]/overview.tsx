@@ -1,7 +1,11 @@
 'use client'
 
-import { useState } from 'react'
-import { MapPin, Globe, Clock, CheckCircle, ArrowRight, MessageCircle, FileText, BarChart3, Mail, ChevronDown } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { MapPin, Globe, Clock, CheckCircle, ArrowRight, MessageCircle, FileText, BarChart3, Mail, ChevronDown, AlertTriangle } from 'lucide-react'
+import { clusterResponses } from '@/lib/campaign-detection'
+
+// Copies below this count are treated as coincidence, not a campaign.
+const CAMPAIGN_ALERT_MIN_COPIES = 3
 
 type Tab = 'overview' | 'feedback' | 'forms' | 'website' | 'analytics' | 'settings'
 
@@ -78,6 +82,40 @@ export function OverviewTab({ project, onNavigate }: OverviewTabProps) {
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 50)
 
+  // Duplicate-submission alert: cluster all response texts in code (no AI
+  // call) so an organised campaign is flagged the moment the copies arrive,
+  // not only after the next analysis run.
+  const publicPins = project.publicPins
+  const feedbackForms = project.feedbackForms
+  const duplicateAlert = useMemo(() => {
+    const clusterable = [
+      ...((publicPins as Array<{ id: string; comment?: string }>) || [])
+        .filter(pin => pin.comment)
+        .map(pin => ({ id: `pin-${pin.id}`, content: pin.comment! })),
+      ...((feedbackForms as Array<{ id: string; responses?: Array<{ id: string; data?: Record<string, unknown> }> }>) || []).flatMap(
+        form =>
+          (form.responses || []).map(response => ({
+            id: `form-${response.id}`,
+            content: Object.values(response.data || {})
+              .filter((value): value is string => typeof value === 'string' && value.length > 10)
+              .join('. '),
+          }))
+      ),
+    ].filter(item => item.content)
+
+    const groups = clusterResponses(clusterable).filter(
+      cluster => cluster.memberIds.length >= CAMPAIGN_ALERT_MIN_COPIES
+    )
+    if (groups.length === 0) return null
+
+    return {
+      copies: groups.reduce((sum, cluster) => sum + cluster.memberIds.length, 0),
+      groups: groups.length,
+      largest: Math.max(...groups.map(cluster => cluster.memberIds.length)),
+      allExact: groups.every(cluster => cluster.exact),
+    }
+  }, [publicPins, feedbackForms])
+
   const ACTIVITY_ICON = {
     pin: { icon: MessageCircle, bg: 'bg-purple-50', color: 'text-purple-600' },
     form: { icon: FileText, bg: 'bg-blue-50', color: 'text-blue-600' },
@@ -153,6 +191,33 @@ export function OverviewTab({ project, onNavigate }: OverviewTabProps) {
           <ArrowRight size={16} />
         </button>
       </div>
+
+      {/* Duplicate-submission alert */}
+      {duplicateAlert && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+          <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center shrink-0">
+            <AlertTriangle size={20} className="text-amber-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-amber-900">
+              Alert — {duplicateAlert.copies}{' '}
+              {duplicateAlert.allExact ? 'identical' : 'near-identical'} submissions detected
+            </p>
+            <p className="text-sm text-amber-700 mt-0.5">
+              {duplicateAlert.groups === 1
+                ? `All copies of one template — likely an organised campaign.`
+                : `${duplicateAlert.groups} template groups, the largest with ${duplicateAlert.largest} copies — likely organised campaigns.`}{' '}
+              Run AI analysis to characterise what the template argues.
+            </p>
+          </div>
+          <button
+            onClick={() => onNavigate('analytics')}
+            className="text-sm font-medium text-amber-700 hover:text-amber-800 flex items-center gap-1 shrink-0 mt-1"
+          >
+            Review <ArrowRight size={14} />
+          </button>
+        </div>
+      )}
 
       {/* Metrics Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">

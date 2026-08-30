@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, ArrowRight, Check } from 'lucide-react';
 import MapPinDemo from './MapPinDemo';
 import ModerationDemo from './ModerationDemo';
+import { MiniShapesDemo, MiniVotingDemo, MiniLayersDemo } from './MiniFeatureDemos';
 import FeedbackFlowDemo from './FeedbackFlowDemo';
 import FormBuilderDemo from './FormBuilderDemo';
 
@@ -260,14 +261,28 @@ export default function Services() {
                   </div>
                 </div>
 
-                {/* Further features */}
-                <div className="mt-10 sm:mt-12 grid sm:grid-cols-3 gap-5">
-                  {open.modal.featureCards.map((feature) => (
-                    <div key={feature.name} className="rounded-xl border border-slate-100 bg-slate-50/50 p-5">
-                      <h4 className="text-[15px] font-semibold text-[#0B2818] mb-1.5">{feature.name}</h4>
-                      <p className="text-sm text-slate-600 leading-relaxed">{feature.detail}</p>
-                    </div>
-                  ))}
+                {/* More to discover — Stripe-style cards, each with a mini product demo */}
+                <div className="mt-12 sm:mt-14">
+                  <h4 className="font-heading text-2xl sm:text-[26px] font-bold text-[#0B2818] tracking-[-0.02em] mb-7">
+                    More to discover
+                  </h4>
+                  <div className="grid sm:grid-cols-3 gap-6 lg:gap-8">
+                    {open.modal.featureCards.map((feature) => (
+                      <div key={feature.name}>
+                        <div className="rounded-xl bg-slate-50 border border-slate-100 overflow-hidden aspect-[4/3] mb-4">
+                          {feature.name === 'Pins, Lines & Polygons' ? (
+                            <MiniShapesDemo />
+                          ) : feature.name === 'Community Voting & Moderation' ? (
+                            <MiniVotingDemo />
+                          ) : (
+                            <MiniLayersDemo />
+                          )}
+                        </div>
+                        <h5 className="text-[15px] font-semibold text-[#0B2818] mb-1.5">{feature.name}</h5>
+                        <p className="text-sm text-slate-600 leading-relaxed">{feature.detail}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </motion.div>

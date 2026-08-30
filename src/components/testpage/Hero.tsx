@@ -55,28 +55,6 @@ export default function Hero() {
           <span className="font-semibold text-[#0B2818]">placemaker.ai</span> is a strategic engagement platform for development and infrastructure projects. Simple digital tools for inclusive community engagement.
         </motion.p>
 
-        {/* Audience Tags */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.25 }}
-          className="flex flex-wrap gap-3 mb-10"
-        >
-          {[
-            'Major Residential Schemes',
-            'Infrastructure & Energy',
-            'Regeneration Programmes',
-            'Local Authority Consultations',
-          ].map((tag) => (
-            <span
-              key={tag}
-              className="px-4 py-1.5 text-sm font-medium text-[#0B2818] bg-white/80 border border-[rgba(22,9,62,0.1)] rounded-full"
-            >
-              {tag}
-            </span>
-          ))}
-        </motion.div>
-
         {/* CTA Buttons */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}

@@ -52,7 +52,7 @@ export default function Hero() {
           transition={{ duration: 0.8, delay: 0.2 }}
           className="text-xl text-[#595959] max-w-2xl mb-8 leading-relaxed"
         >
-          <span className="font-semibold text-[#0B2818]">placemaker.ai</span> is a strategic engagement platform for development and infrastructure projects. Simple digital tools for inclusive community engagement.
+          <span className="font-semibold text-[#0B2818]">placemaker.ai</span> is a strategic engagement platform for development and infrastructure projects. It enhances the engagement website you already have — embedding straight into your pages, with no restrictive CMS to migrate to and no vendor design system to adopt.
         </motion.p>
 
         {/* CTA Buttons */}

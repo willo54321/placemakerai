@@ -1,6 +1,7 @@
 'use client'
 
-import { MapPin, Globe, Clock, CheckCircle, ArrowRight, MessageCircle, FileText, BarChart3, Mail } from 'lucide-react'
+import { useState } from 'react'
+import { MapPin, Globe, Clock, CheckCircle, ArrowRight, MessageCircle, FileText, BarChart3, Mail, ChevronDown } from 'lucide-react'
 
 type Tab = 'overview' | 'feedback' | 'forms' | 'website' | 'analytics' | 'settings'
 
@@ -14,6 +15,8 @@ interface OverviewTabProps {
 }
 
 export function OverviewTab({ project, onNavigate }: OverviewTabProps) {
+  // Activity feed shows the newest few and expands on demand.
+  const [visibleActivity, setVisibleActivity] = useState(5)
   const mapMarkerCount = project.mapMarkers?.length || 0
   const publicPinCount = project.publicPins?.length || 0
   const formCount = project.feedbackForms?.length || 0
@@ -73,7 +76,7 @@ export function OverviewTab({ project, onNavigate }: OverviewTabProps) {
     })),
   ]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, 12)
+    .slice(0, 50)
 
   const ACTIVITY_ICON = {
     pin: { icon: MessageCircle, bg: 'bg-purple-50', color: 'text-purple-600' },
@@ -193,7 +196,7 @@ export function OverviewTab({ project, onNavigate }: OverviewTabProps) {
         </div>
         {activity.length > 0 ? (
           <div className="divide-y divide-slate-100">
-            {activity.map((item) => {
+            {activity.slice(0, visibleActivity).map((item) => {
               const style = ACTIVITY_ICON[item.kind]
               const Icon = style.icon
               return (
@@ -230,6 +233,15 @@ export function OverviewTab({ project, onNavigate }: OverviewTabProps) {
                 </div>
               )
             })}
+            {activity.length > visibleActivity && (
+              <button
+                onClick={() => setVisibleActivity(count => count + 15)}
+                className="w-full px-4 py-2.5 text-sm text-brand-600 hover:text-brand-700 hover:bg-slate-50 flex items-center justify-center gap-1.5 font-medium"
+              >
+                <ChevronDown size={14} />
+                View more ({activity.length - visibleActivity} more)
+              </button>
+            )}
           </div>
         ) : (
           <div className="px-4 py-8 text-center">

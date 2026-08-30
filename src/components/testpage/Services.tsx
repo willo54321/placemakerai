@@ -76,13 +76,6 @@ const services = [
       { name: 'One AI Analysis', detail: 'Stance, themes, and material considerations counted across every channel in a single pass.' },
     ],
   },
-  {
-    number: '05',
-    title: 'Construction Reporting',
-    subtitle: 'Dedicated issue reporting for live sites',
-    description: 'Purpose-built reporting mode for construction phases covering noise, dust, traffic, damage, and safety.',
-    secondaryDescription: 'Give neighbours an easy way to report issues directly to your team, with automatic categorisation and response tracking.',
-  },
 ];
 
 export default function Services() {

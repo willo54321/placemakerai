@@ -20,23 +20,33 @@ interface SentimentHeatmapProps {
   height?: string
 }
 
-// Gradients run transparent → solid; Google interpolates between stops.
+// Single-hue ramps that stay translucent: density reads through colour
+// intensity while the basemap stays legible underneath. Never ramp to dark,
+// opaque tones — that turns clusters into solid discs.
 const POSITIVE_GRADIENT = [
-  'rgba(34, 197, 94, 0)',
-  'rgba(34, 197, 94, 0.5)',
-  'rgba(22, 163, 74, 0.7)',
-  'rgba(21, 128, 61, 0.85)',
-  'rgba(22, 101, 52, 0.95)',
-  'rgba(20, 83, 45, 1)',
+  'rgba(16, 185, 129, 0)',
+  'rgba(16, 185, 129, 0.18)',
+  'rgba(16, 185, 129, 0.32)',
+  'rgba(5, 150, 105, 0.45)',
+  'rgba(5, 150, 105, 0.58)',
 ]
 
 const NEGATIVE_GRADIENT = [
-  'rgba(248, 113, 113, 0)',
-  'rgba(239, 68, 68, 0.5)',
-  'rgba(220, 38, 38, 0.7)',
-  'rgba(185, 28, 28, 0.85)',
-  'rgba(153, 27, 27, 0.95)',
-  'rgba(127, 29, 29, 1)',
+  'rgba(239, 68, 68, 0)',
+  'rgba(239, 68, 68, 0.18)',
+  'rgba(239, 68, 68, 0.32)',
+  'rgba(220, 38, 38, 0.45)',
+  'rgba(220, 38, 38, 0.58)',
+]
+
+// Quiet, desaturated basemap so the heat is the loudest thing on the map.
+const MAP_STYLES: google.maps.MapTypeStyle[] = [
+  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+  { elementType: 'geometry', stylers: [{ saturation: -60 }, { lightness: 10 }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#64748b' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#ffffff' }] },
+  { featureType: 'road', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
 ]
 
 export function SentimentHeatmap({ clusters, height = '400px' }: SentimentHeatmapProps) {
@@ -114,18 +124,19 @@ export function SentimentHeatmap({ clusters, height = '400px' }: SentimentHeatma
           streetViewControl: false,
           mapTypeControl: false,
           fullscreenControl: true,
+          styles: MAP_STYLES,
         }}
       >
         {showPositive && positivePoints.length > 0 && (
           <HeatmapLayerF
             data={positivePoints}
-            options={{ gradient: POSITIVE_GRADIENT, radius: 35, opacity: 0.8 }}
+            options={{ gradient: POSITIVE_GRADIENT, radius: 26, maxIntensity: 1.5 }}
           />
         )}
         {showNegative && negativePoints.length > 0 && (
           <HeatmapLayerF
             data={negativePoints}
-            options={{ gradient: NEGATIVE_GRADIENT, radius: 35, opacity: 0.8 }}
+            options={{ gradient: NEGATIVE_GRADIENT, radius: 26, maxIntensity: 1.5 }}
           />
         )}
       </GoogleMap>
@@ -142,7 +153,7 @@ export function SentimentHeatmap({ clusters, height = '400px' }: SentimentHeatma
               className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
             />
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded bg-gradient-to-r from-emerald-200 to-emerald-700" />
+              <div className="w-3 h-3 rounded-full bg-emerald-500" />
               <span className="text-slate-700">Support</span>
               <span className="text-slate-400 text-xs">({positiveCount})</span>
             </div>
@@ -155,7 +166,7 @@ export function SentimentHeatmap({ clusters, height = '400px' }: SentimentHeatma
               className="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
             />
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded bg-gradient-to-r from-red-200 to-red-700" />
+              <div className="w-3 h-3 rounded-full bg-red-500" />
               <span className="text-slate-700">Opposition</span>
               <span className="text-slate-400 text-xs">({negativeCount})</span>
             </div>

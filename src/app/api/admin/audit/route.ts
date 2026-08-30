@@ -12,14 +12,30 @@ export async function GET() {
   if (denied) return denied
 
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+  const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
 
-  const [entries, runs, projects] = await Promise.all([
+  const [entries, runs, projects, failedRuns, stuckRuns, newMessages] = await Promise.all([
     prisma.auditLog.findMany({ orderBy: { createdAt: 'desc' }, take: 200 }),
     prisma.auditLog.findMany({
       where: { action: 'analysis.run', createdAt: { gte: thirtyDaysAgo } },
       select: { projectId: true, detail: true, createdAt: true },
     }),
     prisma.project.findMany({ select: { id: true, name: true } }),
+    // Domain health: analysis runs currently in a failed state.
+    prisma.analysisResult.findMany({
+      where: { status: 'failed' },
+      select: { projectId: true, error: true, updatedAt: true },
+      orderBy: { updatedAt: 'desc' },
+      take: 10,
+    }),
+    // Runs claiming to be in flight for over a day — dead without a re-run.
+    prisma.analysisResult.findMany({
+      where: { status: { in: ['processing', 'finalizing'] }, updatedAt: { lt: dayAgo } },
+      select: { projectId: true, status: true, updatedAt: true },
+      orderBy: { updatedAt: 'asc' },
+      take: 10,
+    }),
+    prisma.contactMessage.count({ where: { createdAt: { gte: dayAgo } } }),
   ])
 
   const projectNames = Object.fromEntries(projects.map(p => [p.id, p.name]))
@@ -45,5 +61,20 @@ export async function GET() {
     })),
     usage: Object.values(usageByProject).sort((a, b) => b.runs - a.runs),
     usageWindowDays: 30,
+    health: {
+      // Reaching this line means the database answered every query above.
+      database: 'ok',
+      failedRuns: failedRuns.map(run => ({
+        projectName: projectNames[run.projectId] ?? 'Deleted project',
+        error: run.error,
+        at: run.updatedAt,
+      })),
+      stuckRuns: stuckRuns.map(run => ({
+        projectName: projectNames[run.projectId] ?? 'Deleted project',
+        status: run.status,
+        since: run.updatedAt,
+      })),
+      newMessages24h: newMessages,
+    },
   })
 }

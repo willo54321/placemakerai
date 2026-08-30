@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
-import { ArrowLeft, ScrollText, Activity } from 'lucide-react'
+import { ArrowLeft, ScrollText, Activity, HeartPulse, CheckCircle, AlertTriangle, Mail } from 'lucide-react'
 import { fetchJson } from '@/lib/fetch-json'
 import { Spinner } from '@/components/Spinner'
 
@@ -26,10 +26,18 @@ interface UsageRow {
   itemsClassified: number
 }
 
+interface HealthReport {
+  database: string
+  failedRuns: Array<{ projectName: string; error: string | null; at: string }>
+  stuckRuns: Array<{ projectName: string; status: string; since: string }>
+  newMessages24h: number
+}
+
 interface AuditPayload {
   entries: AuditEntry[]
   usage: UsageRow[]
   usageWindowDays: number
+  health: HealthReport
 }
 
 const ACTION_STYLES: Record<string, string> = {
@@ -87,6 +95,58 @@ export default function AdminAuditPage() {
 
       {data && (
         <>
+          {/* System health */}
+          <div className="card p-6 mb-8">
+            <h2 className="font-semibold text-slate-900 flex items-center gap-2 mb-4">
+              <HeartPulse size={18} className="text-brand-600" />
+              System health
+            </h2>
+
+            {data.health.failedRuns.length === 0 && data.health.stuckRuns.length === 0 ? (
+              <p className="text-sm text-emerald-700 bg-emerald-50 rounded-lg px-4 py-3 flex items-center gap-2">
+                <CheckCircle size={15} className="shrink-0" />
+                All systems normal — database reachable, no failed or stuck analysis runs.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {data.health.failedRuns.map((run, index) => (
+                  <div key={`failed-${index}`} className="text-sm bg-red-50 border border-red-100 rounded-lg px-4 py-3 flex items-start gap-2.5">
+                    <AlertTriangle size={15} className="text-red-500 shrink-0 mt-0.5" />
+                    <span className="text-red-800">
+                      <span className="font-semibold">{run.projectName}</span> — analysis run failed
+                      {run.error ? `: ${run.error}` : ''}{' '}
+                      <span className="text-red-500">
+                        ({new Date(run.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        {' '}— hit Re-analyze on the project to retry)
+                      </span>
+                    </span>
+                  </div>
+                ))}
+                {data.health.stuckRuns.map((run, index) => (
+                  <div key={`stuck-${index}`} className="text-sm bg-amber-50 border border-amber-100 rounded-lg px-4 py-3 flex items-start gap-2.5">
+                    <AlertTriangle size={15} className="text-amber-500 shrink-0 mt-0.5" />
+                    <span className="text-amber-800">
+                      <span className="font-semibold">{run.projectName}</span> — run stuck in “{run.status}” since{' '}
+                      {new Date(run.since).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      {' '}— it will not complete; re-run the analysis.
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {data.health.newMessages24h > 0 && (
+              <Link
+                href="/admin/messages"
+                className="mt-3 text-sm text-slate-600 bg-slate-50 hover:bg-slate-100 transition-colors rounded-lg px-4 py-3 flex items-center gap-2"
+              >
+                <Mail size={15} className="text-brand-600 shrink-0" />
+                {data.health.newMessages24h} new contact message{data.health.newMessages24h === 1 ? '' : 's'} in the
+                last 24 hours — view messages
+              </Link>
+            )}
+          </div>
+
           {/* Usage summary */}
           <div className="card p-6 mb-8">
             <h2 className="font-semibold text-slate-900 flex items-center gap-2 mb-1">

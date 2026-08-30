@@ -50,7 +50,7 @@ export default function Hero() {
           transition={{ duration: 0.8, delay: 0.2 }}
           className="text-xl text-[#595959] max-w-2xl mx-auto mb-8 leading-relaxed"
         >
-          <span className="font-semibold text-[#0B2818]">placemaker.io</span> is a strategic engagement platform for development and infrastructure projects. Simple digital tools for inclusive community engagement.
+          <span className="font-semibold text-[#0B2818]">placemaker.ai</span> is a strategic engagement platform for development and infrastructure projects. Simple digital tools for inclusive community engagement.
         </motion.p>
 
         {/* Audience Tags */}

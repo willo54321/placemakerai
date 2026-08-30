@@ -7,7 +7,7 @@ const services = [
     number: '01',
     title: 'Interactive Maps',
     subtitle: 'Location linked feedback with visual context',
-    description: 'placemaker.io enables communities to provide feedback directly linked to specific locations, creating a visual way to understand how concerns, ideas, and support relate to physical places within your project.',
+    description: 'placemaker.ai enables communities to provide feedback directly linked to specific locations, creating a visual way to understand how concerns, ideas, and support relate to physical places within your project.',
     secondaryDescription: '',
     
     features: [
@@ -20,7 +20,7 @@ const services = [
     number: '02',
     title: 'Custom Feedback Forms',
     subtitle: 'Build bespoke forms without writing code',
-    description: 'placemaker.io lets you build bespoke consultation forms without writing code. Create unlimited forms, connect external websites via API, and collect responses with GDPR consent tracked automatically on every submission.',
+    description: 'placemaker.ai lets you build bespoke consultation forms without writing code. Create unlimited forms, connect external websites via API, and collect responses with GDPR consent tracked automatically on every submission.',
     secondaryDescription: '',
     features: [
       { name: 'Drag-and-Drop Builder', detail: 'Eight field types including text, dropdowns, checkboxes, and ratings. Reorder fields, mark as required, and preview instantly.' },

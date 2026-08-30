@@ -12,7 +12,7 @@ export default function Footer() {
               <div className="w-8 h-8 bg-[#16A34A] rounded-lg flex items-center justify-center">
                 <MapPin className="w-5 h-5 text-white" />
               </div>
-              <span className="text-lg font-semibold">Placemaker</span>
+              <span className="text-lg font-semibold">placemaker.ai</span>
             </div>
             <p className="text-gray-400 text-sm text-center md:text-left">
               Digital tools for public consultations.

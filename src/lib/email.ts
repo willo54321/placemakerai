@@ -89,3 +89,91 @@ export async function sendSetPasswordEmail({
     return null
   }
 }
+
+/**
+ * Notify the team that a Start a Project enquiry landed. Reply-To is the
+ * submitter, so replying to the notification answers the lead directly.
+ * Skips silently when RESEND_API_KEY or CONTACT_NOTIFY_EMAIL is unset —
+ * /admin/messages remains the source of truth either way.
+ */
+export async function sendContactNotification({
+  name,
+  email,
+  organization,
+  projectType,
+  message,
+}: {
+  name: string
+  email: string
+  organization?: string | null
+  projectType?: string | null
+  message: string
+}) {
+  const client = getResend()
+  const to = process.env.CONTACT_NOTIFY_EMAIL
+  if (!client || !to) {
+    if (!to) console.log('CONTACT_NOTIFY_EMAIL not configured, skipping contact notification')
+    return null
+  }
+
+  try {
+    const { data, error } = await client.emails.send({
+      from: getFromAddress(),
+      to: [to],
+      replyTo: email,
+      subject: `New enquiry from ${name}${organization ? ` (${organization})` : ''}`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #1e293b;">New Start a Project enquiry</h2>
+          <p style="color: #475569;"><strong>${escapeHtml(name)}</strong> &lt;${escapeHtml(email)}&gt;${organization ? ` — ${escapeHtml(organization)}` : ''}</p>
+          ${projectType ? `<p style="color: #475569;">Project type: ${escapeHtml(projectType)}</p>` : ''}
+          <p style="color: #475569; white-space: pre-wrap; border-left: 3px solid #16a34a; padding-left: 12px;">${escapeHtml(message)}</p>
+          <p style="color: #94a3b8; font-size: 14px;">Reply to this email to answer directly, or view all messages in the admin inbox.</p>
+        </div>
+      `,
+    })
+    if (error) {
+      console.error('Failed to send contact notification:', error)
+      return null
+    }
+    return data
+  } catch (err) {
+    console.error('Contact notification send error:', err)
+    return null
+  }
+}
+
+/**
+ * Ops alert from the daily health cron: failed or stuck analysis runs.
+ * Same graceful-skip behaviour as everything else in this file.
+ */
+export async function sendOpsAlert(problems: string[]) {
+  const client = getResend()
+  const to = process.env.CONTACT_NOTIFY_EMAIL
+  if (!client || !to || problems.length === 0) return null
+
+  try {
+    const { data, error } = await client.emails.send({
+      from: getFromAddress(),
+      to: [to],
+      subject: `Placemaker ops alert: ${problems.length} issue${problems.length === 1 ? '' : 's'} detected`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #b91c1c;">Ops alert</h2>
+          <ul style="color: #475569;">
+            ${problems.map(problem => `<li>${escapeHtml(problem)}</li>`).join('')}
+          </ul>
+          <p style="color: #94a3b8; font-size: 14px;">Details on the admin Audit &amp; usage page (System health card).</p>
+        </div>
+      `,
+    })
+    if (error) {
+      console.error('Failed to send ops alert:', error)
+      return null
+    }
+    return data
+  } catch (err) {
+    console.error('Ops alert send error:', err)
+    return null
+  }
+}

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db'
 import { NextResponse } from 'next/server'
+import { sendOpsAlert } from '@/lib/email'
 
 // Health + ops check, hit daily by the Vercel cron (see vercel.json) and
 // usable by any external uptime monitor (UptimeRobot etc. — point it here).
@@ -51,6 +52,8 @@ export async function GET() {
     }
 
     if (problems.length > 0) {
+      // Email the team when configured (daily cron = at most one email a day).
+      await sendOpsAlert(problems).catch(() => null)
       return NextResponse.json(
         { ok: false, problems, newContactMessages: recentMessages },
         { status: 500 }

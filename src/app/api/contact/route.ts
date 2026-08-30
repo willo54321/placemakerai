@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { rateLimitResponse } from '@/lib/rate-limit'
+import { sendContactNotification } from '@/lib/email'
 
 // Public endpoint for the marketing homepage's Start a Project form. There is
 // no email delivery configured, so the row itself is the lead — super admins
@@ -40,15 +41,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Please enter a valid email address' }, { status: 400 })
   }
 
+  const organization = (body.organization || '').trim().slice(0, MAX_SHORT) || null
+  const projectType = (body.projectType || '').trim().slice(0, MAX_SHORT) || null
+
   await prisma.contactMessage.create({
-    data: {
-      name,
-      email,
-      organization: (body.organization || '').trim().slice(0, MAX_SHORT) || null,
-      projectType: (body.projectType || '').trim().slice(0, MAX_SHORT) || null,
-      message,
-    },
+    data: { name, email, organization, projectType, message },
   })
+
+  // Notify the team by email when configured. The row above is the source of
+  // truth — a failed notification must never fail the submission.
+  sendContactNotification({ name, email, organization, projectType, message }).catch(() => {})
 
   return NextResponse.json({ ok: true })
 }

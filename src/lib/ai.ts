@@ -1003,14 +1003,13 @@ export async function finalizeFullAnalysis(
     assignments
   )
 
-  const [summary, headlineStats, spatialInsights] = await Promise.all([
+  const [summary, spatialInsights] = await Promise.all([
     generateSummary(
       feedbackItems,
       sentiment,
       themes,
       crossRef.highlights.slice(0, 8).map(describeHighlight)
     ),
-    generateHeadlineStats(feedbackItems, sentiment, themes),
     generateSpatialInsights(crossRef, classification, options?.boundaryGeojson ?? null),
   ])
 
@@ -1018,7 +1017,6 @@ export async function finalizeFullAnalysis(
     sentiment,
     themes,
     summary,
-    headlineStats,
     materialAnalysis,
     campaignAnalysis,
     geographic,

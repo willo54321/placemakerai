@@ -266,11 +266,11 @@ export default function AnalysisWorkspacePage() {
               className={`w-2 h-2 rounded-full ${coverage.complete ? 'bg-brand-500' : 'bg-amber-500'}`}
             />
             <span className="font-semibold tabular-nums">
-              {coverage.analyzed.toLocaleString()} / {coverage.total.toLocaleString()} responses classified
+              {coverage.analyzed.toLocaleString()} of {coverage.total.toLocaleString()} responses analysed
             </span>
-            <span className="hidden lg:inline text-slate-500">
-              {coverage.complete ? '— every figure is a count, not an estimate' : `— ${coverage.note ?? ''}`}
-            </span>
+            {!coverage.complete && coverage.note && (
+              <span className="hidden lg:inline text-slate-500">— {coverage.note}</span>
+            )}
           </div>
         )}
       </div>

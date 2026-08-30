@@ -7,7 +7,7 @@ import Link from 'next/link'
 import {
   BarChart3, TrendingUp, TrendingDown, Minus, RefreshCw,
   MessageSquare, AlertCircle, CheckCircle,
-  ThumbsUp, ThumbsDown, Sparkles, MapPin, ChevronRight, Lightbulb,
+  ThumbsUp, ThumbsDown, Sparkles, MapPin, ChevronRight,
   Map as MapIcon
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -20,7 +20,6 @@ import dynamic from 'next/dynamic'
 import {
   ThemeBarChart,
   ThemeWithSentiment,
-  HeadlineStats,
   MaterialClassification,
   CampaignDetection,
   CampaignAnalysis
@@ -420,7 +419,7 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
       </div>
 
       {/* Executive Summary - Hero Card */}
-      <div className="card p-8 bg-gradient-to-br from-brand-50 via-white to-emerald-50/30 border-brand-100">
+      <div className="card p-8">
         <div className="flex items-start gap-5">
           <div className="w-14 h-14 bg-brand-100 rounded-2xl flex items-center justify-center flex-shrink-0">
             <Sparkles className="w-7 h-7 text-brand-600" />
@@ -540,7 +539,7 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
       </div>
 
       {/* Campaign & Duplicate Detection */}
-      {analysis.campaignAnalysis && (
+      {analysis.campaignAnalysis && analysis.campaignAnalysis.campaigns.length > 0 && (
         <div className="card p-6" data-tour="campaign-detection">
           <CampaignDetection analysis={analysis.campaignAnalysis} />
         </div>
@@ -744,21 +743,11 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
         </div>
       )}
 
-      {/* Headline Stats */}
-      {analysis.headlineStats && analysis.headlineStats.stats.length > 0 && (
-        <div className="card p-6">
-          <HeadlineStats
-            stats={analysis.headlineStats.stats}
-            projectName={undefined}
-          />
-        </div>
-      )}
-
       {/* Concerns & Support - Side by Side */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Areas of Concern */}
         {analysis.summary.concernAreas.length > 0 && (
-          <div className="card p-6 border-l-4 border-l-red-400">
+          <div className="card p-6">
             <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
               <AlertCircle className="w-5 h-5 text-red-500" />
               Areas of Concern
@@ -776,7 +765,7 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
 
         {/* Areas of Support */}
         {analysis.summary.supportAreas.length > 0 && (
-          <div className="card p-6 border-l-4 border-l-emerald-400">
+          <div className="card p-6">
             <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
               <CheckCircle className="w-5 h-5 text-emerald-500" />
               Areas of Support
@@ -793,27 +782,6 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
         )}
       </div>
 
-      {/* AI Recommendations - Call to Action */}
-      {analysis.summary.recommendations.length > 0 && (
-        <div className="card p-8 bg-gradient-to-br from-amber-50 via-white to-orange-50/30 border-amber-100">
-          <h3 className="text-lg font-semibold text-slate-900 mb-6 flex items-center gap-3">
-            <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
-              <Lightbulb className="w-5 h-5 text-amber-600" />
-            </div>
-            AI Recommendations
-          </h3>
-          <div className="space-y-4">
-            {analysis.summary.recommendations.map((rec, i) => (
-              <div key={i} className="flex items-start gap-4 bg-white rounded-xl p-4 border border-amber-100">
-                <span className="w-8 h-8 bg-amber-100 text-amber-700 rounded-lg flex items-center justify-center text-sm font-semibold flex-shrink-0">
-                  {i + 1}
-                </span>
-                <p className="text-slate-700 leading-relaxed">{rec}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Geographic Sentiment Heatmap - TEMPORARILY DISABLED */}
       {/* {analysis.geographic && analysis.geographic.clusters.length > 0 && (

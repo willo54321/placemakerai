@@ -19,7 +19,8 @@ export default function Hero() {
           transition={{ duration: 0.8, delay: 0.1 }}
           className="font-heading text-5xl sm:text-6xl lg:text-7xl font-bold leading-[1.15] tracking-[-0.02em] mb-6 text-[#0B2818]"
         >
-          Our{' '}
+          Digital solutions for
+          <br />
           <motion.span
             className="gradient-text"
             animate={{
@@ -38,11 +39,8 @@ export default function Hero() {
               color: 'transparent',
             }}
           >
-            Digital
-          </motion.span>{' '}
-          Engagement
-          <br />
-          Offering
+            public engagement
+          </motion.span>
         </motion.h1>
 
         {/* Subtitle */}

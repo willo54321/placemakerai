@@ -198,6 +198,12 @@ export async function GET(
     analysisFailed: cached.status === 'failed' || undefined,
     lastAnalyzed: cached.updatedAt,
     feedbackCount: feedbackItems.length,
+    // Responses that arrived after this analysis ran — the staleness signal.
+    // Clamped: deletions since the run would otherwise send it negative.
+    newResponses: Math.max(
+      0,
+      feedbackItems.length - (completedAnalysis?.feedbackCount ?? feedbackItems.length)
+    ),
   })
 }
 

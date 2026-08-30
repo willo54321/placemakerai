@@ -25,6 +25,37 @@ import {
   CampaignAnalysis,
   ResponsesExplorer
 } from '@/components/analytics'
+import { AutoInsights } from '@/components/analytics/AutoInsights'
+
+/**
+ * Summary text with validated citation chips. The server replaces the model's
+ * [#n] markers with [ref:<responseId>] tokens — every one checked against the
+ * sample the model actually saw — and this renders each token as a numbered
+ * chip that reveals the cited response in the explorer below.
+ */
+function CitedText({ text, onCite }: { text: string; onCite: (id: string) => void }) {
+  const parts = text.split(/(\[ref:[^\]]+\])/g)
+  let citation = 0
+  return (
+    <>
+      {parts.map((part, index) => {
+        const match = part.match(/^\[ref:([^\]]+)\]$/)
+        if (!match) return <span key={index}>{part}</span>
+        citation++
+        return (
+          <button
+            key={index}
+            onClick={() => onCite(match[1])}
+            title="View the response this is drawn from"
+            className="inline-flex items-center justify-center align-text-top w-[18px] h-[18px] rounded-full bg-brand-100 text-brand-700 hover:bg-brand-600 hover:text-white transition-colors text-[10px] font-semibold mx-0.5 tabular-nums"
+          >
+            {citation}
+          </button>
+        )
+      })}
+    </>
+  )
+}
 
 const SentimentHeatmap = dynamic(
   () => import('@/components/SentimentHeatmap').then(mod => mod.SentimentHeatmap),
@@ -168,6 +199,10 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
   const queryClient = useQueryClient()
   const [selectedTheme, setSelectedTheme] = useState<Theme | null>(null)
   const [showAllFindings, setShowAllFindings] = useState(false)
+  const [focusResponse, setFocusResponse] = useState<{ id: string; nonce: number } | null>(null)
+
+  const handleCite = (id: string) =>
+    setFocusResponse(current => ({ id, nonce: (current?.nonce ?? 0) + 1 }))
 
   // Latch so the auto-run effect fires AT MOST ONCE per mount and never
   // re-fires after a failure (which would otherwise loop forever since
@@ -215,6 +250,7 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
   const sentimentOverTime = data?.sentimentOverTime as
     | Array<{ week: string; support: number; neutral: number; object: number }>
     | undefined
+  const newResponses = (data?.newResponses as number | undefined) ?? 0
 
   // Toast once when a polled run lands.
   const wasProcessing = useRef(false)
@@ -391,7 +427,9 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
           {!processing && !analysisFailed && needsUpdate && (
             <span className="text-sm text-amber-600 bg-amber-50 px-3 py-1.5 rounded-full flex items-center gap-1.5">
               <span className="w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
-              New feedback available
+              {newResponses > 0
+                ? `${newResponses} new response${newResponses === 1 ? '' : 's'} since this analysis`
+                : 'Feedback has changed since this analysis'}
             </span>
           )}
           <Link href={`/projects/${projectId}/analysis`} className="btn-secondary">
@@ -401,6 +439,13 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
           <button
             onClick={() => runAnalysis.mutate({ force: true })}
             disabled={runAnalysis.isPending || processing}
+            title={
+              processing
+                ? 'A run is already in progress — results arrive when the batch completes'
+                : runAnalysis.isPending
+                  ? 'Starting the analysis run…'
+                  : `Re-classify all ${feedbackCount} responses from scratch`
+            }
             data-tour="run-analysis"
             className="btn-secondary"
           >
@@ -427,7 +472,9 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="text-lg font-semibold text-slate-900 mb-3">Executive Summary</h3>
-            <p className="text-slate-700 text-lg leading-relaxed">{analysis.summary.executive}</p>
+            <p className="text-slate-700 text-lg leading-relaxed">
+              <CitedText text={analysis.summary.executive} onCite={handleCite} />
+            </p>
 
             {analysis.summary.keyFindings.length > 0 && (
               <div className="mt-6">
@@ -436,7 +483,7 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
                   {displayedFindings.map((finding, i) => (
                     <li key={i} className="flex items-start gap-3 text-slate-600">
                       <CheckCircle size={18} className="text-emerald-500 mt-0.5 flex-shrink-0" />
-                      <span>{finding}</span>
+                      <span><CitedText text={finding} onCite={handleCite} /></span>
                     </li>
                   ))}
                 </ul>
@@ -757,7 +804,7 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
               {analysis.summary.concernAreas.map((concern, i) => (
                 <li key={i} className="flex items-start gap-3 text-slate-600">
                   <span className="w-2 h-2 bg-red-400 rounded-full mt-2 flex-shrink-0" />
-                  <span>{concern}</span>
+                  <span><CitedText text={concern} onCite={handleCite} /></span>
                 </li>
               ))}
             </ul>
@@ -775,7 +822,7 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
               {analysis.summary.supportAreas.map((support, i) => (
                 <li key={i} className="flex items-start gap-3 text-slate-600">
                   <span className="w-2 h-2 bg-emerald-400 rounded-full mt-2 flex-shrink-0" />
-                  <span>{support}</span>
+                  <span><CitedText text={support} onCite={handleCite} /></span>
                 </li>
               ))}
             </ul>
@@ -798,8 +845,18 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
         </div>
       )}
 
+      {/* Significance-tested patterns: statements + starred heatmap */}
+      <AutoInsights
+        projectId={projectId}
+        onViewTheme={(name) => setSelectedTheme({ name } as Theme)}
+      />
+
       {/* All responses, filterable by theme; a theme clicked in the chart above jumps here */}
-      <ResponsesExplorer projectId={projectId} focusTheme={selectedTheme?.name ?? null} />
+      <ResponsesExplorer
+        projectId={projectId}
+        focusTheme={selectedTheme?.name ?? null}
+        focusResponse={focusResponse}
+      />
     </div>
   )
 }

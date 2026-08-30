@@ -48,13 +48,20 @@ const PAGE_SIZE = 20
 export function ResponsesExplorer({
   projectId,
   focusTheme,
+  focusResponse,
 }: {
   projectId: string
   /** Theme name selected elsewhere (e.g. the theme chart) — filters and scrolls here. */
   focusTheme?: string | null
+  /**
+   * A cited response to reveal — from a summary citation chip. The nonce
+   * retriggers the scroll/flash when the same response is cited twice.
+   */
+  focusResponse?: { id: string; nonce: number } | null
 }) {
   const [themeFilter, setThemeFilter] = useState<number | null>(null)
   const [limit, setLimit] = useState(PAGE_SIZE)
+  const [flashId, setFlashId] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
   const { data } = useQuery<WorkspacePayload>({
@@ -107,6 +114,31 @@ export function ResponsesExplorer({
       (assignmentById.get(item.id)?.themeIds ?? []).includes(themeFilter)
     )
   }, [items, themeFilter, assignmentById])
+
+  // A citation clicked in the summary reveals its response: clear the filter,
+  // extend the page far enough to include it, scroll to it, flash it.
+  useEffect(() => {
+    if (!focusResponse) return
+    const sorted = [...items].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    )
+    const index = sorted.findIndex(item => item.id === focusResponse.id)
+    if (index === -1) return
+    setThemeFilter(null)
+    setLimit(Math.max(PAGE_SIZE, Math.ceil((index + 1) / PAGE_SIZE) * PAGE_SIZE))
+    setFlashId(focusResponse.id)
+    const scrollTimer = setTimeout(() => {
+      document
+        .getElementById(`response-row-${focusResponse.id}`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 60)
+    const flashTimer = setTimeout(() => setFlashId(null), 2600)
+    return () => {
+      clearTimeout(scrollTimer)
+      clearTimeout(flashTimer)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusResponse?.id, focusResponse?.nonce, items])
 
   if (items.length === 0) return null
 
@@ -170,7 +202,13 @@ export function ResponsesExplorer({
         {filtered.slice(0, limit).map(item => {
           const assignment = assignmentById.get(item.id)
           return (
-            <div key={item.id} className="py-3 flex items-start gap-3">
+            <div
+              key={item.id}
+              id={`response-row-${item.id}`}
+              className={`py-3 flex items-start gap-3 transition-colors duration-700 rounded-lg ${
+                flashId === item.id ? 'bg-brand-50 px-3 -mx-3' : ''
+              }`}
+            >
               <span
                 className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
                 style={{ backgroundColor: STANCE_DOT[assignment?.sentiment ?? 'neutral'] }}

@@ -1311,12 +1311,12 @@ export async function generateSummary(
   }
 
   const topThemes = themes.themes.slice(0, 5).map(t => `${t.name} (${t.sentiment})`).join(', ')
-  const feedbackSample = feedbackItems
-    .slice(0, 20)
-    .map(item => item.content.slice(0, MAX_ITEM_CHARS))
+  const sampleItems = feedbackItems.slice(0, 20)
+  const feedbackSample = sampleItems
+    .map((item, index) => `[#${index + 1}] ${item.content.slice(0, MAX_ITEM_CHARS)}`)
     .join('\n---\n')
 
-  return analysisCall<SummaryResult>({
+  const summary = await analysisCall<SummaryResult>({
     system: `You are an expert at summarizing public consultation feedback for planning projects.
 Write clear, actionable summaries that help project teams understand public sentiment.`,
     user: `Summarize this consultation feedback.
@@ -1331,10 +1331,39 @@ ${
     : ''
 }
 Sample feedback:
-${feedbackSample}`,
+${feedbackSample}
+
+When a specific response directly illustrates a point, cite it inline as [#n] using the bracket numbers from the sample above. Cite sparingly — at most one citation per sentence, and only numbers that appear in the sample.`,
     schema: SUMMARY_SCHEMA,
     effort: 'medium',
   })
+
+  return resolveCitations(summary, sampleItems)
+}
+
+/**
+ * Replace the model's [#n] citation markers with [ref:<responseId>] tokens.
+ * Every reference is validated against the sample that was actually shown to
+ * the model — out-of-range or hallucinated numbers are stripped, so the UI
+ * only ever links to a response that exists and informed the sentence.
+ */
+function resolveCitations(summary: SummaryResult, sampleItems: FeedbackItem[]): SummaryResult {
+  const resolve = (text: string) =>
+    text
+      .replace(/\s*\[#(\d+)\]/g, (_match, n: string) => {
+        const item = sampleItems[parseInt(n, 10) - 1]
+        return item ? ` [ref:${item.id}]` : ''
+      })
+      .replace(/ {2,}/g, ' ')
+      .trim()
+
+  return {
+    executive: resolve(summary.executive),
+    keyFindings: (summary.keyFindings || []).map(resolve),
+    recommendations: (summary.recommendations || []).map(resolve),
+    concernAreas: (summary.concernAreas || []).map(resolve),
+    supportAreas: (summary.supportAreas || []).map(resolve),
+  }
 }
 
 /**

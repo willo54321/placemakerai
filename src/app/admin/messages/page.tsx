@@ -49,8 +49,8 @@ export default function AdminMessagesPage() {
           Contact messages
         </h1>
         <p className="text-slate-500 mt-1">
-          Start a Project submissions from the marketing homepage. No email delivery is configured —
-          this page is the inbox.
+          Start a Project submissions from the marketing homepage. New leads are also emailed to the
+          team — replying to that notification answers the sender directly.
         </p>
       </div>
 

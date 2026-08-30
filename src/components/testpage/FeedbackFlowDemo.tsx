@@ -7,7 +7,7 @@ import { Sparkles } from 'lucide-react'
  * dot-grid ground, a top band holding solid channel chips (plus dashed
  * ghost slots), dotted right-angle connectors dropping org-chart style
  * into the central engine tile, then straight down to actionable
- * insights. Particles ride the routes via SVG animateMotion.
+ * insights.
  */
 
 const CHANNELS = [
@@ -15,15 +15,6 @@ const CHANNELS = [
   { label: 'Map comments', x: 240 },
   { label: 'Form responses', x: 368 },
 ]
-
-// Org-chart particle routes: down from each chip, along the rail, into the engine.
-const ROUTES = [
-  'M 122 72 L 122 104 L 240 104 L 240 148',
-  'M 240 72 L 240 148',
-  'M 368 72 L 368 104 L 240 104 L 240 148',
-]
-
-const OUTPUT_ROUTE = 'M 240 240 L 240 272'
 
 const LINE = 'rgba(134, 239, 172, 0.30)'
 
@@ -58,42 +49,6 @@ export default function FeedbackFlowDemo() {
           <path d="M 240 240 L 240 272" />
         </g>
 
-        {/* travelling particles: channels → engine */}
-        {ROUTES.map((d, routeIndex) =>
-          [0, 1].map(n => (
-            <circle key={`${routeIndex}-${n}`} r="2.5" fill="#4ADE80">
-              <animateMotion
-                dur={`${2.4 + routeIndex * 0.3}s`}
-                begin={`${n * 1.3 + routeIndex * 0.45}s`}
-                repeatCount="indefinite"
-                path={d}
-              />
-              <animate
-                attributeName="opacity"
-                values="0;1;1;0"
-                keyTimes="0;0.1;0.85;1"
-                dur={`${2.4 + routeIndex * 0.3}s`}
-                begin={`${n * 1.3 + routeIndex * 0.45}s`}
-                repeatCount="indefinite"
-              />
-            </circle>
-          ))
-        )}
-
-        {/* travelling particles: engine → insights */}
-        {[0, 1].map(n => (
-          <circle key={`out-${n}`} r="2.5" fill="#4ADE80">
-            <animateMotion dur="1.8s" begin={`${n * 0.9}s`} repeatCount="indefinite" path={OUTPUT_ROUTE} />
-            <animate
-              attributeName="opacity"
-              values="0;1;1;0"
-              keyTimes="0;0.15;0.8;1"
-              dur="1.8s"
-              begin={`${n * 0.9}s`}
-              repeatCount="indefinite"
-            />
-          </circle>
-        ))}
       </svg>
 
       {/* Top band holding the channel chips */}
@@ -129,7 +84,6 @@ export default function FeedbackFlowDemo() {
           <Sparkles size={22} className="text-white" />
         </div>
         <span className="text-[10.5px] font-medium text-white/80 whitespace-nowrap">AI analysis engine</span>
-        <span className="text-[8.5px] text-white/40 whitespace-nowrap -mt-0.5">every response, one analysis</span>
       </div>
 
       {/* Bottom row: insights chip flanked by ghost slots */}

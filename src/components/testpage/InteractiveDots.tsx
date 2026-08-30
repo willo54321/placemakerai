@@ -20,7 +20,7 @@ function lerpColor(t: number): string {
   return `${r}, ${g}, ${b}`;
 }
 
-export default function InteractiveDots() {
+export default function InteractiveDots({ background = 'var(--putty)' }: { background?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const mouseRef = useRef({ x: -1000, y: -1000 });
   const animRef = useRef<number>(0);
@@ -134,7 +134,7 @@ export default function InteractiveDots() {
     <canvas
       ref={canvasRef}
       className="absolute inset-0 w-full h-full"
-      style={{ background: 'var(--putty)' }}
+      style={{ background }}
     />
   );
 }

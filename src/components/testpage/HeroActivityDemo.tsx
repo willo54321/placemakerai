@@ -18,10 +18,7 @@ interface FeedItem {
   kind: 'pin' | 'form' | 'enquiry'
   title: string
   detail: string
-  duplicate?: boolean
 }
-
-const TEMPLATE = 'I object to the proposed development. Local roads and services are already at capacity.'
 
 const ITEMS: FeedItem[] = [
   { id: 1, kind: 'pin', title: 'Map comment from Sarah T.', detail: 'Love the new green link to the riverside path — please keep it lit in winter.' },
@@ -29,9 +26,6 @@ const ITEMS: FeedItem[] = [
   { id: 3, kind: 'enquiry', title: 'Enquiry from David M.', detail: 'Will the community hall stay open during the construction phase?' },
   { id: 4, kind: 'form', title: 'Form response from Grace O.', detail: 'More family homes are badly needed here — good to see a brownfield site being used.' },
   { id: 5, kind: 'pin', title: 'Map comment from Priya K.', detail: 'Parking on Weald Road is already impossible on match days — where will visitors go?' },
-  { id: 6, kind: 'form', title: 'Form response from Alan B.', detail: TEMPLATE, duplicate: true },
-  { id: 7, kind: 'form', title: 'Form response from Janet R.', detail: TEMPLATE, duplicate: true },
-  { id: 8, kind: 'form', title: 'Form response from Chris P.', detail: TEMPLATE, duplicate: true },
 ]
 
 const ICON = {
@@ -48,7 +42,7 @@ export default function HeroActivityDemo() {
 
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      setVisible([...ITEMS.slice(2).reverse()])
+      setVisible([...ITEMS].reverse())
       setAlertOn(true)
       return
     }
@@ -68,16 +62,16 @@ export default function HeroActivityDemo() {
       setVisible([])
       setAlertOn(false)
 
-      // Ordinary responses arrive at an unhurried pace…
-      const arrival = [900, 4200, 7500, 10800, 14100, 17000, 17900, 18800]
+      // Responses arrive at an unhurried pace…
+      const arrival = [900, 4200, 7500, 10800, 14100]
       ITEMS.forEach((item, index) => {
         at(arrival[index], () =>
           setVisible(current => [item, ...current].slice(0, 5))
         )
       })
-      // …then the burst of copies trips the detector.
-      at(20200, () => setAlertOn(true))
-      at(27500, run)
+      // …then the detector fires on copies arriving behind the scenes.
+      at(16800, () => setAlertOn(true))
+      at(24000, run)
     }
 
     const observer = new IntersectionObserver(
@@ -142,7 +136,6 @@ export default function HeroActivityDemo() {
             {visible.map(item => {
               const style = ICON[item.kind]
               const Icon = style.icon
-              const flagged = item.duplicate && alertOn
               return (
                 <motion.div
                   key={item.id}
@@ -152,11 +145,7 @@ export default function HeroActivityDemo() {
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.45, ease: EASE }}
                   className="flex items-start gap-2.5 rounded-xl border p-2.5"
-                  style={{
-                    borderColor: flagged ? '#FDE68A' : '#F1F5F9',
-                    backgroundColor: flagged ? '#FFFBEB' : '#FFFFFF',
-                    transition: 'background-color 0.5s, border-color 0.5s',
-                  }}
+                  style={{ borderColor: '#F1F5F9', backgroundColor: '#FFFFFF' }}
                 >
                   <span
                     className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
@@ -167,11 +156,6 @@ export default function HeroActivityDemo() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
                       <p className="text-xs font-semibold text-slate-800 truncate">{item.title}</p>
-                      {flagged && (
-                        <span className="text-[9px] font-bold text-amber-700 bg-amber-100 rounded px-1 py-px shrink-0">
-                          DUPLICATE
-                        </span>
-                      )}
                       <span className="text-[10px] text-slate-300 ml-auto shrink-0">just now</span>
                     </div>
                     <p className="text-[11px] text-slate-500 leading-snug line-clamp-2">{item.detail}</p>

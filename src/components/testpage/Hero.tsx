@@ -21,7 +21,7 @@ export default function Hero() {
           transition={{ duration: 0.8, delay: 0.1 }}
           className="font-heading text-4xl sm:text-5xl xl:text-6xl font-bold leading-[1.12] tracking-[-0.02em] mb-6 text-[#0B2818]"
         >
-          Public consultation,
+          Digital solutions for
           <br />
           <motion.span
             className="gradient-text"
@@ -41,7 +41,7 @@ export default function Hero() {
               color: 'transparent',
             }}
           >
-            on your own website
+            public engagement
           </motion.span>
         </motion.h1>
 

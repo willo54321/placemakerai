@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
 import InteractiveDots from './InteractiveDots';
+import HeroActivityDemo from './HeroActivityDemo';
 
 export default function Hero() {
   return (
@@ -93,8 +94,15 @@ export default function Hero() {
         </motion.div>
         </div>
 
-        {/* Reserved for the product demo */}
-        <div className="hidden lg:block min-h-[420px]" aria-hidden="true" />
+        {/* Product demo: live activity feed + campaign detection */}
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.4 }}
+          className="hidden lg:block"
+        >
+          <HeroActivityDemo />
+        </motion.div>
       </div>
 
       {/* Scroll Indicator */}

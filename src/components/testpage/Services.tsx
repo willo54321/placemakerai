@@ -1,6 +1,8 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X, ArrowRight } from 'lucide-react';
 import MapPinDemo from './MapPinDemo';
 import FeedbackFlowDemo from './FeedbackFlowDemo';
 import FormBuilderDemo from './FormBuilderDemo';
@@ -18,6 +20,28 @@ const services = [
       { name: 'Community Voting & Moderation', detail: 'The public upvotes feedback they agree with, surfacing what matters most. Approve submissions before they go live.' },
       { name: 'Layers & Overlays', detail: 'Add site boundaries, planning zones, and architectural renders. Rotate, resize, and toggle visibility.' },
     ],
+    modal: {
+      intro:
+        'The map is where residents already think about your project — in streets, junctions, footpaths and boundaries. placemaker.ai turns that spatial instinct into structured, analysable feedback.',
+      sections: [
+        {
+          title: 'Every kind of spatial feedback',
+          body: 'Visitors drop pins for a spot, draw lines for routes and desire paths, or outline whole areas. Each submission carries a category — positive, negative, question or comment — plus a written comment of up to 2,000 characters, with area and distance calculated automatically for drawn shapes.',
+        },
+        {
+          title: 'Moderation before anything goes public',
+          body: 'Nothing appears on the public map until you approve it. Submissions queue for review, and once live, residents can upvote the feedback they agree with — so the strength of feeling around an issue is visible, not guessed.',
+        },
+        {
+          title: 'Your site plan, in context',
+          body: 'Upload GeoJSON boundaries and planning zones, overlay architectural renders or masterplans, and rotate, resize and toggle them. Street labels can be hidden for cleaner presentation, and the whole embed inherits your colours and typography.',
+        },
+        {
+          title: 'It lives on your website',
+          body: 'The map embeds into your existing site with a single line of code — no separate consultation portal, no new domain, nothing for residents to learn. Every pin then feeds the same AI analysis as your forms and enquiries.',
+        },
+      ],
+    },
   },
   {
     number: '02',
@@ -62,6 +86,24 @@ const services = [
 ];
 
 export default function Services() {
+  const [openModal, setOpenModal] = useState<string | null>(null);
+  const open = services.find((service) => service.number === openModal);
+
+  // Lock page scroll and close on Escape while the modal is up.
+  useEffect(() => {
+    if (!openModal) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpenModal(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = previous;
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [openModal]);
+
   return (
     <section id="services">
       {services.map((service, index) => (
@@ -108,6 +150,16 @@ export default function Services() {
                     </p>
                   )}
 
+                  {'modal' in service && service.modal && (
+                    <button
+                      onClick={() => setOpenModal(service.number)}
+                      className="inline-flex items-center gap-1.5 text-sm font-medium text-[#4ADE80] hover:text-[#86EFAC] transition-colors mb-2 group/learn"
+                    >
+                      Learn more
+                      <ArrowRight className="w-3.5 h-3.5 transition-transform duration-300 group-hover/learn:translate-x-0.5" />
+                    </button>
+                  )}
+
                   {/* Features list */}
                   {service.features && (
                     <div className="grid grid-cols-2 gap-2 mt-4">
@@ -146,6 +198,70 @@ export default function Services() {
           </div>
         </div>
       ))}
+
+      {/* Stripe-style feature modal */}
+      <AnimatePresence>
+        {open && 'modal' in open && open.modal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-8"
+            style={{ backgroundColor: 'rgba(11, 40, 24, 0.55)', backdropFilter: 'blur(6px)' }}
+            onClick={() => setOpenModal(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.97, y: 10 }}
+              transition={{ duration: 0.35, ease: [0.19, 1, 0.22, 1] }}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto relative"
+              onClick={(event) => event.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-label={`${open.title} details`}
+            >
+              <button
+                onClick={() => setOpenModal(null)}
+                className="absolute top-4 right-4 p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="p-8 sm:p-10">
+                <span className="text-sm font-medium text-[#16A34A] uppercase tracking-wider">
+                  {open.number}
+                </span>
+                <h3 className="text-2xl sm:text-3xl font-semibold text-[#0B2818] mt-1 mb-2 tracking-tight">
+                  {open.title}
+                </h3>
+                <p className="text-slate-600 leading-relaxed mb-8">{open.modal.intro}</p>
+
+                <div className="space-y-6">
+                  {open.modal.sections.map((section) => (
+                    <div key={section.title} className="border-t border-slate-100 pt-5">
+                      <h4 className="font-semibold text-[#0B2818] mb-1.5">{section.title}</h4>
+                      <p className="text-sm text-slate-600 leading-relaxed">{section.body}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-9 flex flex-col sm:flex-row gap-3">
+                  <a href="#contact" onClick={() => setOpenModal(null)} className="btn-primary text-sm justify-center">
+                    Get in Touch
+                    <ArrowRight className="w-4 h-4" />
+                  </a>
+                  <button onClick={() => setOpenModal(null)} className="btn-secondary text-sm justify-center">
+                    Close
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </section>
   );
 }

@@ -11,7 +11,8 @@ export default function Hero() {
       <InteractiveDots />
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-white/80" />
 
-      <div className="max-w-7xl mx-auto px-6 text-center relative z-10">
+      <div className="max-w-7xl mx-auto px-6 relative z-10 grid lg:grid-cols-2 gap-12 items-center w-full">
+        <div className="text-left">
         {/* Main Heading */}
         <motion.h1
           initial={{ opacity: 0, y: 30 }}
@@ -48,7 +49,7 @@ export default function Hero() {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.2 }}
-          className="text-xl text-[#595959] max-w-2xl mx-auto mb-8 leading-relaxed"
+          className="text-xl text-[#595959] max-w-2xl mb-8 leading-relaxed"
         >
           <span className="font-semibold text-[#0B2818]">placemaker.ai</span> is a strategic engagement platform for development and infrastructure projects. Simple digital tools for inclusive community engagement.
         </motion.p>
@@ -58,7 +59,7 @@ export default function Hero() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.25 }}
-          className="flex flex-wrap justify-center gap-3 mb-10"
+          className="flex flex-wrap gap-3 mb-10"
         >
           {[
             'Major Residential Schemes',
@@ -80,7 +81,7 @@ export default function Hero() {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.3 }}
-          className="flex flex-col sm:flex-row items-center justify-center gap-4"
+          className="flex flex-col sm:flex-row items-start sm:items-center gap-4"
         >
           <a href="#services" className="btn-primary text-base group">
             Explore Services
@@ -90,6 +91,10 @@ export default function Hero() {
             Get in Touch
           </a>
         </motion.div>
+        </div>
+
+        {/* Reserved for the product demo */}
+        <div className="hidden lg:block min-h-[420px]" aria-hidden="true" />
       </div>
 
       {/* Scroll Indicator */}

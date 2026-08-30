@@ -26,12 +26,15 @@ export async function middleware(req: NextRequest) {
     if (pathname.startsWith('/_next') || pathname.includes('.')) {
       return NextResponse.next()
     }
-    if (pathname === '/' || pathname === '/holding') {
-      return NextResponse.rewrite(new URL('/holding', req.url))
+    // The marketing homepage (built at /testpage, promoted 2026-08-30).
+    if (pathname === '/') {
+      return NextResponse.rewrite(new URL('/testpage', req.url))
     }
-    // /testpage: work-in-progress homepage builds, viewable without touching
-    // the holding page.
-    if (pathname === '/privacy' || pathname === '/testpage') {
+    // Old URLs collapse onto the canonical homepage.
+    if (pathname === '/testpage' || pathname === '/holding') {
+      return NextResponse.redirect(new URL('/', req.url), 308)
+    }
+    if (pathname === '/privacy') {
       return NextResponse.next()
     }
     // Any product link shared before the split (logins, embeds, forms, API)

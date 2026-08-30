@@ -9,14 +9,13 @@ import CaseStudies from '@/components/testpage/CaseStudies'
 import ContactForm from '@/components/testpage/ContactForm'
 import Footer from '@/components/testpage/Footer'
 
-// Homepage starter, ported from the original consultation-services marketing
-// site (~/Documents/consultation-services). Served at /testpage on the
-// marketing domain for editing; promote over /holding when it's right.
+// The marketing homepage: served at / on placemakerai.io via a middleware
+// rewrite (the /testpage URL 308s to /). Originally ported from the
+// consultation-services marketing site.
 export const metadata: Metadata = {
   title: 'Placemaker | Digital Stakeholder Engagement',
   description:
     'Digital stakeholder engagement tools for planning and development projects. Interactive feedback maps, custom feedback forms, and AI-powered analysis.',
-  robots: { index: false, follow: false },
 }
 
 export default function TestHomePage() {

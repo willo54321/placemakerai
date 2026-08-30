@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion';
 import MapPinDemo from './MapPinDemo';
 import FeedbackFlowDemo from './FeedbackFlowDemo';
+import FormBuilderDemo from './FormBuilderDemo';
 
 const services = [
   {
@@ -130,6 +131,8 @@ export default function Services() {
                 >
                   {service.number === '01' ? (
                     <MapPinDemo />
+                  ) : service.number === '02' ? (
+                    <FormBuilderDemo />
                   ) : service.number === '04' ? (
                     <FeedbackFlowDemo />
                   ) : (

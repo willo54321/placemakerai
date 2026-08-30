@@ -212,6 +212,9 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
   const feedbackCount = data?.feedbackCount || 0
   const processing = Boolean(data?.processing)
   const analysisFailed = Boolean(data?.analysisFailed)
+  const sentimentOverTime = data?.sentimentOverTime as
+    | Array<{ week: string; support: number; neutral: number; object: number }>
+    | undefined
 
   // Toast once when a polled run lands.
   const wasProcessing = useRef(false)
@@ -643,6 +646,57 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
           </div>
         </div>
       </div>
+
+      {/* Sentiment over time — weekly stance counts from per-response assignments */}
+      {sentimentOverTime && sentimentOverTime.length >= 2 && (
+        <div className="card p-6">
+          <div className="mb-4">
+            <h3 className="font-semibold text-slate-900">Sentiment over time</h3>
+            <p className="text-sm text-slate-500">
+              Weekly responses by classified stance — a sudden objection spike often marks an organised campaign
+            </p>
+          </div>
+          <div style={{ height: 280 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={sentimentOverTime} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                <XAxis
+                  dataKey="week"
+                  tickFormatter={(week: string) =>
+                    new Date(week).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+                  }
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: '#94a3b8', fontSize: 11 }}
+                />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: '#94a3b8', fontSize: 11 }}
+                  width={40}
+                />
+                <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f1f5f9' }} />
+                <Bar dataKey="object" name="Object" stackId="stance" fill={CHART_COLORS.negative} />
+                <Bar dataKey="neutral" name="Neutral" stackId="stance" fill={CHART_COLORS.neutral} />
+                <Bar dataKey="support" name="Support" stackId="stance" fill={CHART_COLORS.positive} radius={[3, 3, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="mt-3 flex items-center justify-center gap-6 text-sm">
+            <span className="flex items-center gap-2 text-slate-600">
+              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: CHART_COLORS.negative }} />
+              Object
+            </span>
+            <span className="flex items-center gap-2 text-slate-600">
+              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: CHART_COLORS.neutral }} />
+              Neutral / question
+            </span>
+            <span className="flex items-center gap-2 text-slate-600">
+              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: CHART_COLORS.positive }} />
+              Support
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Interactive Theme Bar Chart */}
       <div className="card p-6">

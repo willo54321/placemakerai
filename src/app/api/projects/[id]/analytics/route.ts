@@ -7,6 +7,7 @@ import {
   isAnalysisBatchReady,
   finalizeFullAnalysis,
   createFeedbackHash,
+  FeedbackItem,
   FullAnalysisResult,
   PendingAnalysis,
 } from '@/lib/ai'
@@ -20,6 +21,42 @@ export const maxDuration = 60
 
 function isEmptyData(data: unknown): boolean {
   return !data || Object.keys(data as object).length === 0
+}
+
+/**
+ * Weekly stance counts, joined from the persisted per-response assignments and
+ * each response's submission date. Computed per request rather than stored, so
+ * it works for any completed analysis that carries assignments.
+ */
+function buildSentimentOverTime(
+  feedbackItems: FeedbackItem[],
+  analysis: FullAnalysisResult | null
+): Array<{ week: string; support: number; neutral: number; object: number }> | undefined {
+  const assignments = analysis?.assignments
+  if (!assignments || assignments.length === 0) return undefined
+
+  const sentimentById = new Map(assignments.map(a => [a.id, a.sentiment]))
+  const buckets = new Map<string, { support: number; neutral: number; object: number }>()
+
+  feedbackItems.forEach(item => {
+    const sentiment = sentimentById.get(item.id)
+    if (!sentiment) return
+    // Bucket by the Monday of the submission week (UTC).
+    const date = new Date(item.createdAt)
+    const monday = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()))
+    monday.setUTCDate(monday.getUTCDate() - ((monday.getUTCDay() + 6) % 7))
+    const key = monday.toISOString().slice(0, 10)
+
+    if (!buckets.has(key)) buckets.set(key, { support: 0, neutral: 0, object: 0 })
+    const bucket = buckets.get(key)!
+    if (sentiment === 'positive') bucket.support++
+    else if (sentiment === 'negative') bucket.object++
+    else bucket.neutral++
+  })
+
+  return Array.from(buckets.entries())
+    .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+    .map(([week, counts]) => ({ week, ...counts }))
 }
 
 // GET - Retrieve the cached analysis, advancing an in-flight run if its batch
@@ -86,6 +123,7 @@ export async function GET(
             })
             return NextResponse.json({
               analysis,
+              sentimentOverTime: buildSentimentOverTime(feedbackItems, analysis),
               needsUpdate: false,
               lastAnalyzed: new Date(),
               feedbackCount: feedbackItems.length,
@@ -149,10 +187,13 @@ export async function GET(
     })
   }
 
+  const completedAnalysis = isEmptyData(cached.data)
+    ? null
+    : (cached.data as unknown as FullAnalysisResult)
+
   return NextResponse.json({
-    analysis: isEmptyData(cached.data)
-      ? null
-      : (cached.data as unknown as FullAnalysisResult),
+    analysis: completedAnalysis,
+    sentimentOverTime: buildSentimentOverTime(feedbackItems, completedAnalysis),
     needsUpdate: cached.feedbackHash !== currentHash || cached.status === 'failed',
     analysisFailed: cached.status === 'failed' || undefined,
     lastAnalyzed: cached.updatedAt,

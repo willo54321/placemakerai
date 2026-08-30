@@ -34,13 +34,6 @@ const SENTIMENT_COLORS = {
   mixed: '#f59e0b', // amber-500
 }
 
-const BAR_COLORS = {
-  positive: '#059669', // emerald-600
-  negative: '#dc2626', // red-600
-  neutral: '#64748b', // slate-500
-  mixed: '#d97706', // amber-600
-}
-
 // Custom tooltip showing sentiment breakdown
 const CustomTooltip = ({
   active,
@@ -135,11 +128,18 @@ export function ThemeBarChart({
   // Sort themes by count descending
   const sortedThemes = [...themes].sort((a, b) => b.count - a.count)
 
-  // Calculate percentages
-  const chartData = sortedThemes.map(theme => ({
-    ...theme,
-    percentage: totalFeedback > 0 ? Math.round((theme.count / totalFeedback) * 100) : 0,
-  }))
+  // Flatten the stance split into stackable series. Analyses that predate
+  // per-theme breakdowns fall back to one segment in the dominant stance.
+  const chartData = sortedThemes.map(theme => {
+    const breakdown = theme.sentimentBreakdown
+    return {
+      ...theme,
+      percentage: totalFeedback > 0 ? Math.round((theme.count / totalFeedback) * 100) : 0,
+      objectCount: breakdown?.negative ?? (theme.sentiment === 'negative' ? theme.count : 0),
+      neutralCount: breakdown?.neutral ?? (theme.sentiment === 'neutral' ? theme.count : 0),
+      supportCount: breakdown?.positive ?? (theme.sentiment === 'positive' ? theme.count : 0),
+    }
+  })
 
   const handleExportPNG = useCallback(async () => {
     if (!chartRef.current) return
@@ -225,27 +225,34 @@ export function ThemeBarChart({
                 tick={{ fill: '#334155', fontSize: 13, fontWeight: 500 }}
               />
               <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f1f5f9' }} />
-              <Bar
-                dataKey="count"
-                radius={[0, 6, 6, 0]}
-                onClick={(data) => {
-                  if (data && data.payload) {
-                    handleBarClick(data.payload as ThemeWithSentiment)
-                  }
-                }}
-                style={{ cursor: 'pointer' }}
-              >
-                {chartData.map((entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={selectedTheme?.name === entry.name
-                      ? '#3b82f6' // brand blue when selected
-                      : BAR_COLORS[entry.sentiment]
-                    }
-                    opacity={selectedTheme && selectedTheme.name !== entry.name ? 0.4 : 1}
-                  />
-                ))}
-              </Bar>
+              {([
+                ['objectCount', SENTIMENT_COLORS.negative, [0, 0, 0, 0]],
+                ['neutralCount', SENTIMENT_COLORS.neutral, [0, 0, 0, 0]],
+                ['supportCount', SENTIMENT_COLORS.positive, [0, 6, 6, 0]],
+              ] as Array<[string, string, [number, number, number, number]]>).map(
+                ([dataKey, color, radius]) => (
+                  <Bar
+                    key={dataKey}
+                    dataKey={dataKey}
+                    stackId="stance"
+                    radius={radius}
+                    onClick={(data) => {
+                      if (data && data.payload) {
+                        handleBarClick(data.payload as ThemeWithSentiment)
+                      }
+                    }}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    {chartData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={color}
+                        opacity={selectedTheme && selectedTheme.name !== entry.name ? 0.35 : 1}
+                      />
+                    ))}
+                  </Bar>
+                )
+              )}
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -253,20 +260,16 @@ export function ThemeBarChart({
         {/* Inline labels showing count and percentage */}
         <div className="mt-4 flex items-center justify-center gap-6 text-sm">
           <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-emerald-600" />
-            <span className="text-slate-600">Positive sentiment</span>
+            <span className="w-3 h-3 rounded-full bg-red-500" />
+            <span className="text-slate-600">Object</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-red-600" />
-            <span className="text-slate-600">Negative sentiment</span>
+            <span className="w-3 h-3 rounded-full bg-slate-400" />
+            <span className="text-slate-600">Neutral / question</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-amber-600" />
-            <span className="text-slate-600">Mixed sentiment</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-slate-500" />
-            <span className="text-slate-600">Neutral</span>
+            <span className="w-3 h-3 rounded-full bg-emerald-500" />
+            <span className="text-slate-600">Support</span>
           </div>
         </div>
       </div>

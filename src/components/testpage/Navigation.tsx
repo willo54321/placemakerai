@@ -71,11 +71,12 @@ export default function Navigation() {
             ))}
           </div>
 
-          {/* CTA Buttons */}
-          <div className="hidden md:flex items-center gap-5">
+          {/* CTA Buttons — paired with equal weight, Stripe-style */}
+          <div className="hidden md:flex items-center gap-3">
             <a
               href="https://platform.placemakerai.io/login"
-              className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+              className="btn-secondary text-sm"
+              style={{ background: '#ffffff' }}
             >
               Sign in
             </a>

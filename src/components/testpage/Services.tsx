@@ -1,6 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import MapPinDemo from './MapPinDemo';
 
 const services = [
   {
@@ -128,9 +129,13 @@ export default function Services() {
                   transition={{ duration: 0.5, delay: 0.1 }}
                   className="flex items-center"
                 >
-                  <div className="relative aspect-[4/3] w-full rounded-lg overflow-hidden bg-white/10 flex items-center justify-center border border-white/10">
-                    <span className="text-white/30 text-sm">{service.title} screenshot</span>
-                  </div>
+                  {service.number === '01' ? (
+                    <MapPinDemo />
+                  ) : (
+                    <div className="relative aspect-[4/3] w-full rounded-lg overflow-hidden bg-white/10 flex items-center justify-center border border-white/10">
+                      <span className="text-white/30 text-sm">{service.title} screenshot</span>
+                    </div>
+                  )}
                 </motion.div>
               </div>
             </div>

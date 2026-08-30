@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import MapPinDemo from './MapPinDemo';
+import FeedbackFlowDemo from './FeedbackFlowDemo';
 
 const services = [
   {
@@ -40,16 +41,14 @@ const services = [
   {
     number: '04',
     title: 'Stakeholder Relationship Management',
-    subtitle: 'All your engagement history in one place',
-    description: 'Influence/interest mapping, engagement history logging, threaded enquiry inbox, and email broadcast tools. Track every interaction with every stakeholder. Never lose context between team members or across project phases.',
+    subtitle: 'All of your stakeholder feedback in one place',
+    description: 'Every channel lands in the same project: public enquiries, map comments, and form responses. One database, one moderation queue, and one AI analysis across everything — so nothing said anywhere gets missed.',
     secondaryDescription: '',
     features: [
-      { name: 'Influence & Interest Mapping', detail: 'Plot stakeholders on a classic influence-interest matrix. Score contacts 1-5, categorise by stance and type.' },
-      { name: 'Automatic Political Detection', detail: 'Enter project coordinates and we identify your MP, councillors, ward members, and parish councils using live UK government data.' },
-      { name: 'Complete Engagement History', detail: 'Log every meeting, call, email, event, and site visit. Emails sent through the platform log automatically.' },
-      { name: 'Threaded Enquiry Inbox', detail: 'Five-stage workflow from New to Closed. Assign to team members, add notes, draft responses for approval.' },
-      { name: 'Mailing List & Broadcasts', detail: 'Build lists from form submissions and enquiries. Send updates with one click. Engagement logs automatically.' },
-      { name: 'Team Collaboration', detail: 'Shared database with full visibility. Role-based permissions and complete audit trails.' },
+      { name: 'Public Enquiries', detail: 'A branded enquiry form embeds on your site; submissions feed straight into the project.' },
+      { name: 'Map Comments', detail: 'Every pin, line, and polygon comment sits alongside the rest of the feedback.' },
+      { name: 'Form Responses', detail: 'In-platform forms and external website forms via API, collected with GDPR consent.' },
+      { name: 'One AI Analysis', detail: 'Stance, themes, and material considerations counted across every channel in a single pass.' },
     ],
   },
   {
@@ -131,6 +130,8 @@ export default function Services() {
                 >
                   {service.number === '01' ? (
                     <MapPinDemo />
+                  ) : service.number === '04' ? (
+                    <FeedbackFlowDemo />
                   ) : (
                     <div className="relative aspect-[4/3] w-full rounded-lg overflow-hidden bg-white/10 flex items-center justify-center border border-white/10">
                       <span className="text-white/30 text-sm">{service.title} screenshot</span>

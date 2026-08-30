@@ -3,7 +3,7 @@ import { MapPin, FileText, Sparkles, ArrowRight, Check } from 'lucide-react'
 import { HeroDemo } from '@/components/marketing/HeroDemo'
 
 export const metadata: Metadata = {
-  title: 'Placemaker — consultation that runs on your website, not ours',
+  title: 'Placemaker — digital solutions for better public consultation',
   description:
     'Embed interactive map feedback, custom forms and AI analysis into the website you already have. No new domain, no migration, no vendor lock-in.',
 }
@@ -45,8 +45,8 @@ export default function MarketingHomePage() {
       <section className="max-w-6xl mx-auto px-6 pt-10 pb-20 grid lg:grid-cols-2 gap-12 items-center">
         <div>
           <h1 className="text-4xl sm:text-5xl font-bold leading-[1.1] tracking-tight text-balance">
-            Consultation that runs on{' '}
-            <span className="text-brand-600">your website</span>, not ours.
+            Digital solutions for{' '}
+            <span className="text-brand-600">better public consultation</span>.
           </h1>
           <p className="mt-5 text-lg text-slate-600 leading-relaxed max-w-xl">
             Placemaker embeds interactive map feedback, custom forms and AI

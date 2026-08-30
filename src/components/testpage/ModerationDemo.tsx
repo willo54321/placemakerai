@@ -49,7 +49,7 @@ const ROWS: QueueRow[] = [
     color: '#DC2626',
     bg: '#FEE2E2',
     icon: ThumbsDown,
-    comment: 'The four-storey block would overshadow every garden on Elm Grove. Too tall for this street.',
+    comment: 'The four-storey block would overshadow every garden on Elm Rise. Too tall for this street.',
     time: 'Today, 10:02',
   },
   {

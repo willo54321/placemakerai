@@ -21,8 +21,9 @@ const EASE = 'cubic-bezier(0.19, 1, 0.22, 1)'
 const STAGE_W = 480
 const STAGE_H = 360
 
-// Ford, West Sussex — the Vistry case study's patch.
-const MAP_CENTER = { lat: 50.8285, lng: -0.5754 }
+// Open countryside near Aylesbury — deliberately unconnected to any client
+// scheme, so the fictional demo comment can't be read as real feedback.
+const MAP_CENTER = { lat: 51.846, lng: -0.856 }
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''
 const LIBRARIES: ("drawing" | "geometry" | "visualization")[] = ['drawing', 'geometry', 'visualization']

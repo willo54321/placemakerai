@@ -22,7 +22,7 @@ interface FeedItem {
 
 const ITEMS: FeedItem[] = [
   { id: 1, kind: 'pin', title: 'Map comment from Sarah T.', detail: 'Love the new green link to the riverside path — please keep it lit in winter.' },
-  { id: 2, kind: 'form', title: 'Form response from Tom W.', detail: 'The four-storey block would overshadow every garden on Elm Grove. Too tall for this street.' },
+  { id: 2, kind: 'form', title: 'Form response from Tom W.', detail: 'The four-storey block would overshadow every garden on Elm Rise. Too tall for this street.' },
   { id: 3, kind: 'enquiry', title: 'Enquiry from David M.', detail: 'Will the community hall stay open during the construction phase?' },
   { id: 4, kind: 'form', title: 'Form response from Grace O.', detail: 'More family homes are badly needed here — good to see a brownfield site being used.' },
   { id: 5, kind: 'pin', title: 'Map comment from Priya K.', detail: 'Parking on Weald Road is already impossible on match days — where will visitors go?' },

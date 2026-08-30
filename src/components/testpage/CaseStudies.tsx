@@ -155,7 +155,7 @@ function AccordionItem({
               onClick={(e) => e.stopPropagation()}
               className="inline-flex items-center gap-2 h-10 px-4 rounded-full bg-[#0B2818] text-white text-sm font-medium hover:bg-[#0B2818]/90 transition-all duration-[400ms] ease-[cubic-bezier(.3,0,.2,1)]"
             >
-              Read the case study
+              Discuss a project like this
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           ) : (

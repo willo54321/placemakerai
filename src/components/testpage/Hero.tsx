@@ -21,7 +21,7 @@ export default function Hero() {
           transition={{ duration: 0.8, delay: 0.1 }}
           className="font-heading text-4xl sm:text-5xl xl:text-6xl font-bold leading-[1.12] tracking-[-0.02em] mb-6 text-[#0B2818]"
         >
-          Digital solutions for
+          Public consultation,
           <br />
           <motion.span
             className="gradient-text"
@@ -41,7 +41,7 @@ export default function Hero() {
               color: 'transparent',
             }}
           >
-            public engagement
+            on your own website
           </motion.span>
         </motion.h1>
 
@@ -52,7 +52,7 @@ export default function Hero() {
           transition={{ duration: 0.8, delay: 0.2 }}
           className="text-xl text-[#595959] max-w-2xl mb-8 leading-relaxed"
         >
-          <span className="font-semibold text-[#0B2818]">placemaker.ai</span> is a strategic engagement platform for development and infrastructure projects. It enhances the engagement website you already have — embedding straight into your pages, with no restrictive CMS to migrate to and no templates to squeeze your brand into.
+          <span className="font-semibold text-[#0B2818]">placemaker.ai</span> adds interactive maps, feedback forms and AI analysis to the consultation website you already have — no restrictive CMS to migrate to, no templates to squeeze your brand into.
         </motion.p>
 
         {/* CTA Buttons */}
@@ -77,7 +77,6 @@ export default function Hero() {
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.4 }}
-          className="hidden lg:block"
         >
           <HeroActivityDemo />
         </motion.div>

@@ -12,7 +12,7 @@ import {
   MiniLayersDemo,
   MiniApiDemo,
   MiniComplianceDemo,
-  MiniResponsesDemo,
+  MiniSecureDemo,
   MiniSentimentDemo,
   MiniThemesDemo,
   MiniMaterialDemo,
@@ -24,7 +24,7 @@ const MINI_DEMOS: Record<string, () => JSX.Element> = {
   'Layers & Overlays': MiniLayersDemo,
   'API Integration': MiniApiDemo,
   'Built-In Compliance': MiniComplianceDemo,
-  'Smart Responses': MiniResponsesDemo,
+  'Secure Response Storage': MiniSecureDemo,
   'Sentiment Analysis': MiniSentimentDemo,
   'Theme Extraction': MiniThemesDemo,
   'Material Considerations': MiniMaterialDemo,
@@ -71,13 +71,13 @@ const services = [
         'Eight field types — text, dropdowns, checkboxes and ratings — with drag-and-drop reordering and instant preview',
         'Connect any website with a single endpoint that auto-detects field names and builds the schema on the fly',
         'GDPR consent mandatory on every submission — timestamps recorded automatically, mailing opt-in kept separate',
-        'Responses land in expandable cards with automatic name and email detection — click any email to start a conversation',
+        'Every response stored in a secure database with GDPR consent recorded — personal data visible only to your project team',
       ],
       footnote: 'Every form lives at its own shareable link — or posts in from your existing website.',
       featureCards: [
         { name: 'API Integration', detail: 'Connect any website with a single endpoint. Auto-detects field names and builds the schema on the fly.' },
         { name: 'Built-In Compliance', detail: 'GDPR consent mandatory on every submission. Timestamps recorded automatically, mailing opt-in kept separate.' },
-        { name: 'Smart Responses', detail: 'View submissions in expandable cards with automatic name and email detection. Click any email to start a conversation.' },
+        { name: 'Secure Response Storage', detail: 'Every submission is stored in a secure database with GDPR consent recorded — personal data stays protected and visible only to your project team.' },
       ],
     },
   },
@@ -107,8 +107,8 @@ const services = [
   },
   {
     number: '04',
-    title: 'Stakeholder Relationship Management',
-    subtitle: 'All of your stakeholder feedback in one place',
+    title: 'Every Channel, One Analysis',
+    subtitle: 'All your stakeholder feedback in one place',
     description: 'Every channel lands in the same project: public enquiries, map comments, and form responses. One database, one moderation queue, and one AI analysis across everything — so nothing said anywhere gets missed.',
     secondaryDescription: '',
     features: [
@@ -144,7 +144,7 @@ export default function Services() {
       {services.map((service, index) => (
         <div
           key={service.number}
-          className="sticky top-0 h-screen flex items-center"
+          className="lg:sticky lg:top-0 lg:min-h-screen flex items-center"
           style={{
             zIndex: index + 1,
             backgroundColor: index % 2 === 0 ? '#0B2818' : '#1a0b45',

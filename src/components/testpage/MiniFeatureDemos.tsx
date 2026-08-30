@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { ThumbsUp, X, Eye, Upload, Image as ImageIcon, Layers, ChevronLeft, ChevronDown, ChevronUp, CheckCircle } from 'lucide-react'
+import { ThumbsUp, X, Eye, Upload, Image as ImageIcon, Layers, ChevronLeft, ChevronDown, ChevronUp, CheckCircle, Lock, ShieldCheck } from 'lucide-react'
 
 /**
  * Three miniature looping product demos for the modal's "More to discover"
@@ -610,7 +610,7 @@ export function MiniResponsesDemo() {
             <div className="bg-slate-50 rounded-lg px-2 py-1.5">
               <p className="text-[7.5px] font-medium text-slate-400 uppercase tracking-wide">Your view</p>
               <p className="text-[8.5px] text-slate-700 leading-snug">
-                The four-storey block would overshadow every garden on Elm Grove.
+                The four-storey block would overshadow every garden on Elm Rise.
               </p>
             </div>
             <div className="bg-slate-50 rounded-lg px-2 py-1.5">
@@ -633,7 +633,7 @@ export function MiniResponsesDemo() {
 
 const STANCE_ITEMS = [
   {
-    text: 'The four-storey block would overshadow every garden on Elm Grove.',
+    text: 'The four-storey block would overshadow every garden on Elm Rise.',
     chip: 'Object',
     color: '#DC2626',
     bg: '#FEF2F2',
@@ -769,7 +769,7 @@ export function MiniThemesDemo() {
 
 const MATERIAL_ITEMS = [
   {
-    text: 'Overshadowing and loss of daylight to Elm Grove gardens.',
+    text: 'Overshadowing and loss of daylight to Elm Rise gardens.',
     chip: 'Material — residential amenity',
     material: true,
   },
@@ -828,6 +828,87 @@ export function MiniMaterialDemo() {
         style={{ opacity: phase >= 3 ? 1 : 0, transition: `opacity 0.5s ${EASE}` }}
       >
         Ready for officer reports and committee
+      </p>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* 02 — Secure Response Storage                                        */
+/* ------------------------------------------------------------------ */
+
+export function MiniSecureDemo() {
+  // 1 submission lands · 2 secured (lock + email masked) · 3 team-only note
+  const phase = useLoop(
+    [
+      { at: 1000, phase: 1 },
+      { at: 2400, phase: 2 },
+      { at: 3600, phase: 3 },
+    ],
+    8400,
+    3
+  )
+  const secured = phase >= 2
+
+  return (
+    <div className="relative w-full h-full flex flex-col items-center justify-center gap-2.5 px-5 select-none" aria-label="Demo: a submission stored in a secure database with personal data protected">
+      <div
+        className="w-full max-w-[240px] bg-white rounded-xl shadow-md p-3 border"
+        style={{
+          borderColor: secured ? '#BBF7D0' : '#F1F5F9',
+          opacity: phase >= 1 ? 1 : 0,
+          transform: phase >= 1 ? 'translateY(0)' : 'translateY(8px)',
+          transition: `opacity 0.5s ${EASE}, transform 0.5s ${EASE}, border-color 0.5s ${EASE}`,
+        }}
+      >
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <span className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-[9px] font-semibold text-slate-600 shrink-0">
+            T
+          </span>
+          <span className="flex-1 min-w-0">
+            <span className="block text-[10px] font-semibold text-slate-900 leading-tight">Tom Wilson</span>
+            <span className="relative block text-[8.5px] leading-tight" style={{ height: 12 }}>
+              <span
+                className="absolute inset-0 text-blue-600"
+                style={{ opacity: secured ? 0 : 1, transition: `opacity 0.4s ${EASE}` }}
+              >
+                tom@example.com
+              </span>
+              <span
+                className="absolute inset-0 text-slate-400"
+                style={{ opacity: secured ? 1 : 0, transition: `opacity 0.4s ${EASE}` }}
+              >
+                t•••@e•••••••.com
+              </span>
+            </span>
+          </span>
+          <span
+            className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
+            style={{
+              backgroundColor: secured ? '#DCFCE7' : '#F1F5F9',
+              transition: `background-color 0.4s ${EASE}`,
+            }}
+          >
+            <Lock size={10} style={{ color: secured ? '#16A34A' : '#CBD5E1', transition: `color 0.4s ${EASE}` }} />
+          </span>
+        </div>
+        <p className="text-[9.5px] text-slate-700 leading-snug mb-1.5">
+          The four-storey block would overshadow every garden on Elm Rise.
+        </p>
+        <p className="text-[8px] text-slate-400 flex items-center gap-1">
+          <CheckCircle size={8} className="text-[#16A34A] shrink-0" /> GDPR consent recorded — Sat 30 Aug 2026, 10:02
+        </p>
+      </div>
+
+      <p
+        className="inline-flex items-center gap-1 text-[8.5px] text-slate-500 bg-white rounded-full border border-slate-100 shadow-sm px-2.5 py-1"
+        style={{
+          opacity: phase >= 3 ? 1 : 0,
+          transform: phase >= 3 ? 'translateY(0)' : 'translateY(4px)',
+          transition: `opacity 0.5s ${EASE}, transform 0.5s ${EASE}`,
+        }}
+      >
+        <ShieldCheck size={9} className="text-[#16A34A]" /> Stored securely — visible only to your project team
       </p>
     </div>
   )

@@ -63,8 +63,8 @@ export const caseStudies: CaseStudy[] = [
     slug: 'royal-mail-brighton',
     client: 'Royal Mail',
     logo: '/logos/royal-mail.png',
-    headline: 'Digital engagement platform enabled residents to report construction issues directly via an interactive map.',
-    title: 'Digital engagement platform for construction phase community relations',
+    headline: 'Residents reported construction issues directly via an interactive map.',
+    title: 'Location-precise issue reporting for construction phase community relations',
     project: 'Brighton Delivery Office Construction',
     location: 'Brighton, East Sussex',
     sector: 'Construction & Infrastructure',
@@ -80,15 +80,15 @@ export const caseStudies: CaseStudy[] = [
     },
     solution: {
       summary:
-        'We created a branded construction update portal with an integrated geospatial feedback system.',
+        'We embedded an interactive issue-reporting map in the project website, giving residents a precise way to raise concerns.',
       tools: [
         'Interactive issue reporting map',
-        'Centralised communications hub',
-        'Mailing list integration',
-        'Project team directory',
+        'Location-pinned concerns',
+        'Categorised feedback for the site team',
+        'Feedback reporting and export',
       ],
       detail:
-        'Residents can click on a map to report concerns at precise locations, categorising issues by type. This gives the site team actionable data to investigate and respond quickly. Monthly progress updates, downloadable documents, and FAQs provide a single destination for project information, reducing enquiries and keeping the community informed. Residents can subscribe to receive updates directly, maintaining engagement throughout the construction period.',
+        'Residents could click on a map to report concerns at precise locations, categorising issues by type. This gave the site team actionable data to investigate and respond quickly, and demonstrated responsive community management throughout the construction period.',
     },
     image: '/case-studies/royal-mail-brighton.png',
   },

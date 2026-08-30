@@ -29,7 +29,7 @@ const THEMES = [
 ]
 
 const SUMMARY =
-  'Opposition centres on traffic and overshadowing along Elm Grove; support focuses on housing delivery and re-use of the brownfield site.'
+  'Opposition centres on traffic and overshadowing along Elm Rise; support focuses on housing delivery and re-use of the brownfield site.'
 
 /** Count from 0 to target while active. */
 function useCountUp(target: number, active: boolean, ms = 900) {

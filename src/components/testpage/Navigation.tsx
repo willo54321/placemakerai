@@ -6,18 +6,11 @@ import { Menu, X, ChevronRight, MapPin } from 'lucide-react';
 
 export default function Navigation() {
   const [isScrolled, setIsScrolled] = useState(false);
-  const [isPastCarousel, setIsPastCarousel] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 20);
-
-      const carousel = document.getElementById('clients-carousel');
-      if (carousel) {
-        const rect = carousel.getBoundingClientRect();
-        setIsPastCarousel(rect.bottom < 0);
-      }
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
@@ -34,7 +27,7 @@ export default function Navigation() {
     <>
       <motion.nav
         initial={{ y: -100 }}
-        animate={{ y: isPastCarousel ? -100 : 0 }}
+        animate={{ y: 0 }}
         transition={{ duration: 0.4, ease: 'easeInOut' }}
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
           isScrolled

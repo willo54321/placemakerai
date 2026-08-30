@@ -14,16 +14,33 @@ export default function ContactForm() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setSubmitError(null);
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
-    setIsSubmitting(false);
-    setIsSubmitted(true);
+    try {
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.error || 'Something went wrong');
+      }
+      setIsSubmitted(true);
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error && error.message !== 'Failed to fetch'
+          ? error.message
+          : 'Something went wrong sending your message. Please try again.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const projectTypes = [
@@ -55,7 +72,7 @@ export default function ContactForm() {
             className="flex flex-col justify-center"
           >
             <h2 className="font-heading text-4xl lg:text-5xl font-semibold text-white mb-6 tracking-[-0.02em] leading-[1.15]">
-              Get in Touch
+              Start a Project
             </h2>
             <p className="text-xl text-gray-400">
               Interested in our digital consultation tools? Fill out the form and we&apos;ll be in touch.
@@ -81,7 +98,7 @@ export default function ContactForm() {
                   </div>
                   <h3 className="text-2xl font-bold mb-2">Message Sent!</h3>
                   <p className="text-gray-600 mb-8">
-                    Thank you for reaching out. We&apos;ll be in touch within 24 hours.
+                    Thank you for reaching out. We&apos;ll get back to you within one working day.
                   </p>
                   <button
                     onClick={() => {
@@ -185,9 +202,15 @@ export default function ContactForm() {
                     )}
                   </button>
 
+                  {submitError && (
+                    <p className="text-center text-sm text-red-600 bg-red-50 rounded-xl px-4 py-3">
+                      {submitError}
+                    </p>
+                  )}
+
                   <p className="text-center text-sm text-gray-500">
                     By submitting, you agree to our{' '}
-                    <a href="#" className="text-[#16A34A] hover:underline">Privacy Policy</a>
+                    <a href="/privacy" target="_blank" className="text-[#16A34A] hover:underline">Privacy Policy</a>
                   </p>
                 </form>
               )}

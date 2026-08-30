@@ -359,3 +359,16 @@ model AnalysisResult {
   @@unique([projectId, type])
   @@index([projectId])
 }
+
+// Marketing-site contact form submissions ("Start a Project"). No email
+// delivery is configured, so the database is the inbox — viewed by super
+// admins at /admin/messages.
+model ContactMessage {
+  id           String   @id @default(cuid())
+  name         String
+  email        String
+  organization String?
+  projectType  String?
+  message      String
+  createdAt    DateTime @default(now())
+}

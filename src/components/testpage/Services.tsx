@@ -277,7 +277,7 @@ export default function Services() {
                     </p>
                     <div className="flex flex-col sm:flex-row gap-3">
                       <a href="#contact" onClick={() => setOpenModal(null)} className="btn-primary text-sm justify-center">
-                        Get in Touch
+                        Start a Project
                         <ArrowRight className="w-4 h-4" />
                       </a>
                       <button onClick={() => setOpenModal(null)} className="btn-secondary text-sm justify-center">

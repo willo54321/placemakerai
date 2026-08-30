@@ -67,7 +67,7 @@ export default function Hero() {
             <ArrowRight className="w-5 h-5 transition-transform duration-300 group-hover:translate-x-1" />
           </a>
           <a href="#contact" className="btn-secondary text-base">
-            Get in Touch
+            Start a Project
           </a>
         </motion.div>
         </div>

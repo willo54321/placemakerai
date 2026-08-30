@@ -34,7 +34,8 @@ export async function middleware(req: NextRequest) {
     if (pathname === '/testpage' || pathname === '/holding') {
       return NextResponse.redirect(new URL('/', req.url), 308)
     }
-    if (pathname === '/privacy') {
+    // /api/contact serves the homepage's own form — same-origin, no redirect.
+    if (pathname === '/privacy' || pathname === '/api/contact') {
       return NextResponse.next()
     }
     // Any product link shared before the split (logins, embeds, forms, API)

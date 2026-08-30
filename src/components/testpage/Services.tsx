@@ -161,7 +161,7 @@ export default function Services() {
                   transition={{ duration: 0.5 }}
                 >
                   {/* Number */}
-                  <span className="text-6xl font-light text-white/20 block mb-4">
+                  <span className="text-3xl lg:text-4xl font-light text-white/20 block mb-4">
                     {service.number}
                   </span>
 

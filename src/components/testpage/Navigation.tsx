@@ -74,7 +74,7 @@ export default function Navigation() {
               Sign in
             </a>
             <a href="#contact" className="btn-primary text-sm">
-              Get Started
+              Start a Project
               <ChevronRight className="w-4 h-4" />
             </a>
           </div>
@@ -121,7 +121,7 @@ export default function Navigation() {
                 className="mt-6"
               >
                 <a href="#contact" className="btn-primary w-full justify-center text-lg">
-                  Get Started
+                  Start a Project
                 </a>
               </motion.div>
             </div>

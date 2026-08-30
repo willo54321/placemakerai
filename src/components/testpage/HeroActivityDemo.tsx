@@ -25,12 +25,13 @@ const TEMPLATE = 'I object to the proposed development. Local roads and services
 
 const ITEMS: FeedItem[] = [
   { id: 1, kind: 'pin', title: 'Map comment from Sarah T.', detail: 'Love the new green link to the riverside path — please keep it lit in winter.' },
-  { id: 2, kind: 'form', title: 'Form response', detail: 'Public Consultation Survey — the junction needs a safe crossing for school children.' },
+  { id: 2, kind: 'form', title: 'Form response from Tom W.', detail: 'The four-storey block would overshadow every garden on Elm Grove. Too tall for this street.' },
   { id: 3, kind: 'enquiry', title: 'Enquiry from David M.', detail: 'Will the community hall stay open during the construction phase?' },
-  { id: 4, kind: 'pin', title: 'Map comment from Priya K.', detail: 'Parking on Weald Road is already impossible on match days.' },
-  { id: 5, kind: 'form', title: 'Form response from Alan B.', detail: TEMPLATE, duplicate: true },
-  { id: 6, kind: 'form', title: 'Form response from Janet R.', detail: TEMPLATE, duplicate: true },
-  { id: 7, kind: 'form', title: 'Form response from Chris P.', detail: TEMPLATE, duplicate: true },
+  { id: 4, kind: 'form', title: 'Form response from Grace O.', detail: 'More family homes are badly needed here — good to see a brownfield site being used.' },
+  { id: 5, kind: 'pin', title: 'Map comment from Priya K.', detail: 'Parking on Weald Road is already impossible on match days — where will visitors go?' },
+  { id: 6, kind: 'form', title: 'Form response from Alan B.', detail: TEMPLATE, duplicate: true },
+  { id: 7, kind: 'form', title: 'Form response from Janet R.', detail: TEMPLATE, duplicate: true },
+  { id: 8, kind: 'form', title: 'Form response from Chris P.', detail: TEMPLATE, duplicate: true },
 ]
 
 const ICON = {
@@ -67,16 +68,16 @@ export default function HeroActivityDemo() {
       setVisible([])
       setAlertOn(false)
 
-      // Ordinary responses arrive at a human pace…
-      const arrival = [700, 2300, 3900, 5400, 7000, 7600, 8200]
+      // Ordinary responses arrive at an unhurried pace…
+      const arrival = [900, 4200, 7500, 10800, 14100, 17000, 17900, 18800]
       ITEMS.forEach((item, index) => {
         at(arrival[index], () =>
           setVisible(current => [item, ...current].slice(0, 5))
         )
       })
-      // …the burst of copies trips the detector.
-      at(9300, () => setAlertOn(true))
-      at(15000, run)
+      // …then the burst of copies trips the detector.
+      at(20200, () => setAlertOn(true))
+      at(27500, run)
     }
 
     const observer = new IntersectionObserver(

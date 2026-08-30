@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, ArrowRight, Check } from 'lucide-react';
 import MapPinDemo from './MapPinDemo';
 import ModerationDemo from './ModerationDemo';
+import AnalysisDemo from './AnalysisDemo';
 import {
   MiniShapesDemo,
   MiniVotingDemo,
@@ -12,6 +13,9 @@ import {
   MiniApiDemo,
   MiniComplianceDemo,
   MiniResponsesDemo,
+  MiniSentimentDemo,
+  MiniThemesDemo,
+  MiniMaterialDemo,
 } from './MiniFeatureDemos';
 
 const MINI_DEMOS: Record<string, () => JSX.Element> = {
@@ -21,6 +25,9 @@ const MINI_DEMOS: Record<string, () => JSX.Element> = {
   'API Integration': MiniApiDemo,
   'Built-In Compliance': MiniComplianceDemo,
   'Smart Responses': MiniResponsesDemo,
+  'Sentiment Analysis': MiniSentimentDemo,
+  'Theme Extraction': MiniThemesDemo,
+  'Material Considerations': MiniMaterialDemo,
 };
 import FeedbackFlowDemo from './FeedbackFlowDemo';
 import FormBuilderDemo from './FormBuilderDemo';
@@ -80,6 +87,23 @@ const services = [
     subtitle: 'From raw feedback to executive summaries',
     description: 'Automated sentiment analysis, theme extraction, and material vs non-material consideration classification.',
     secondaryDescription: 'Generates executive summaries and recommendations from raw feedback, saving hours of manual review while ensuring nothing is missed.',
+    modal: {
+      headline: 'From raw feedback to executive summaries',
+      intro:
+        'Automated sentiment analysis, theme extraction, and material vs non-material consideration classification. placemaker.ai generates executive summaries from raw feedback, saving hours of manual review while ensuring nothing is missed.',
+      bullets: [
+        'Every response classified for stance — support, objection and mixed positions counted, not estimated',
+        'Themes extracted and quantified across map comments, form responses and enquiries in one pass',
+        'Material planning considerations separated from non-material automatically',
+        'Executive summaries written from the evidence — hours of manual review done in minutes',
+      ],
+      footnote: 'One analysis across every channel — map pins, form responses and public enquiries.',
+      featureCards: [
+        { name: 'Sentiment Analysis', detail: 'Each response is classified as support, objection, mixed or neutral — so headline figures are counts of real responses, not estimates.' },
+        { name: 'Theme Extraction', detail: 'Recurring topics are identified and quantified, showing exactly how many responses raise traffic, housing, green space and more.' },
+        { name: 'Material Considerations', detail: 'Feedback is separated into material and non-material planning considerations, ready for officer reports and committee.' },
+      ],
+    },
   },
   {
     number: '04',
@@ -199,8 +223,8 @@ export default function Services() {
                   ) : service.number === '04' ? (
                     <FeedbackFlowDemo />
                   ) : (
-                    <div className="relative aspect-[4/3] w-full rounded-lg overflow-hidden bg-white/10 flex items-center justify-center border border-white/10">
-                      <span className="text-white/30 text-sm">{service.title} screenshot</span>
+                    <div className="w-full rounded-lg overflow-hidden border border-white/10">
+                      <AnalysisDemo />
                     </div>
                   )}
                 </motion.div>
@@ -284,7 +308,13 @@ export default function Services() {
                   }}
                 >
                   <div className="max-w-2xl mx-auto -mb-2 sm:-mb-3 rounded-t-xl overflow-hidden shadow-2xl border border-slate-200/70 border-b-0">
-                    {open.number === '01' ? <ModerationDemo /> : <FormBuilderDemo />}
+                    {open.number === '01' ? (
+                      <ModerationDemo />
+                    ) : open.number === '02' ? (
+                      <FormBuilderDemo />
+                    ) : (
+                      <AnalysisDemo />
+                    )}
                   </div>
                 </div>
 

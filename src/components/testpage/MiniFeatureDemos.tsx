@@ -626,3 +626,209 @@ export function MiniResponsesDemo() {
     </div>
   )
 }
+
+/* ------------------------------------------------------------------ */
+/* 03 — Sentiment Analysis                                             */
+/* ------------------------------------------------------------------ */
+
+const STANCE_ITEMS = [
+  {
+    text: 'The four-storey block would overshadow every garden on Elm Grove.',
+    chip: 'Object',
+    color: '#DC2626',
+    bg: '#FEF2F2',
+    border: '#FECACA',
+  },
+  {
+    text: 'More family homes are badly needed — good to see a brownfield site used.',
+    chip: 'Support',
+    color: '#16A34A',
+    bg: '#F0FDF4',
+    border: '#BBF7D0',
+  },
+]
+
+export function MiniSentimentDemo() {
+  // 1 first classified · 2 second appears · 3 second classified
+  const phase = useLoop(
+    [
+      { at: 1200, phase: 1 },
+      { at: 2600, phase: 2 },
+      { at: 3800, phase: 3 },
+    ],
+    8400,
+    3
+  )
+
+  return (
+    <div className="relative w-full h-full flex flex-col items-center justify-center gap-2 px-5 select-none" aria-label="Demo: each response classified as support or objection — counted, not estimated">
+      {STANCE_ITEMS.map((item, index) => {
+        const visible = index === 0 || phase >= 2
+        const classified = index === 0 ? phase >= 1 : phase >= 3
+        return (
+          <div
+            key={item.chip}
+            className="w-full max-w-[240px] bg-white rounded-xl shadow-md border p-2.5"
+            style={{
+              borderColor: classified ? item.border : '#F1F5F9',
+              opacity: visible ? 1 : 0,
+              transform: visible ? 'translateY(0)' : 'translateY(8px)',
+              transition: `opacity 0.5s ${EASE}, transform 0.5s ${EASE}, border-color 0.4s ${EASE}`,
+            }}
+          >
+            <p className="text-[9.5px] text-slate-700 leading-snug mb-1.5">{item.text}</p>
+            <span
+              className="inline-flex items-center gap-1 text-[8.5px] font-semibold px-1.5 py-0.5 rounded-full"
+              style={{
+                color: item.color,
+                backgroundColor: item.bg,
+                opacity: classified ? 1 : 0,
+                transform: classified ? 'scale(1)' : 'scale(0.85)',
+                transition: `opacity 0.4s ${EASE}, transform 0.4s ${EASE}`,
+              }}
+            >
+              <CheckCircle size={8} /> {item.chip}
+            </span>
+          </div>
+        )
+      })}
+      <p
+        className="text-[8.5px] text-slate-400"
+        style={{ opacity: phase >= 3 ? 1 : 0, transition: `opacity 0.5s ${EASE}`, fontVariantNumeric: 'tabular-nums' }}
+      >
+        21 object · 18 support — every response counted
+      </p>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* 03 — Theme Extraction                                               */
+/* ------------------------------------------------------------------ */
+
+export function MiniThemesDemo() {
+  // 1 highlight phrases · 2 themes extracted
+  const phase = useLoop(
+    [
+      { at: 1100, phase: 1 },
+      { at: 2700, phase: 2 },
+    ],
+    8000,
+    2
+  )
+  const mark = (on: boolean, color: string) => ({
+    backgroundColor: on ? color : 'transparent',
+    borderRadius: 3,
+    padding: '0 1px',
+    transition: `background-color 0.6s ${EASE}`,
+  })
+
+  return (
+    <div className="relative w-full h-full flex flex-col items-center justify-center gap-2.5 px-5 select-none" aria-label="Demo: themes identified in a comment and quantified across all responses">
+      <div className="w-full max-w-[240px] bg-white rounded-xl shadow-md border border-slate-100 p-3">
+        <p className="text-[10px] text-slate-700 leading-relaxed">
+          <span style={mark(phase >= 1, '#FEF3C7')}>Parking on Weald Road</span> is already impossible on
+          match days, and the <span style={mark(phase >= 1, '#DCFCE7')}>new junction</span> will make the
+          school run slower for everyone.
+        </p>
+      </div>
+
+      <div
+        className="w-full max-w-[240px] space-y-1"
+        style={{
+          opacity: phase >= 2 ? 1 : 0,
+          transform: phase >= 2 ? 'translateY(0)' : 'translateY(6px)',
+          transition: `opacity 0.5s ${EASE}, transform 0.5s ${EASE}`,
+        }}
+      >
+        {[
+          { label: 'Traffic & parking', count: 21, width: '100%' },
+          { label: 'Road safety', count: 9, width: '43%' },
+        ].map(theme => (
+          <div key={theme.label} className="flex items-center gap-2">
+            <span className="text-[8.5px] text-slate-600 w-[74px] shrink-0 truncate">{theme.label}</span>
+            <span className="flex-1 h-1.5 bg-slate-200/70 rounded-full overflow-hidden">
+              <span
+                className="block h-full rounded-full bg-[#16A34A]/70"
+                style={{ width: phase >= 2 ? theme.width : '0%', transition: `width 1s ${EASE}` }}
+              />
+            </span>
+            <span className="text-[8.5px] font-semibold text-slate-700 w-4 text-right" style={{ fontVariantNumeric: 'tabular-nums' }}>
+              {theme.count}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* 03 — Material Considerations                                        */
+/* ------------------------------------------------------------------ */
+
+const MATERIAL_ITEMS = [
+  {
+    text: 'Overshadowing and loss of daylight to Elm Grove gardens.',
+    chip: 'Material — residential amenity',
+    material: true,
+  },
+  {
+    text: 'The development will lower the value of my house.',
+    chip: 'Non-material',
+    material: false,
+  },
+]
+
+export function MiniMaterialDemo() {
+  // 1 first classified · 2 second appears · 3 second classified
+  const phase = useLoop(
+    [
+      { at: 1200, phase: 1 },
+      { at: 2600, phase: 2 },
+      { at: 3800, phase: 3 },
+    ],
+    8400,
+    3
+  )
+
+  return (
+    <div className="relative w-full h-full flex flex-col items-center justify-center gap-2 px-5 select-none" aria-label="Demo: feedback separated into material and non-material planning considerations">
+      {MATERIAL_ITEMS.map((item, index) => {
+        const visible = index === 0 || phase >= 2
+        const classified = index === 0 ? phase >= 1 : phase >= 3
+        return (
+          <div
+            key={item.chip}
+            className="w-full max-w-[240px] bg-white rounded-xl shadow-md border border-slate-100 p-2.5"
+            style={{
+              opacity: visible ? 1 : 0,
+              transform: visible ? 'translateY(0)' : 'translateY(8px)',
+              transition: `opacity 0.5s ${EASE}, transform 0.5s ${EASE}`,
+            }}
+          >
+            <p className="text-[9.5px] text-slate-700 leading-snug mb-1.5">{item.text}</p>
+            <span
+              className="inline-flex items-center gap-1 text-[8.5px] font-semibold px-1.5 py-0.5 rounded-full"
+              style={{
+                color: item.material ? '#1D4ED8' : '#64748B',
+                backgroundColor: item.material ? '#EFF6FF' : '#F1F5F9',
+                opacity: classified ? 1 : 0,
+                transform: classified ? 'scale(1)' : 'scale(0.85)',
+                transition: `opacity 0.4s ${EASE}, transform 0.4s ${EASE}`,
+              }}
+            >
+              {item.chip}
+            </span>
+          </div>
+        )
+      })}
+      <p
+        className="text-[8.5px] text-slate-400"
+        style={{ opacity: phase >= 3 ? 1 : 0, transition: `opacity 0.5s ${EASE}` }}
+      >
+        Ready for officer reports and committee
+      </p>
+    </div>
+  )
+}

@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db'
+import { logAudit } from '@/lib/audit'
 import { NextResponse } from 'next/server'
 import { getAuth } from '@/lib/auth'
 import bcrypt from 'bcryptjs'
@@ -107,6 +108,16 @@ export async function PATCH(
       data: updateData,
     })
 
+    await logAudit({
+      action: 'user.update',
+      targetType: 'User',
+      targetId: params.id,
+      detail: {
+        fields: Object.keys(updateData),
+        projectAccessReplaced: projectAccess !== undefined,
+      },
+    })
+
     // Update project access if provided
     if (projectAccess !== undefined) {
       // Delete existing project access
@@ -182,6 +193,12 @@ export async function DELETE(
 
     await prisma.user.delete({
       where: { id: params.id },
+    })
+
+    await logAudit({
+      action: 'user.delete',
+      targetType: 'User',
+      targetId: params.id,
     })
 
     return NextResponse.json({ success: true })

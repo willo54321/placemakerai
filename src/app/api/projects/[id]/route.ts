@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { getAuth } from '@/lib/auth'
 import { canAccessProject } from '@/lib/permissions'
+import { logAudit } from '@/lib/audit'
 
 export async function GET(
   request: Request,
@@ -110,6 +111,15 @@ export async function PATCH(
       where: { id: params.id },
       data: updateData,
     })
+
+    await logAudit({
+      projectId: params.id,
+      action: 'settings.update',
+      targetType: 'Project',
+      targetId: params.id,
+      detail: { fields: Object.keys(updateData) },
+    })
+
     return NextResponse.json(project)
   } catch (error) {
     console.error('Failed to update project:', error)
@@ -140,8 +150,15 @@ export async function DELETE(
       )
     }
 
-    await prisma.project.delete({
+    const deleted = await prisma.project.delete({
       where: { id: params.id },
+    })
+
+    await logAudit({
+      action: 'project.delete',
+      targetType: 'Project',
+      targetId: params.id,
+      detail: { name: deleted.name },
     })
     return NextResponse.json({ success: true })
   } catch (error) {

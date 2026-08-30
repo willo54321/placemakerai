@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuth } from '@/lib/auth'
+import { getCurrentUser } from '@/lib/permissions'
 
 // Use Node.js runtime because getServerSession (via getAuth) is not supported on edge
 export const runtime = 'nodejs'
@@ -11,6 +12,20 @@ export async function POST(request: Request) {
     const session = await getAuth()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Uploads land in shared blob storage, so read-only CLIENT members don't
+    // get to write there: require ADMIN on at least one project.
+    const user = await getCurrentUser()
+    const canUpload =
+      user &&
+      (user.systemRole === 'SUPER_ADMIN' ||
+        user.projectAccess.some(access => access.role === 'ADMIN'))
+    if (!canUpload) {
+      return NextResponse.json(
+        { error: 'Project admin access required to upload files' },
+        { status: 403 }
+      )
     }
 
     const formData = await request.formData()

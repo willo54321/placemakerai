@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db'
+import { logAudit } from '@/lib/audit'
 import { authorizeProject } from '@/lib/api-auth'
 import { NextResponse } from 'next/server'
 
@@ -39,5 +40,14 @@ export async function DELETE(
   await prisma.feedbackForm.delete({
     where: { id: params.formId },
   })
+
+  await logAudit({
+    projectId: params.id,
+    action: 'form.delete',
+    targetType: 'FeedbackForm',
+    targetId: params.formId,
+    detail: { name: form.name },
+  })
+
   return NextResponse.json({ success: true })
 }

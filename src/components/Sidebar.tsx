@@ -6,6 +6,8 @@ import {
   FolderOpen,
   MapPin,
   Users,
+  Inbox,
+  ScrollText,
   LucideIcon,
 } from 'lucide-react'
 import UserMenu from './UserMenu'
@@ -22,6 +24,8 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: 'Projects', href: '/projects', icon: FolderOpen },
   { label: 'Users', href: '/admin/users', icon: Users, adminOnly: true },
+  { label: 'Messages', href: '/admin/messages', icon: Inbox, adminOnly: true },
+  { label: 'Audit & usage', href: '/admin/audit', icon: ScrollText, adminOnly: true },
 ]
 
 export function Sidebar() {

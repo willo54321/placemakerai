@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db'
+import { logAudit } from '@/lib/audit'
 import { authorizeProject } from '@/lib/api-auth'
 import { NextResponse } from 'next/server'
 
@@ -10,12 +11,21 @@ export async function POST(
   if (denied) return denied
 
   const body = await request.json()
-  const form = await prisma.feedbackForm.create({
+  const created = await prisma.feedbackForm.create({
     data: {
       projectId: params.id,
       name: body.name,
       fields: body.fields,
     },
   })
-  return NextResponse.json(form)
+
+  await logAudit({
+    projectId: params.id,
+    action: 'form.create',
+    targetType: 'FeedbackForm',
+    targetId: created.id,
+    detail: { name: created.name },
+  })
+
+  return NextResponse.json(created)
 }

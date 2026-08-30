@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { getAuth } from '@/lib/auth'
 import { Prisma } from '@prisma/client'
+import { logAudit } from '@/lib/audit'
 
 // GDPR data-subject request tooling (super admin only).
 // GET  ?email=  -> find everything held for that email address (the response
@@ -159,6 +160,16 @@ export async function DELETE(request: Request) {
     console.log(
       `GDPR erasure for ${email}: ${pins.count} pins, ${enquiries.count} enquiries, ${formResponses.count} form responses, ${accounts.count} accounts${skippedAccounts ? ` (${skippedAccounts} super-admin account skipped)` : ''}`
     )
+    await logAudit({
+      action: 'gdpr.erase',
+      detail: {
+        // The point of erasure is that the data is gone — record scale, not the identity.
+        pins: pins.count,
+        enquiries: enquiries.count,
+        formResponses: formResponses.count,
+        accounts: accounts.count,
+      },
+    })
     return NextResponse.json({
       email,
       deleted: {

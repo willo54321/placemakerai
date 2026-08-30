@@ -12,6 +12,7 @@ import {
   PendingAnalysis,
 } from '@/lib/ai'
 import { collectFeedback, getBoundaryGeojson } from '@/lib/collect-feedback'
+import { logAudit } from '@/lib/audit'
 
 // Analysis runs through the Batch API: POST submits the run (one taxonomy call
 // plus the batch submission, well under a minute), and GET finalizes it once
@@ -279,9 +280,33 @@ export async function POST(
       })
     }
 
+    // Cost guard: every run pays for real model calls, so cap runs per
+    // project per day. The audit log doubles as the usage meter.
+    const RUNS_PER_DAY = 10
+    const runsToday = await prisma.auditLog.count({
+      where: {
+        projectId,
+        action: 'analysis.run',
+        createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+      },
+    })
+    if (runsToday >= RUNS_PER_DAY) {
+      return NextResponse.json(
+        { error: `Daily analysis limit reached (${RUNS_PER_DAY} runs in 24h). Try again tomorrow.` },
+        { status: 429 }
+      )
+    }
+
     // Submit the run: taxonomy call + batch submission. The previous result
     // stays in `data` so the UI can keep showing it while the new run cooks.
     const pending = await startFullAnalysis(feedbackItems)
+
+    await logAudit({
+      projectId,
+      action: 'analysis.run',
+      targetType: 'AnalysisResult',
+      detail: { itemCount: feedbackItems.length, forced: force },
+    })
 
     await prisma.analysisResult.upsert({
       where: {

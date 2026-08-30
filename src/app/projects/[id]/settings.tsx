@@ -181,6 +181,31 @@ export function SettingsTab({ projectId, project }: SettingsTabProps) {
         </dl>
       </section>
 
+      {/* Data export */}
+      <section className="card p-6">
+        <h3 className="text-lg font-semibold text-slate-900 mb-1">Data Export</h3>
+        <p className="text-sm text-slate-500 mb-4">
+          Download everything this project holds — for reporting, audits, or subject access requests.
+          Exports are recorded in the audit log.
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <a
+            href={`/api/projects/${projectId}/export?format=json`}
+            className="btn-secondary text-sm"
+            download
+          >
+            Full export (JSON)
+          </a>
+          <a
+            href={`/api/projects/${projectId}/export?format=csv`}
+            className="btn-secondary text-sm"
+            download
+          >
+            Feedback spreadsheet (CSV)
+          </a>
+        </div>
+      </section>
+
       {/* Danger Zone */}
       {canDeleteProject && (
         <section className="card p-6 border-red-200 bg-red-50">

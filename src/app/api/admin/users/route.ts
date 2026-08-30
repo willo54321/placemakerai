@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db'
+import { logAudit } from '@/lib/audit'
 import { NextResponse } from 'next/server'
 import { getAuth } from '@/lib/auth'
 import { sendSetPasswordEmail } from '@/lib/email'
@@ -140,6 +141,13 @@ export async function POST(request: Request) {
     }
 
     const { password: _pw, passwordResetToken: _prt, ...safeUser } = user
+    await logAudit({
+      action: 'user.create',
+      targetType: 'User',
+      targetId: user.id,
+      detail: { email: user.email, systemRole: user.systemRole },
+    })
+
     return NextResponse.json({ ...safeUser, inviteEmailSent })
   } catch (error) {
     console.error('Failed to create user:', error)

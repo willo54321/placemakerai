@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
+import { rateLimitResponse } from '@/lib/rate-limit'
 
 // Public endpoint for the marketing homepage's Start a Project form. There is
 // no email delivery configured, so the row itself is the lead — super admins
@@ -9,6 +10,9 @@ const MAX_SHORT = 200
 const MAX_MESSAGE = 5000
 
 export async function POST(request: Request) {
+  const limited = rateLimitResponse(request, 'contact', 5, 60_000)
+  if (limited) return limited
+
   let body: {
     name?: string
     email?: string

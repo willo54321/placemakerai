@@ -372,3 +372,20 @@ model ContactMessage {
   message      String
   createdAt    DateTime @default(now())
 }
+
+// Append-only audit trail: who did what, where. Written fire-and-forget at
+// mutation points; never updated or deleted from application code.
+model AuditLog {
+  id         String   @id @default(cuid())
+  projectId  String? // Null for system-level actions (user admin etc.)
+  userId     String?
+  userEmail  String? // Denormalised so entries survive user deletion
+  action     String // e.g. "pin.approve", "analysis.run", "settings.update"
+  targetType String? // e.g. "PublicPin", "FeedbackForm"
+  targetId   String?
+  detail     Json? // Small, human-readable context (counts, names, old/new)
+  createdAt  DateTime @default(now())
+
+  @@index([projectId, createdAt])
+  @@index([action, createdAt])
+}

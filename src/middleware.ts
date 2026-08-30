@@ -29,7 +29,9 @@ export async function middleware(req: NextRequest) {
     if (pathname === '/' || pathname === '/holding') {
       return NextResponse.rewrite(new URL('/holding', req.url))
     }
-    if (pathname === '/privacy') {
+    // /testpage: work-in-progress homepage builds, viewable without touching
+    // the holding page.
+    if (pathname === '/privacy' || pathname === '/testpage') {
       return NextResponse.next()
     }
     // Any product link shared before the split (logins, embeds, forms, API)

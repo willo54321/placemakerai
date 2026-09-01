@@ -95,6 +95,9 @@ export async function PATCH(
 
     if (body.name !== undefined) updateData.name = body.name
     if (body.description !== undefined) updateData.description = body.description
+    if (body.status !== undefined && ['LIVE', 'CLOSED', 'ARCHIVED'].includes(body.status)) {
+      updateData.status = body.status
+    }
     if (body.latitude !== undefined) updateData.latitude = body.latitude
     if (body.longitude !== undefined) updateData.longitude = body.longitude
     if (body.mapZoom !== undefined) updateData.mapZoom = body.mapZoom

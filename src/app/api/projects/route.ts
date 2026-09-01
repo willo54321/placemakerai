@@ -47,6 +47,7 @@ export async function GET() {
       id: string
       name: string
       description: string | null
+      status: 'LIVE' | 'CLOSED' | 'ARCHIVED'
       latitude: number | null
       longitude: number | null
       mapZoom: number | null
@@ -93,6 +94,7 @@ export async function GET() {
         id: p.id,
         name: p.name,
         description: p.description,
+        status: p.status,
         latitude: p.latitude,
         longitude: p.longitude,
         embedEnabled: p.embedEnabled,

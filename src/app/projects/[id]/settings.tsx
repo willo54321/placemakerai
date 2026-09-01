@@ -11,6 +11,7 @@ interface Project {
   id: string
   name: string
   description: string | null
+  status?: 'LIVE' | 'CLOSED' | 'ARCHIVED'
   latitude: number | null
   longitude: number | null
   mapZoom: number | null
@@ -35,11 +36,12 @@ export function SettingsTab({ projectId, project }: SettingsTabProps) {
 
   const [name, setName] = useState(project.name)
   const [description, setDescription] = useState(project.description || '')
+  const [status, setStatus] = useState(project.status || 'LIVE')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
 
   const updateProject = useMutation({
-    mutationFn: (data: { name: string; description: string }) =>
+    mutationFn: (data: { name: string; description: string; status: string }) =>
       fetch(`/api/projects/${projectId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -74,6 +76,7 @@ export function SettingsTab({ projectId, project }: SettingsTabProps) {
     updateProject.mutate({
       name: name.trim(),
       description: description.trim(),
+      status,
     })
   }
 
@@ -84,7 +87,8 @@ export function SettingsTab({ projectId, project }: SettingsTabProps) {
   }
 
   const hasChanges = name !== project.name ||
-    description !== (project.description || '')
+    description !== (project.description || '') ||
+    status !== (project.status || 'LIVE')
 
   return (
     <div className="space-y-8">
@@ -122,6 +126,27 @@ export function SettingsTab({ projectId, project }: SettingsTabProps) {
               disabled={!canEdit}
               rows={3}
             />
+          </div>
+
+          <div>
+            <label htmlFor="project-status" className="label">
+              Status
+            </label>
+            <select
+              id="project-status"
+              value={status}
+              onChange={(e) => setStatus(e.target.value as 'LIVE' | 'CLOSED' | 'ARCHIVED')}
+              className="input w-full"
+              disabled={!canEdit}
+            >
+              <option value="LIVE">Live — consultation open, accepting feedback</option>
+              <option value="CLOSED">Closed — consultation ended, still analysing</option>
+              <option value="ARCHIVED">Archived — filed away</option>
+            </select>
+            <p className="text-xs text-slate-500 mt-1">
+              Shown as the status pill on the projects list. Doesn&apos;t affect whether the embed is live —
+              control that in Website settings.
+            </p>
           </div>
 
           {canEdit && (

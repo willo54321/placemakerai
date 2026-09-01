@@ -14,6 +14,7 @@ interface Project {
   id: string
   name: string
   description: string | null
+  status: 'LIVE' | 'CLOSED' | 'ARCHIVED'
   latitude: number | null
   longitude: number | null
   embedEnabled: boolean
@@ -37,6 +38,12 @@ function relativeTime(iso: string): string {
   const days = Math.round(hours / 24)
   if (days < 30) return `${days}d ago`
   return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+}
+
+const STATUS_STYLES: Record<Project['status'], { label: string; dot: string; text: string }> = {
+  LIVE: { label: 'Live', dot: 'bg-emerald-500', text: 'text-emerald-700' },
+  CLOSED: { label: 'Closed', dot: 'bg-amber-500', text: 'text-amber-700' },
+  ARCHIVED: { label: 'Archived', dot: 'bg-slate-400', text: 'text-slate-500' },
 }
 
 export default function ProjectsPage() {
@@ -184,16 +191,12 @@ export default function ProjectsPage() {
                       longitude={project.longitude}
                       className="w-full h-28 object-cover"
                     />
-                    {/* Status pill */}
+                    {/* Status pill — consultation lifecycle */}
                     <span
-                      className={`absolute top-3 left-3 inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full shadow-sm ${
-                        project.embedEnabled
-                          ? 'bg-white text-emerald-700'
-                          : 'bg-white text-slate-500'
-                      }`}
+                      className={`absolute top-3 left-3 inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full shadow-sm bg-white ${STATUS_STYLES[project.status].text}`}
                     >
-                      <span className={`w-1.5 h-1.5 rounded-full ${project.embedEnabled ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-                      {project.embedEnabled ? 'Embed live' : 'Draft'}
+                      <span className={`w-1.5 h-1.5 rounded-full ${STATUS_STYLES[project.status].dot}`} />
+                      {STATUS_STYLES[project.status].label}
                     </span>
 
                     {canDeleteProject && (

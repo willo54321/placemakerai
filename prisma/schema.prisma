@@ -215,6 +215,8 @@ model Project {
   id                    String           @id @default(cuid())
   name                  String
   description           String?
+  // Consultation lifecycle, shown as the project card's status pill.
+  status                ProjectStatus    @default(LIVE)
   latitude              Float?
   longitude             Float?
   createdAt             DateTime         @default(now())
@@ -289,6 +291,12 @@ model Session {
 enum SystemRole {
   SUPER_ADMIN
   USER
+}
+
+enum ProjectStatus {
+  LIVE // Consultation open, accepting feedback
+  CLOSED // Consultation period ended; still analysing/reporting
+  ARCHIVED // Filed away
 }
 
 enum ProjectRole {

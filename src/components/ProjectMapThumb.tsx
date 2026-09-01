@@ -1,13 +1,14 @@
+'use client'
+
+import { useState } from 'react'
+
 /**
- * A stylised map thumbnail for a project card — a deterministic, brand-coloured
- * motif (streets, a site boundary, a cluster of pins) seeded by the project id,
- * so every project looks like a distinct place without any external map tiles.
- *
- * A real Google Static Maps image would show the actual site, but needs the
- * Static Maps API enabled on the key and burns map quota per card load; this
- * motif is free, always on-brand, and never renders a broken tile. The seed
- * blends in the project's coordinates when it has them, so a given site keeps
- * a stable look.
+ * A map thumbnail for a project card. When the project has coordinates and a
+ * Google Maps key is configured, it shows a real Static Maps image of the site;
+ * if that fails to load (API not enabled, referrer blocked, no coords) it falls
+ * back to a stylised, brand-coloured map motif seeded by the project id — so a
+ * card never renders a broken tile. The motif also shows underneath while the
+ * real image loads, avoiding a blank flash.
  */
 
 function hashSeed(input: string): number {
@@ -34,20 +35,35 @@ function rng(seed: number) {
 const W = 300
 const H = 120
 
-export function ProjectMapThumb({
-  seed,
-  latitude,
-  longitude,
-  className,
-}: {
-  seed: string
-  latitude?: number | null
-  longitude?: number | null
-  className?: string
-}) {
+const GOOGLE_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+
+// Light styling: drop POI/transit clutter and desaturate a touch so a real map
+// sits comfortably next to the brand-green UI.
+const MAP_STYLE = [
+  'feature:poi|visibility:off',
+  'feature:transit|visibility:off',
+  'feature:road|element:labels|visibility:simplified',
+  'saturation:-30',
+]
+
+function staticMapUrl(lat: number, lng: number): string | null {
+  if (!GOOGLE_KEY) return null
+  const params = new URLSearchParams({
+    center: `${lat},${lng}`,
+    zoom: '14',
+    size: `${W}x${H}`,
+    scale: '2',
+    maptype: 'roadmap',
+    markers: `color:0x16A34A|${lat},${lng}`,
+    key: GOOGLE_KEY,
+  })
+  const style = MAP_STYLE.map((s) => `style=${encodeURIComponent(s)}`).join('&')
+  return `https://maps.googleapis.com/maps/api/staticmap?${params.toString()}&${style}`
+}
+
+function Motif({ seed, latitude, longitude }: { seed: string; latitude?: number | null; longitude?: number | null }) {
   const rand = rng(hashSeed(`${seed}:${latitude ?? ''}:${longitude ?? ''}`))
 
-  // A few roads: mostly-horizontal and mostly-vertical sweeps with slight drift.
   const roads: string[] = []
   const hCount = 2 + Math.floor(rand() * 2)
   const vCount = 2 + Math.floor(rand() * 2)
@@ -62,7 +78,6 @@ export function ProjectMapThumb({
     roads.push(`M ${x.toFixed(1)} -10 C ${(x + drift).toFixed(1)} ${H * 0.35}, ${(x - drift).toFixed(1)} ${H * 0.65}, ${x.toFixed(1)} ${H + 10}`)
   }
 
-  // A translucent site-boundary blob, roughly central.
   const bx = W * (0.42 + rand() * 0.16)
   const by = H * (0.42 + rand() * 0.16)
   const br = 22 + rand() * 10
@@ -72,7 +87,6 @@ export function ProjectMapThumb({
     return `${(bx + Math.cos(ang) * r).toFixed(1)},${(by + Math.sin(ang) * r * 0.7).toFixed(1)}`
   }).join(' ')
 
-  // A cluster of pins around the boundary.
   const pinCount = 3 + Math.floor(rand() * 3)
   const pins = Array.from({ length: pinCount }, () => ({
     x: bx + (rand() - 0.5) * br * 2.4,
@@ -80,13 +94,7 @@ export function ProjectMapThumb({
   }))
 
   return (
-    <svg
-      viewBox={`0 0 ${W} ${H}`}
-      className={className}
-      preserveAspectRatio="xMidYMid slice"
-      role="img"
-      aria-label="Stylised project location map"
-    >
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Stylised project location map">
       <defs>
         <linearGradient id={`mapbg-${seed}`} x1="0" y1="0" x2="1" y2="1">
           <stop offset="0" stopColor="#ECFDF5" />
@@ -94,13 +102,8 @@ export function ProjectMapThumb({
           <stop offset="1" stopColor="#DCFCE7" />
         </linearGradient>
       </defs>
-
       <rect width={W} height={H} fill={`url(#mapbg-${seed})`} />
-
-      {/* park / green patch */}
       <ellipse cx={W * 0.16} cy={H * 0.28} rx={34} ry={22} fill="#BBF7D0" opacity="0.6" />
-
-      {/* roads: grey casing then white surface */}
       <g fill="none" strokeLinecap="round">
         {roads.map((d, i) => (
           <path key={`c${i}`} d={d} stroke="#D1D5DB" strokeWidth="7" opacity="0.7" />
@@ -109,18 +112,7 @@ export function ProjectMapThumb({
           <path key={`s${i}`} d={d} stroke="#FFFFFF" strokeWidth="4.5" />
         ))}
       </g>
-
-      {/* site boundary */}
-      <polygon
-        points={boundary}
-        fill="rgba(22,163,74,0.14)"
-        stroke="#16A34A"
-        strokeWidth="1.5"
-        strokeDasharray="4 3"
-        strokeLinejoin="round"
-      />
-
-      {/* pins */}
+      <polygon points={boundary} fill="rgba(22,163,74,0.14)" stroke="#16A34A" strokeWidth="1.5" strokeDasharray="4 3" strokeLinejoin="round" />
       {pins.map((p, i) => (
         <g key={i} transform={`translate(${p.x.toFixed(1)} ${p.y.toFixed(1)})`}>
           <ellipse cx="0" cy="1.5" rx="4" ry="1.6" fill="rgba(0,0,0,0.12)" />
@@ -129,5 +121,40 @@ export function ProjectMapThumb({
         </g>
       ))}
     </svg>
+  )
+}
+
+export function ProjectMapThumb({
+  seed,
+  latitude,
+  longitude,
+  className,
+}: {
+  seed: string
+  latitude?: number | null
+  longitude?: number | null
+  className?: string
+}) {
+  const [imageFailed, setImageFailed] = useState(false)
+  const url =
+    latitude != null && longitude != null && !imageFailed ? staticMapUrl(latitude, longitude) : null
+
+  return (
+    <div className={`relative overflow-hidden ${className ?? ''}`}>
+      {/* Motif is always the base layer — instant, and the fallback if the image fails. */}
+      <div className="absolute inset-0">
+        <Motif seed={seed} latitude={latitude} longitude={longitude} />
+      </div>
+      {url && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={url}
+          alt="Project location map"
+          className="absolute inset-0 w-full h-full object-cover"
+          loading="lazy"
+          onError={() => setImageFailed(true)}
+        />
+      )}
+    </div>
   )
 }

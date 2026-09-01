@@ -144,7 +144,7 @@ export default function Services() {
       {services.map((service, index) => (
         <div
           key={service.number}
-          className="lg:sticky lg:top-0 lg:min-h-screen flex items-center"
+          className="lg:sticky lg:top-0 lg:min-h-screen flex items-start"
           style={{
             zIndex: index + 1,
             backgroundColor: index % 2 === 0 ? '#0B2818' : '#1a0b45',

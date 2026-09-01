@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 
 export default function ValueProposition() {
   return (
-    <section className="pt-24 lg:pt-32 pb-16 lg:pb-20 relative bg-[#0B2818]">
+    <section className="pt-16 lg:pt-20 pb-0 relative bg-[#0B2818]">
       <div className="max-w-6xl mx-auto px-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}

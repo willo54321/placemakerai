@@ -160,11 +160,6 @@ export default function Services() {
                   viewport={{ once: true, margin: '-100px' }}
                   transition={{ duration: 0.5 }}
                 >
-                  {/* Number */}
-                  <span className="text-3xl lg:text-4xl font-light text-white/20 block mb-4">
-                    {service.number}
-                  </span>
-
                   {/* Title */}
                   <h2 className="text-3xl lg:text-4xl font-semibold text-white mb-3 leading-tight">
                     {service.title}

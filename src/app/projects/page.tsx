@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import ProjectOnboardingWizard from '@/components/ProjectOnboardingWizard'
 import { Sidebar } from '@/components/Sidebar'
+import InteractiveDots from '@/components/testpage/InteractiveDots'
 import { usePermissions } from '@/hooks/usePermissions'
 
 interface Project {
@@ -93,7 +94,10 @@ export default function ProjectsPage() {
       <Sidebar />
 
       {/* Main content area */}
-      <main id="main-content" className="flex-1 p-8 bg-slate-50">
+      <main id="main-content" className="flex-1 p-8 bg-[#F7F6F4] relative overflow-hidden">
+        {/* Same interactive dot background as the homepage and login */}
+        <InteractiveDots background="#F7F6F4" />
+        <div className="relative z-10">
           {/* Page header */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
             <div>
@@ -286,6 +290,7 @@ export default function ProjectsPage() {
               ))}
             </div>
           )}
+        </div>
       </main>
     </div>
   )

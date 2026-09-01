@@ -75,6 +75,12 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Invalid email or password')
         }
 
+        // Record the successful sign-in for the admin users list. Kept off the
+        // critical path — a failed stamp must never block a valid login.
+        await prisma.user
+          .update({ where: { id: user.id }, data: { lastLoginAt: new Date() } })
+          .catch(() => null)
+
         return {
           id: user.id,
           email: user.email,

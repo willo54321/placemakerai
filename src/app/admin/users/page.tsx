@@ -35,7 +35,21 @@ interface User {
   systemRole: 'SUPER_ADMIN' | 'USER'
   showTour: boolean
   createdAt: string
+  lastLoginAt: string | null
   projectAccess: ProjectAccess[]
+}
+
+/** Compact relative-time for the last-login column. */
+function relativeTime(iso: string): string {
+  const then = new Date(iso).getTime()
+  const mins = Math.round((Date.now() - then) / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.round(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.round(hours / 24)
+  if (days < 30) return `${days}d ago`
+  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 interface Project {
@@ -187,6 +201,15 @@ export default function UsersPage() {
                         </span>
                       </div>
                       <p className="text-sm text-slate-500">{user.email}</p>
+
+                      {/* Last login */}
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        {user.lastLoginAt ? (
+                          <>Last signed in {relativeTime(user.lastLoginAt)}</>
+                        ) : (
+                          <span className="text-amber-600">Never signed in</span>
+                        )}
+                      </p>
 
                       {/* Project access */}
                       {user.projectAccess.length > 0 && (

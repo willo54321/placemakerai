@@ -32,6 +32,7 @@ export async function GET() {
         systemRole: true,
         showTour: true,
         createdAt: true,
+        lastLoginAt: true,
         projectAccess: {
           include: {
             project: {

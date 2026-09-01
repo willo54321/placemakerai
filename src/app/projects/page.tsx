@@ -1,23 +1,42 @@
 'use client'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, MapPin, FileText, Trash2, FolderOpen } from 'lucide-react'
+import { Plus, Trash2, FolderOpen, Clock, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import ProjectOnboardingWizard from '@/components/ProjectOnboardingWizard'
 import { Sidebar } from '@/components/Sidebar'
+import { ProjectMapThumb } from '@/components/ProjectMapThumb'
 import { usePermissions } from '@/hooks/usePermissions'
 
 interface Project {
   id: string
   name: string
   description: string | null
-  _count: {
-    feedbackForms: number
-    mapMarkers: number
-    publicPins: number
+  latitude: number | null
+  longitude: number | null
+  embedEnabled: boolean
+  stats: {
+    mapComments: number
+    forms: number
+    responses: number
+    enquiries: number
   }
+  pendingPins: number
+  lastActivity: string | null
+}
+
+/** Compact relative time for the card activity line. */
+function relativeTime(iso: string): string {
+  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.round(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.round(hours / 24)
+  if (days < 30) return `${days}d ago`
+  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
 }
 
 export default function ProjectsPage() {
@@ -150,34 +169,46 @@ export default function ProjectsPage() {
             </div>
           ) : (
             /* Project grid */
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" role="list">
+            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3" role="list">
               {projects?.map(project => (
                 <article
                   key={project.id}
-                  className="card-hover p-6 group"
+                  className="group relative bg-white rounded-xl border border-slate-200 hover:border-slate-300 hover:shadow-md transition-all overflow-hidden flex flex-col"
                   role="listitem"
                 >
-                  <div className="flex justify-between items-start mb-3">
-                    <Link
-                      href={`/projects/${project.id}`}
-                      className="text-lg font-semibold text-slate-900 hover:text-brand-600 focus:text-brand-600 transition-colors"
+                  {/* Map thumbnail — a sense of place */}
+                  <Link href={`/projects/${project.id}`} className="block relative">
+                    <ProjectMapThumb
+                      seed={project.id}
+                      latitude={project.latitude}
+                      longitude={project.longitude}
+                      className="w-full h-28 object-cover"
+                    />
+                    {/* Status pill */}
+                    <span
+                      className={`absolute top-3 left-3 inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full shadow-sm ${
+                        project.embedEnabled
+                          ? 'bg-white text-emerald-700'
+                          : 'bg-white text-slate-500'
+                      }`}
                     >
-                      {project.name}
-                    </Link>
+                      <span className={`w-1.5 h-1.5 rounded-full ${project.embedEnabled ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                      {project.embedEnabled ? 'Embed live' : 'Draft'}
+                    </span>
 
                     {canDeleteProject && (
                       deleteConfirm === project.id ? (
-                        <div className="flex items-center gap-1">
+                        <div className="absolute top-3 right-3 flex items-center gap-1" onClick={(e) => e.preventDefault()}>
                           <button
                             onClick={() => deleteProject.mutate(project.id)}
-                            className="text-xs px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+                            className="text-xs px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition-colors shadow-sm"
                             aria-label={`Confirm delete ${project.name}`}
                           >
                             Delete
                           </button>
                           <button
                             onClick={() => setDeleteConfirm(null)}
-                            className="text-xs px-2 py-1 bg-slate-200 text-slate-700 rounded hover:bg-slate-300 transition-colors"
+                            className="text-xs px-2 py-1 bg-white text-slate-700 rounded hover:bg-slate-100 transition-colors shadow-sm"
                             aria-label="Cancel delete"
                           >
                             Cancel
@@ -185,33 +216,67 @@ export default function ProjectsPage() {
                         </div>
                       ) : (
                         <button
-                          onClick={() => setDeleteConfirm(project.id)}
-                          className="btn-icon opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+                          onClick={(e) => { e.preventDefault(); setDeleteConfirm(project.id) }}
+                          className="absolute top-3 right-3 p-1.5 bg-white/90 text-slate-500 hover:text-red-600 rounded-lg shadow-sm opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
                           aria-label={`Delete ${project.name}`}
                         >
-                          <Trash2 size={18} aria-hidden="true" />
+                          <Trash2 size={16} aria-hidden="true" />
                         </button>
                       )
                     )}
-                  </div>
+                  </Link>
 
-                  {project.description && (
-                    <p className="text-slate-600 text-sm mb-4 line-clamp-2">
-                      {project.description}
-                    </p>
-                  )}
+                  <div className="p-5 flex-1 flex flex-col">
+                    <Link
+                      href={`/projects/${project.id}`}
+                      className="text-lg font-semibold text-slate-900 hover:text-brand-600 focus:text-brand-600 transition-colors"
+                    >
+                      {project.name}
+                    </Link>
 
-                  <div className="flex gap-4 text-sm text-slate-500">
-                    <span className="flex items-center gap-1.5" title="Public map comments">
-                      <MapPin size={16} aria-hidden="true" />
-                      <span>{project._count.publicPins ?? 0}</span>
-                      <span className="sr-only">public map comments</span>
-                    </span>
-                    <span className="flex items-center gap-1.5" title="Feedback forms">
-                      <FileText size={16} aria-hidden="true" />
-                      <span>{project._count.feedbackForms}</span>
-                      <span className="sr-only">feedback forms</span>
-                    </span>
+                    {project.description && (
+                      <p className="text-slate-500 text-sm mt-1 mb-4 line-clamp-2">
+                        {project.description}
+                      </p>
+                    )}
+
+                    {/* Stat row — brag about the engagement */}
+                    <div className="grid grid-cols-4 gap-2 mt-auto pt-4 border-t border-slate-100">
+                      {[
+                        { value: project.stats.mapComments, label: 'Map' },
+                        { value: project.stats.responses, label: 'Responses' },
+                        { value: project.stats.forms, label: 'Forms' },
+                        { value: project.stats.enquiries, label: 'Enquiries' },
+                      ].map((stat) => (
+                        <div key={stat.label}>
+                          <p className="text-xl font-semibold text-slate-900 leading-none" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                            {stat.value}
+                          </p>
+                          <p className="text-[11px] text-slate-400 mt-1">{stat.label}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Footer: moderation nudge + last activity */}
+                    <div className="flex items-center justify-between mt-4 text-xs">
+                      {project.pendingPins > 0 ? (
+                        <Link
+                          href={`/projects/${project.id}`}
+                          className="inline-flex items-center gap-1.5 font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 px-2 py-1 rounded-full transition-colors"
+                        >
+                          <AlertTriangle size={12} />
+                          {project.pendingPins} pending to review
+                        </Link>
+                      ) : (
+                        <span className="text-slate-400">Up to date</span>
+                      )}
+                      {project.lastActivity && (
+                        <span className="inline-flex items-center gap-1 text-slate-400">
+                          <Clock size={12} />
+                          {relativeTime(project.lastActivity)}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </article>
               ))}

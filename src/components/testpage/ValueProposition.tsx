@@ -16,7 +16,7 @@ export default function ValueProposition() {
           <h2 className="text-3xl lg:text-4xl xl:text-5xl font-semibold mb-6 tracking-tight leading-tight text-white">
             Our <span className="text-[#16A34A]">tools</span>
           </h2>
-          <p className="text-lg text-white/60 max-w-2xl leading-relaxed">
+          <p className="text-lg text-white max-w-2xl leading-relaxed">
             Interactive digital tools that help developers, councils, and energy companies run more inclusive and effective community engagement.
           </p>
         </motion.div>

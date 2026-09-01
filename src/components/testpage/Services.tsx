@@ -176,11 +176,11 @@ export default function Services() {
                   </p>
 
                   {/* Description */}
-                  <p className="text-sm text-white/70 leading-relaxed mb-4">
+                  <p className="text-sm text-white leading-relaxed mb-4">
                     {service.description}
                   </p>
                   {service.secondaryDescription && (
-                    <p className="text-sm text-white/50 leading-relaxed mb-4">
+                    <p className="text-sm text-white/80 leading-relaxed mb-4">
                       {service.secondaryDescription}
                     </p>
                   )}

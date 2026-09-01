@@ -102,6 +102,18 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id
         token.systemRole = user.systemRole || 'USER'
       }
+      // Throttled "last active": stamp at most once per 5 min per user, off the
+      // critical path. The jwt callback runs whenever the session token is read
+      // (page loads and client session polls), so this tracks genuine ongoing
+      // use rather than only the last full sign-in.
+      const now = Date.now()
+      const lastWrite = (token.lastActiveWrite as number | undefined) ?? 0
+      if (token.id && now - lastWrite > 5 * 60 * 1000) {
+        token.lastActiveWrite = now
+        prisma.user
+          .update({ where: { id: token.id as string }, data: { lastActiveAt: new Date() } })
+          .catch(() => null)
+      }
       return token
     },
     async session({ session, token }) {

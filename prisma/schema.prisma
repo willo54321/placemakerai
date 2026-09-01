@@ -309,6 +309,9 @@ model User {
   systemRole              SystemRole           @default(USER)
   // Stamped on each successful credentials sign-in; surfaced in /admin/users.
   lastLoginAt             DateTime?
+  // Stamped (throttled ~5 min) whenever the session is read — tracks ongoing
+  // use, which can be far more recent than the last full sign-in.
+  lastActiveAt            DateTime?
   // Show the dashboard product tour on next sign-in; user can opt out via
   // "don't show again", super admins can re-enable per user.
   showTour                Boolean              @default(true)

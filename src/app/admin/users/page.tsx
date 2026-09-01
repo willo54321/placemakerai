@@ -36,6 +36,7 @@ interface User {
   showTour: boolean
   createdAt: string
   lastLoginAt: string | null
+  lastActiveAt: string | null
   projectAccess: ProjectAccess[]
 }
 
@@ -202,9 +203,16 @@ export default function UsersPage() {
                       </div>
                       <p className="text-sm text-slate-500">{user.email}</p>
 
-                      {/* Last login */}
+                      {/* Activity */}
                       <p className="text-xs text-slate-400 mt-0.5">
-                        {user.lastLoginAt ? (
+                        {user.lastActiveAt ? (
+                          <>
+                            Active {relativeTime(user.lastActiveAt)}
+                            {user.lastLoginAt && (
+                              <span className="text-slate-300"> · signed in {relativeTime(user.lastLoginAt)}</span>
+                            )}
+                          </>
+                        ) : user.lastLoginAt ? (
                           <>Last signed in {relativeTime(user.lastLoginAt)}</>
                         ) : (
                           <span className="text-amber-600">Never signed in</span>

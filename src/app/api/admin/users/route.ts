@@ -33,6 +33,7 @@ export async function GET() {
         showTour: true,
         createdAt: true,
         lastLoginAt: true,
+        lastActiveAt: true,
         projectAccess: {
           include: {
             project: {

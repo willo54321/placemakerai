@@ -193,7 +193,7 @@ export default function ProjectsPage() {
                       className="w-full h-28"
                       style={{
                         background:
-                          'radial-gradient(120% 140% at 15% 10%, rgba(74,222,128,0.35) 0%, rgba(74,222,128,0) 45%), linear-gradient(135deg, #16A34A 0%, #15803D 55%, #0B2818 100%)',
+                          'radial-gradient(120% 140% at 15% 10%, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0) 45%), linear-gradient(135deg, #ECFDF5 0%, #A7F3D0 55%, #4ADE80 100%)',
                       }}
                     />
                     {/* Status pill — consultation lifecycle */}

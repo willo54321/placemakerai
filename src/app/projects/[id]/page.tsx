@@ -2,13 +2,14 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { useSession } from 'next-auth/react'
-import { ArrowLeft, Users, MapPin, Settings, LayoutDashboard, BarChart3, Globe, Eye, FileText, HelpCircle } from 'lucide-react'
+import { ArrowLeft, Users, MapPin, Settings, LayoutDashboard, BarChart3, Globe, Eye, FileText, HelpCircle, Inbox } from 'lucide-react'
 import Link from 'next/link'
 import { useState, Suspense } from 'react'
 import dynamic from 'next/dynamic'
 import { OverviewTab } from './overview'
 import { SettingsTab } from './settings'
 import { AnalyticsTab } from './analytics'
+import { EnquiriesTab } from './enquiries'
 import { HowToTab, type GuideStep } from './how-to'
 import UserMenu from '@/components/UserMenu'
 import { ProductTour, type TourStep } from '@/components/ProductTour'
@@ -34,6 +35,10 @@ const TOUR_COPY: Record<Tab, { title: string; body: string }> = {
   analytics: {
     title: 'AI analytics',
     body: 'AI-powered analysis of all feedback: sentiment, themes, material planning considerations, and report-ready summaries.',
+  },
+  enquiries: {
+    title: 'Enquiries',
+    body: 'Public enquiries submitted through your embed, in one desk. Read each conversation, and mark them new, open or closed as you work through them.',
   },
   settings: {
     title: 'Settings',
@@ -82,7 +87,7 @@ const FormsTabWrapper = dynamic(() => import('./forms-wrapper').then(mod => ({ d
   )
 })
 
-type Tab = 'overview' | 'feedback' | 'forms' | 'website' | 'analytics' | 'settings' | 'howto'
+type Tab = 'overview' | 'feedback' | 'forms' | 'enquiries' | 'website' | 'analytics' | 'settings' | 'howto'
 
 // Deep-link target passed alongside a tab switch (e.g. from the activity
 // feed): jump straight to a specific pin or form response.
@@ -99,7 +104,7 @@ type TabGroup = {
 
 const tabGroups: TabGroup[] = [
   { id: 'top', label: '', tabs: ['overview'] },
-  { id: 'collect', label: 'Collect', tabs: ['feedback', 'forms', 'analytics'] },
+  { id: 'collect', label: 'Collect', tabs: ['feedback', 'forms', 'enquiries', 'analytics'] },
   { id: 'publish', label: 'Publish', tabs: ['website'] },
   { id: 'configure', label: 'Configure', tabs: ['settings'] },
   { id: 'help', label: 'Help', tabs: ['howto'] },
@@ -242,6 +247,13 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
       icon: FileText,
       count: formResponseCount,
       adminOnly: true,
+    },
+    {
+      id: 'enquiries' as Tab,
+      label: 'Enquiries',
+      icon: Inbox,
+      count: 0,
+      adminOnly: false,
     },
     {
       id: 'website' as Tab,
@@ -476,6 +488,11 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
           {activeTab === 'website' && (
             <div className="p-6">
               <EmbedSettingsTab projectId={params.id} project={project} />
+            </div>
+          )}
+          {activeTab === 'enquiries' && (
+            <div className="p-6">
+              <EnquiriesTab projectId={params.id} isAdmin={Boolean(isAdmin)} />
             </div>
           )}
           {activeTab === 'analytics' && (

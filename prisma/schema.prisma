@@ -85,11 +85,42 @@ model Enquiry {
   category        String    @default("general")
   gdprConsent     Boolean   @default(false)
   gdprConsentDate DateTime?
+  // Enquiry desk state. status: new | open | closed. assigneeId points at a
+  // User (no FK — an assignee losing project access shouldn't orphan the row).
+  // threadToken is the reply-routing handle; nullable so existing rows don't
+  // need a backfill and it can be minted lazily when the email channel lands.
+  status          String    @default("new")
+  assigneeId      String?
+  read            Boolean   @default(false)
+  threadToken     String?   @unique
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
-  project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project         Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  messages        EnquiryMessage[]
 
   @@index([projectId, createdAt])
+  @@index([projectId, status])
+}
+
+// A message in an enquiry's conversation thread. The originating submission is
+// NOT stored here — it's synthesised from the Enquiry record when the thread is
+// rendered, so historic enquiries thread correctly with no backfill. Rows are
+// added as staff reply (outbound) or correspondents write back (inbound).
+model EnquiryMessage {
+  id             String   @id @default(cuid())
+  enquiryId      String
+  direction      String   // 'inbound' | 'outbound'
+  body           String
+  authorName     String?
+  authorEmail    String?
+  // stored | queued | sent | delivered | bounced | failed. Inbound messages
+  // are always 'delivered'; outbound advances as the provider reports back.
+  deliveryStatus String   @default("stored")
+  attachments    Json?    // [{ name, url, size, mime }]
+  createdAt      DateTime @default(now())
+  enquiry        Enquiry  @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+
+  @@index([enquiryId, createdAt])
 }
 
 model FeedbackForm {

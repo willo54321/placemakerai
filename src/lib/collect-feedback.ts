@@ -2,9 +2,9 @@ import { prisma } from '@/lib/db'
 import { FeedbackItem } from '@/lib/ai'
 
 /**
- * Gather every analysable piece of feedback for a project: approved map pins
- * and form responses. Used by the analytics routes and the analysis
- * workspace, so all of them see an identical corpus.
+ * Gather every analysable piece of feedback for a project: approved map pins,
+ * form responses and public enquiries. Used by the analytics routes and the
+ * analysis workspace, so all of them see an identical corpus.
  */
 export async function collectFeedback(projectId: string): Promise<FeedbackItem[]> {
   const feedbackItems: FeedbackItem[] = []
@@ -75,8 +75,30 @@ export async function collectFeedback(projectId: string): Promise<FeedbackItem[]
     })
   })
 
-  // Enquiries are collected (public embed form) but not yet part of the
-  // analysis — re-add them here when the enquiry channel is enabled.
+  // Get public enquiries (submitted via the embed enquiry form). Their
+  // subject + message is analysable free text, so they join the same corpus
+  // as pins and form responses.
+  const enquiries = await prisma.enquiry.findMany({
+    where: { projectId },
+    orderBy: { createdAt: 'desc' },
+  })
+
+  enquiries.forEach(enquiry => {
+    const content = [enquiry.subject, enquiry.message]
+      .map(part => part?.trim())
+      .filter(Boolean)
+      .join(': ')
+
+    if (content) {
+      feedbackItems.push({
+        id: enquiry.id,
+        type: 'enquiry',
+        content,
+        category: enquiry.category,
+        createdAt: enquiry.createdAt,
+      })
+    }
+  })
 
   return feedbackItems
 }

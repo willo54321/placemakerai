@@ -10,6 +10,7 @@ import { OverviewTab } from './overview'
 import { SettingsTab } from './settings'
 import { AnalyticsTab } from './analytics'
 import { EnquiriesTab } from './enquiries'
+import { StakeholdersTab } from './stakeholders'
 import { HowToTab, type GuideStep } from './how-to'
 import UserMenu from '@/components/UserMenu'
 import { ProductTour, type TourStep } from '@/components/ProductTour'
@@ -39,6 +40,10 @@ const TOUR_COPY: Record<Tab, { title: string; body: string }> = {
   enquiries: {
     title: 'Enquiries',
     body: 'Public enquiries submitted through your embed, in one desk. Read each conversation, and mark them new, open or closed as you work through them.',
+  },
+  stakeholders: {
+    title: 'Stakeholders',
+    body: 'Your register of named contacts and organisations. Log every meeting, call and email to build the consultation audit trail — who you engaged, when, and what they said.',
   },
   settings: {
     title: 'Settings',
@@ -87,7 +92,7 @@ const FormsTabWrapper = dynamic(() => import('./forms-wrapper').then(mod => ({ d
   )
 })
 
-type Tab = 'overview' | 'feedback' | 'forms' | 'enquiries' | 'website' | 'analytics' | 'settings' | 'howto'
+type Tab = 'overview' | 'feedback' | 'forms' | 'enquiries' | 'stakeholders' | 'website' | 'analytics' | 'settings' | 'howto'
 
 // Deep-link target passed alongside a tab switch (e.g. from the activity
 // feed): jump straight to a specific pin or form response.
@@ -105,6 +110,7 @@ type TabGroup = {
 const tabGroups: TabGroup[] = [
   { id: 'top', label: '', tabs: ['overview'] },
   { id: 'collect', label: 'Collect', tabs: ['feedback', 'forms', 'enquiries', 'analytics'] },
+  { id: 'engage', label: 'Engage', tabs: ['stakeholders'] },
   { id: 'publish', label: 'Publish', tabs: ['website'] },
   { id: 'configure', label: 'Configure', tabs: ['settings'] },
   { id: 'help', label: 'Help', tabs: ['howto'] },
@@ -252,6 +258,13 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
       id: 'enquiries' as Tab,
       label: 'Enquiries',
       icon: Inbox,
+      count: 0,
+      adminOnly: false,
+    },
+    {
+      id: 'stakeholders' as Tab,
+      label: 'Stakeholders',
+      icon: Users,
       count: 0,
       adminOnly: false,
     },
@@ -493,6 +506,11 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
           {activeTab === 'enquiries' && (
             <div className="p-6">
               <EnquiriesTab projectId={params.id} isAdmin={Boolean(isAdmin)} />
+            </div>
+          )}
+          {activeTab === 'stakeholders' && (
+            <div className="p-6">
+              <StakeholdersTab projectId={params.id} isAdmin={Boolean(isAdmin)} />
             </div>
           )}
           {activeTab === 'analytics' && (

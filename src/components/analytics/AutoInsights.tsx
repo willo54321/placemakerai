@@ -214,9 +214,6 @@ export function AutoInsights({
           <TrendingUp size={18} className="text-brand-600" />
           Auto-insights
         </h3>
-        <p className="text-sm text-slate-500">
-          Patterns tested for statistical significance across every classified response — counted, not sampled.
-        </p>
       </div>
 
       {/* Report-ready statements */}

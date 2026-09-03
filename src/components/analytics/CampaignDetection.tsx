@@ -120,25 +120,15 @@ export function CampaignDetection({ analysis }: { analysis: CampaignAnalysis }) 
                 </button>
 
                 {expanded === i && (
-                  <div className="px-4 pb-4 pt-1 space-y-3 border-t border-slate-100">
-                    <div>
-                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
-                        What the template says
-                      </p>
-                      <p className="text-sm text-slate-700">{campaign.templateSummary}</p>
-                    </div>
-                    {campaign.personalAdditions && (
-                      <div>
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
-                          What respondents added personally
-                        </p>
-                        <p className="text-sm text-slate-700">{campaign.personalAdditions}</p>
-                      </div>
-                    )}
-                    <blockquote className="text-sm text-slate-600 bg-slate-50 rounded-lg p-3 border-l-4 border-brand-300 italic">
-                      &ldquo;{campaign.sampleQuote}
-                      {campaign.sampleQuote.length >= 220 ? '…' : ''}&rdquo;
-                    </blockquote>
+                  <div className="px-4 pb-4 pt-3 space-y-2 border-t border-slate-100">
+                    {((campaign as { responses?: string[] }).responses?.length
+                      ? (campaign as { responses?: string[] }).responses!
+                      : [campaign.sampleQuote]
+                    ).map((text, j) => (
+                      <blockquote key={j} className="text-sm text-slate-600 bg-slate-50 rounded-lg p-3 border-l-4 border-brand-300">
+                        {text}
+                      </blockquote>
+                    ))}
                   </div>
                 )}
               </div>

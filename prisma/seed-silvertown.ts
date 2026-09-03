@@ -175,6 +175,21 @@ const PINS: PinSeed[] = [
 ]
 
 // ---------------------------------------------------------------------------
+// An organised campaign: a shared template objection to Plot B with one
+// personal line each. Drives the campaign / duplicate detection panel.
+// ---------------------------------------------------------------------------
+const CAMPAIGN_TEMPLATE =
+  'I strongly object to the proposals for Plot B (Dock Wharf). 620 homes with only 90 parking spaces will overwhelm our already-full streets, and the DLR is at capacity at peak times. The scheme must not go ahead without a binding transport and parking plan.'
+const CAMPAIGN_PERSONAL = [
+  'I have lived on Evelyn Road for twelve years and already cannot park near my own home.',
+  'As a parent doing the school run, the extra rat-running traffic frightens me.',
+  'I depend on the DLR every day and it is already unbearable at rush hour.',
+  'My elderly mother needs a Blue Badge space and there are none to be found now.',
+  'We were promised no more overdevelopment after the last scheme went up.',
+  'I run a small business nearby and my customers already have nowhere to park.',
+]
+
+// ---------------------------------------------------------------------------
 // Consultation survey responses. Fields chosen so the audience + plot cuts work.
 // ---------------------------------------------------------------------------
 const AUDIENCE_OPTIONS = ['Local resident', 'Business / worker', 'Community group', 'Landowner / developer', 'Visitor', 'Other']
@@ -416,7 +431,7 @@ async function main() {
   console.log(`Created ${PLOTS.length} plot boundary layers`)
 
   // --- collect corpus + assignments as we create rows ---------------------
-  type CorpusRow = { id: string; content: string; type: 'pin' | 'form' | 'enquiry'; latitude: number | null; longitude: number | null; createdAt: Date; sentiment: Sent; themes: number[]; material: 'material' | 'non-material' | 'mixed'; source: 'pin' | 'form' | 'enquiry' }
+  type CorpusRow = { id: string; content: string; type: 'pin' | 'form' | 'enquiry'; latitude: number | null; longitude: number | null; createdAt: Date; sentiment: Sent; themes: number[]; material: 'material' | 'non-material' | 'mixed'; source: 'pin' | 'form' | 'enquiry'; campaign?: boolean }
   const corpus: CorpusRow[] = []
 
   const themeIsMaterial = (t: number) => t !== 4 // jobs/economy often weighed less as a material planning consideration; everything else material here
@@ -479,6 +494,32 @@ async function main() {
     corpus.push({ id: row.id, content: seed.comment, type: 'pin', latitude: lat, longitude: lng, createdAt, sentiment: seed.sentiment, themes: seed.themes, material: materialFor(seed.themes), source: 'pin' })
   }
   console.log(`Created ${PINS.length} feedback pins across three plots`)
+
+  // --- organised campaign: near-identical template objections on Plot B ----
+  const plotB = PLOTS.find(p => p.key === 'B')!
+  for (let ci = 0; ci < CAMPAIGN_PERSONAL.length; ci++) {
+    const [lat, lng] = pointIn(plotB, ci, CAMPAIGN_PERSONAL.length)
+    const createdAt = ago(9 - ci) // a recent surge
+    const comment = `${CAMPAIGN_TEMPLATE} ${CAMPAIGN_PERSONAL[ci]}`
+    const row = await prisma.publicPin.create({
+      data: {
+        projectId: PROJECT_ID,
+        shapeType: 'pin',
+        latitude: lat,
+        longitude: lng,
+        category: 'negative',
+        comment,
+        name: `Resident ${400 + ci}`,
+        approved: true,
+        votes: 3 + ci,
+        gdprConsent: true,
+        gdprConsentDate: createdAt,
+        createdAt,
+      },
+    })
+    corpus.push({ id: row.id, content: comment, type: 'pin', latitude: lat, longitude: lng, createdAt, sentiment: 'negative', themes: [1], material: materialFor([1]), source: 'pin', campaign: true })
+  }
+  console.log(`Created ${CAMPAIGN_PERSONAL.length} campaign responses (Plot B parking template)`)
 
   // --- consultation survey ------------------------------------------------
   const surveyFields: Field[] = [
@@ -671,13 +712,23 @@ async function main() {
       items: assignments.map(a => ({ id: a.id, classification: a.material, materialCategories: a.materialCategories, nonMaterialCategories: a.nonMaterialCategories })),
     }
 
-    // Campaign detection — one small organised push on parking (Plot B).
-    const parkingIds = rows.filter(r => r.themes.includes(1) && r.sentiment === 'negative').slice(0, 5).map(r => r.id)
+    // Campaign detection — the organised template objection on Plot B.
+    const campaignRows = rows.filter(r => r.campaign)
     const campaignAnalysis = {
       totalAnalyzed: total,
-      templatedCount: parkingIds.length,
-      uniqueCount: total - parkingIds.length,
-      campaigns: parkingIds.length >= 3 ? [{ label: 'Parking & transport objections (Plot B)', count: parkingIds.length, stance: 'oppose' as const, templateSummary: 'A cluster of responses raising the same parking-provision and DLR-capacity objection to Plot B, several with near-identical wording.', personalAdditions: 'Most add a specific street or personal circumstance.', exact: false, sampleQuote: quote(rows.find(r => parkingIds.includes(r.id))?.content ?? ''), memberIds: parkingIds }] : [],
+      templatedCount: campaignRows.length,
+      uniqueCount: total - campaignRows.length,
+      campaigns: campaignRows.length >= 3 ? [{
+        label: 'Parking & DLR capacity objection (Plot B)',
+        count: campaignRows.length,
+        stance: 'oppose' as const,
+        templateSummary: '',
+        personalAdditions: '',
+        exact: false,
+        sampleQuote: quote(campaignRows[0]?.content ?? ''),
+        memberIds: campaignRows.map(r => r.id),
+        responses: campaignRows.map(r => r.content),
+      }] : [],
     }
 
     const headlineStats = {

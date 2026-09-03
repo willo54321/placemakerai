@@ -161,7 +161,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
   // Registrations + other channels into the timeline.
   registrations.forEach(r => bump(timeline, weekKey(r.submittedAt), 'registrations'))
-  allPins.forEach(p => bump(timeline, weekKey(p.createdAt), 'pins'))
+  pointPins.forEach(p => bump(timeline, weekKey(p.createdAt), 'pins'))
   enquiries.forEach(e => bump(timeline, weekKey(e.createdAt), 'enquiries'))
 
   const timelineArr = Array.from(timeline.entries()).sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([week, v]) => ({ week, ...v }))
@@ -182,20 +182,20 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
   // --- participation totals ----------------------------------------------
   const totals = {
-    pins: allPins.length,
+    pins: pointPins.length,
     survey: surveyTotal,
     enquiries: enquiries.length,
     registrations: registrations.length,
     stakeholders: stakeholders.length,
-    contributions: allPins.length + surveyTotal + enquiries.length,
+    contributions: pointPins.length + surveyTotal + enquiries.length,
   }
 
   // strip internal geometry before returning
   const plotsOut = (plots as any[]).map(({ _geometry, ...rest }) => rest)
 
-  // --- flexible breakdowns: slice the same feedback by plot / source / shape --
+  // --- breakdowns: slice the same feedback by plot (zone) or by source -----
   const mapTally = tally()
-  allPins.forEach(p => addStance(mapTally, stanceFromSentiment(p.id) ?? pinToStance(p.category)))
+  pointPins.forEach(p => addStance(mapTally, stanceFromSentiment(p.id) ?? pinToStance(p.category)))
   const enquiryTally = tally()
   enquiries.forEach(e => addStance(enquiryTally, stanceFromSentiment(e.id) ?? 'neutral'))
 
@@ -208,28 +208,12 @@ export async function GET(request: Request, { params }: { params: { id: string }
     { key: 'enquiries', label: 'Enquiries', color: '#D97706', t: enquiryTally },
   ].filter(s => s.t.total > 0).map(s => ({ key: s.key, label: s.label, color: s.color, total: s.t.total, support: s.t.support, neutral: s.t.neutral, object: s.t.object, sublabel: pct(s.t.total) }))
 
-  const SHAPE_META: Record<string, { label: string; color: string }> = {
-    pin: { label: 'Pins', color: '#0E7C86' },
-    polygon: { label: 'Areas', color: '#7C3AED' },
-    line: { label: 'Routes', color: '#16A34A' },
-  }
-  const shapeTallies = new Map<string, Tally>()
-  allPins.forEach(p => {
-    const st = p.shapeType || 'pin'
-    if (!shapeTallies.has(st)) shapeTallies.set(st, tally())
-    addStance(shapeTallies.get(st)!, stanceFromSentiment(p.id) ?? pinToStance(p.category))
-  })
-  const shapeSegments = ['pin', 'polygon', 'line'].filter(st => shapeTallies.has(st)).map(st => {
-    const t = shapeTallies.get(st)!
-    return { key: st, label: SHAPE_META[st].label, color: SHAPE_META[st].color, total: t.total, support: t.support, neutral: t.neutral, object: t.object, sublabel: `${t.total} on the map` }
-  })
-
+  // Plot segments — each drawn zone's feedback, attributed by point-in-polygon.
   const plotSegments = plotsOut.map((p: any) => ({ key: p.key, label: p.name, color: p.color, total: p.pins + p.surveyResponses, support: p.support, neutral: p.neutral, object: p.object, sublabel: `${p.pins} map · ${p.surveyResponses} survey`, theme: p.theme, headline: p.headline }))
 
   const breakdowns = [
-    plotSegments.length >= 2 ? { key: 'plot', label: 'By plot', segments: plotSegments } : null,
+    plotSegments.length >= 2 ? { key: 'plot', label: 'By zone', segments: plotSegments } : null,
     sourceSegments.length >= 2 ? { key: 'source', label: 'By source', segments: sourceSegments } : null,
-    shapeSegments.length >= 2 ? { key: 'shape', label: 'By map shape', segments: shapeSegments } : null,
   ].filter(Boolean)
 
   return NextResponse.json({

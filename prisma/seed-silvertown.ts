@@ -175,28 +175,6 @@ const PINS: PinSeed[] = [
 ]
 
 // ---------------------------------------------------------------------------
-// Visitor-drawn shapes — lines (routes) and polygons (areas) — so the "by map
-// shape" breakdown is populated with genuine feedback, not just point pins.
-// ---------------------------------------------------------------------------
-type ShapeSeed = {
-  shapeType: 'line' | 'polygon'
-  geometry: any
-  category: 'positive' | 'negative' | 'question' | 'comment'
-  comment: string
-  sentiment: Sent
-  themes: number[]
-  votes: number
-  daysAgo: number
-}
-
-const SHAPES: ShapeSeed[] = [
-  { shapeType: 'line', geometry: { type: 'LineString', coordinates: [[0.0206, 51.5017], [0.0211, 51.5012], [0.0216, 51.5008]] }, category: 'negative', comment: 'The walk from Pontoon Dock DLR to Plot A has no safe crossing on North Woolwich Road. This route needs a proper pedestrian crossing.', sentiment: 'negative', themes: [1], votes: 16, daysAgo: 23 },
-  { shapeType: 'line', geometry: { type: 'LineString', coordinates: [[0.0205, 51.5016], [0.0250, 51.5002], [0.0300, 51.5022]] }, category: 'positive', comment: 'A continuous cycle route along the dockside would connect all three plots beautifully. Please make this a spine of the masterplan.', sentiment: 'positive', themes: [1, 8], votes: 19, daysAgo: 14 },
-  { shapeType: 'polygon', geometry: { type: 'Polygon', coordinates: [[[0.0240, 51.4996], [0.0248, 51.4996], [0.0248, 51.5000], [0.0240, 51.5000], [0.0240, 51.4996]]] }, category: 'negative', comment: 'This corner by Dock Wharf floods badly after heavy rain. Please design the drainage out before building homes here.', sentiment: 'negative', themes: [8], votes: 12, daysAgo: 17 },
-  { shapeType: 'polygon', geometry: { type: 'Polygon', coordinates: [[[0.0300, 51.5024], [0.0308, 51.5024], [0.0308, 51.5028], [0.0300, 51.5028], [0.0300, 51.5024]]] }, category: 'positive', comment: 'This would be a great spot for community growing space or allotments alongside the new park on Plot C.', sentiment: 'positive', themes: [3, 6], votes: 14, daysAgo: 8 },
-]
-
-// ---------------------------------------------------------------------------
 // Consultation survey responses. Fields chosen so the audience + plot cuts work.
 // ---------------------------------------------------------------------------
 const AUDIENCE_OPTIONS = ['Local resident', 'Business / worker', 'Community group', 'Landowner / developer', 'Visitor', 'Other']
@@ -501,31 +479,6 @@ async function main() {
     corpus.push({ id: row.id, content: seed.comment, type: 'pin', latitude: lat, longitude: lng, createdAt, sentiment: seed.sentiment, themes: seed.themes, material: materialFor(seed.themes), source: 'pin' })
   }
   console.log(`Created ${PINS.length} feedback pins across three plots`)
-
-  // --- visitor-drawn shapes (routes & areas) ------------------------------
-  for (let si = 0; si < SHAPES.length; si++) {
-    const sh = SHAPES[si]
-    const createdAt = ago(sh.daysAgo)
-    const row = await prisma.publicPin.create({
-      data: {
-        projectId: PROJECT_ID,
-        shapeType: sh.shapeType,
-        latitude: null,
-        longitude: null,
-        geometry: sh.geometry,
-        category: sh.category,
-        comment: sh.comment,
-        name: `Resident ${300 + si}`,
-        approved: true,
-        votes: sh.votes,
-        gdprConsent: true,
-        gdprConsentDate: createdAt,
-        createdAt,
-      },
-    })
-    corpus.push({ id: row.id, content: sh.comment, type: 'pin', latitude: null, longitude: null, createdAt, sentiment: sh.sentiment, themes: sh.themes, material: materialFor(sh.themes), source: 'pin' })
-  }
-  console.log(`Created ${SHAPES.length} drawn shapes (routes & areas)`)
 
   // --- consultation survey ------------------------------------------------
   const surveyFields: Field[] = [

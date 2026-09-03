@@ -44,14 +44,10 @@ export function CampaignDetection({ analysis }: { analysis: CampaignAnalysis }) 
 
   return (
     <div>
-      <h3 className="font-semibold text-slate-900 mb-1 flex items-center gap-2">
+      <h3 className="font-semibold text-slate-900 mb-6 flex items-center gap-2">
         <Copy className="w-5 h-5 text-brand-600" />
         Campaign &amp; Duplicate Detection
       </h3>
-      <p className="text-sm text-slate-500 mb-6">
-        Responses that are copies or variants of the same template letter, grouped into
-        campaigns — so you can weigh organised responses and individual voices separately.
-      </p>
 
       {analysis.campaigns.length === 0 ? (
         <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-100 rounded-xl p-4">

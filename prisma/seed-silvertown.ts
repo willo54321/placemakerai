@@ -18,6 +18,7 @@
  */
 import 'dotenv/config'
 import { PrismaClient } from '@prisma/client'
+import * as turf from '@turf/turf'
 import {
   crossReference,
   CrossRefItem,
@@ -101,12 +102,28 @@ const plotRing = (p: Plot): number[][] => {
   ]
 }
 
-// Deterministic-ish point inside a plot, spread by index so 100m clusters split.
-const pointIn = (p: Plot, i: number, n: number): [number, number] => {
-  const { latMin, latMax, lngMin, lngMax } = p.bounds
-  const fx = ((i * 2 + 1) % (n + 1)) / (n + 1)
-  const fy = ((i * 3 + 2) % (n + 1)) / (n + 1)
-  return [latMin + (latMax - latMin) * fy, lngMin + (lngMax - lngMin) * fx]
+// Seeded PRNG so pin scatter is reproducible across reseeds (no teleporting).
+function mulberry32(seed: number) {
+  return () => {
+    let t = (seed += 0x6d2b79f5)
+    t = Math.imul(t ^ (t >>> 15), t | 1)
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+// A random point strictly inside a polygon (rejection-sampled within its bbox).
+// Works for any shape, so pins follow admin-edited zone outlines.
+function scatterInPolygon(geometry: any, rng: () => number): [number, number] {
+  const poly = turf.polygon(geometry.coordinates)
+  const [minX, minY, maxX, maxY] = turf.bbox(poly)
+  for (let k = 0; k < 400; k++) {
+    const lng = minX + rng() * (maxX - minX)
+    const lat = minY + rng() * (maxY - minY)
+    if (turf.booleanPointInPolygon(turf.point([lng, lat]), poly)) return [lat, lng]
+  }
+  const c = turf.centroid(poly).geometry.coordinates as number[]
+  return [c[1], c[0]]
 }
 
 // ---------------------------------------------------------------------------
@@ -351,7 +368,8 @@ async function main() {
     await prisma.feedbackForm.deleteMany({ where: { projectId: PROJECT_ID } })
     await prisma.publicPin.deleteMany({ where: { projectId: PROJECT_ID } })
     await prisma.enquiry.deleteMany({ where: { projectId: PROJECT_ID } })
-    await prisma.geoLayer.deleteMany({ where: { projectId: PROJECT_ID } })
+    // Keep plot zones — admins may have reshaped them in the Zones editor.
+    await prisma.geoLayer.deleteMany({ where: { projectId: PROJECT_ID, type: { not: 'plot' } } })
     await prisma.imageOverlay.deleteMany({ where: { projectId: PROJECT_ID } })
     await prisma.mapMarker.deleteMany({ where: { projectId: PROJECT_ID } })
     await prisma.analysisResult.deleteMany({ where: { projectId: PROJECT_ID } })
@@ -412,22 +430,39 @@ async function main() {
   } catch (e) { console.warn('Could not grant project access:', (e as Error).message) }
 
   // --- plot boundaries as GeoLayers (admin map) ---------------------------
+  // Zones are preserved across reseeds (admins can reshape them), so only create
+  // ones that don't exist yet. Either way, capture each plot's current polygon
+  // so pins can be scattered inside the actual shape.
+  const zoneGeomByKey: Record<string, any> = {}
+  const currentZones = await prisma.geoLayer.findMany({ where: { projectId: PROJECT_ID, type: 'plot' } })
+  const zoneByKey = new Map<string, any>()
+  for (const z of currentZones) {
+    const gj: any = z.geojson
+    const feat = gj?.type === 'FeatureCollection' ? gj.features?.[0] : gj
+    const key = feat?.properties?.plot || z.name
+    if (feat?.geometry) zoneByKey.set(key, feat.geometry)
+  }
+  let createdZones = 0
   for (const p of PLOTS) {
+    if (zoneByKey.has(p.key)) {
+      zoneGeomByKey[p.key] = zoneByKey.get(p.key)
+      continue
+    }
+    const geometry = { type: 'Polygon', coordinates: [plotRing(p)] }
     await prisma.geoLayer.create({
       data: {
         projectId: PROJECT_ID,
         name: p.name,
         type: 'plot',
-        geojson: {
-          type: 'FeatureCollection',
-          features: [ { type: 'Feature', properties: { name: p.name, plot: p.key, status: p.status, blurb: p.blurb }, geometry: { type: 'Polygon', coordinates: [plotRing(p)] } } ],
-        },
+        geojson: { type: 'FeatureCollection', features: [ { type: 'Feature', properties: { name: p.name, plot: p.key, status: p.status, blurb: p.blurb }, geometry } ] },
         style: { fillColor: p.color, strokeColor: p.color, fillOpacity: 0.18, strokeWidth: 2 },
         visible: true,
       },
     })
+    zoneGeomByKey[p.key] = geometry
+    createdZones++
   }
-  console.log(`Created ${PLOTS.length} plot boundary layers`)
+  console.log(`Plot zones: ${createdZones} created, ${PLOTS.length - createdZones} preserved`)
 
   // --- collect corpus + assignments as we create rows ---------------------
   type CorpusRow = { id: string; content: string; type: 'pin' | 'form' | 'enquiry'; latitude: number | null; longitude: number | null; createdAt: Date; sentiment: Sent; themes: number[]; material: 'material' | 'non-material' | 'mixed'; source: 'pin' | 'form' | 'enquiry'; campaign?: boolean }
@@ -445,13 +480,12 @@ async function main() {
   // edit them in the Zones tab, so no polygon "pins" are needed for the plots.
 
   // --- feedback pins ------------------------------------------------------
-  const perPlotCount: Record<string, number> = {}
-  PINS.forEach(pin => { perPlotCount[pin.plot] = (perPlotCount[pin.plot] || 0) + 1 })
+  // Scatter each pin inside its plot's current polygon (follows edited shapes).
+  const rngByPlot: Record<string, () => number> = { '1': mulberry32(101), '1JC': mulberry32(202), 'D': mulberry32(303) }
   const plotIndex: Record<string, number> = { '1': 0, '1JC': 0, 'D': 0 }
   for (const seed of PINS) {
-    const plot = PLOTS.find(p => p.key === seed.plot)!
     const i = plotIndex[seed.plot]++
-    const [lat, lng] = pointIn(plot, i, perPlotCount[seed.plot])
+    const [lat, lng] = scatterInPolygon(zoneGeomByKey[seed.plot], rngByPlot[seed.plot])
     const createdAt = ago(seed.daysAgo)
     const row = await prisma.publicPin.create({
       data: {
@@ -461,7 +495,7 @@ async function main() {
         longitude: lng,
         category: seed.category,
         comment: seed.comment,
-        name: `Resident ${100 + i + (seed.plot.charCodeAt(0) - 65) * 40}`,
+        name: `Resident ${100 + i + (seed.plot === '1' ? 0 : seed.plot === '1JC' ? 40 : 80)}`,
         approved: true,
         votes: seed.votes,
         gdprConsent: true,
@@ -473,10 +507,10 @@ async function main() {
   }
   console.log(`Created ${PINS.length} feedback pins across three plots`)
 
-  // --- organised campaign: near-identical template objections on Plot B ----
-  const plotB = PLOTS.find(p => p.key === '1JC')!
+  // --- organised campaign: near-identical template objections on Plot 1J&C --
+  const campaignRng = mulberry32(404)
   for (let ci = 0; ci < CAMPAIGN_PERSONAL.length; ci++) {
-    const [lat, lng] = pointIn(plotB, ci, CAMPAIGN_PERSONAL.length)
+    const [lat, lng] = scatterInPolygon(zoneGeomByKey['1JC'], campaignRng)
     const createdAt = ago(9 - ci) // a recent surge
     const comment = `${CAMPAIGN_TEMPLATE} ${CAMPAIGN_PERSONAL[ci]}`
     const row = await prisma.publicPin.create({

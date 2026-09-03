@@ -54,15 +54,18 @@ export async function GET(request: Request, { params }: { params: { id: string }
   if (denied) return denied
   const projectId = params.id
 
-  const [project, plotLayers, pins, forms, enquiries] = await Promise.all([
+  const [project, plotLayers, allPins, forms, enquiries] = await Promise.all([
     prisma.project.findUnique({ where: { id: projectId }, select: { name: true } }),
     prisma.geoLayer.findMany({ where: { projectId, type: 'plot' }, orderBy: { createdAt: 'asc' } }),
-    prisma.publicPin.findMany({ where: { projectId, approved: true, shapeType: 'pin', latitude: { not: null }, longitude: { not: null } } }),
+    prisma.publicPin.findMany({ where: { projectId, approved: true } }),
     prisma.feedbackForm.findMany({ where: { projectId }, include: { responses: true } }),
     prisma.enquiry.findMany({ where: { projectId } }),
   ])
 
   if (!project) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  // Point pins carry coordinates for plot bucketing; lines/polygons are drawn shapes.
+  const pointPins = allPins.filter(p => p.shapeType === 'pin' && p.latitude != null && p.longitude != null)
 
   // Stakeholders are optional (schema may be absent in some environments).
   let stakeholders: Array<{ type: string; category: string; organization: string | null }> = []
@@ -70,9 +73,20 @@ export async function GET(request: Request, { params }: { params: { id: string }
     stakeholders = await (prisma as any).stakeholder.findMany({ where: { projectId }, select: { type: true, category: true, organization: true } })
   } catch { /* no stakeholder table here */ }
 
-  // The stored AI analysis, if any — used only for per-plot theme labels.
+  // The stored AI analysis, if any — per-plot theme labels + per-item stance.
   const analysisRow = await prisma.analysisResult.findUnique({ where: { projectId_type: { projectId, type: 'full' } } })
   const analysis = (analysisRow?.data as unknown as FullAnalysisResult) || null
+
+  // Per-item stance: prefer the AI's classified sentiment; fall back to a cheap
+  // proxy (pin category / survey support field) so this works with no analysis.
+  const sentimentById = new Map<string, string>((analysis?.assignments ?? []).map(a => [a.id, a.sentiment]))
+  const stanceFromSentiment = (id: string): Stance | undefined => {
+    const s = sentimentById.get(id)
+    return s === 'positive' ? 'support' : s === 'negative' ? 'object' : s === 'neutral' ? 'neutral' : undefined
+  }
+  type Tally = { support: number; neutral: number; object: number; total: number }
+  const tally = (): Tally => ({ support: 0, neutral: 0, object: 0, total: 0 })
+  const addStance = (t: Tally, s: Stance) => { t[s]++; t.total++ }
 
   // --- classify forms -----------------------------------------------------
   const registerForm = forms.find(f => REGISTER_RE.test(f.name))
@@ -91,14 +105,14 @@ export async function GET(request: Request, { params }: { params: { id: string }
   }) as any
 
   // Map pins → plots by point-in-polygon.
-  for (const pin of pins) {
+  for (const pin of pointPins) {
     const pt = turf.point([pin.longitude as number, pin.latitude as number])
     for (const p of plots as any[]) {
       if (!p._geometry) continue
       try {
         if (turf.booleanPointInPolygon(pt, p._geometry)) {
           p.pins++
-          const s = pinToStance(pin.category)
+          const s = stanceFromSentiment(pin.id) ?? pinToStance(pin.category)
           p[s]++
           break
         }
@@ -115,6 +129,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
   }
 
   let surveyTotal = 0
+  const formTally = tally()
   for (const form of surveyForms) {
     const fields = (form.fields as Field[]) || []
     const audienceField = findField(fields, AUDIENCE_RE, 'audience')
@@ -124,6 +139,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
       surveyTotal++
       const data = resp.data as Record<string, unknown>
       const stance: Stance = supportField ? supportToStance(String(data[supportField.id] ?? data[supportField.label] ?? '')) : 'neutral'
+      addStance(formTally, stanceFromSentiment(resp.id) ?? stance)
       // audience
       if (audienceField) {
         const val = String(data[audienceField.id] ?? data[audienceField.label] ?? '').trim()
@@ -145,7 +161,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
   // Registrations + other channels into the timeline.
   registrations.forEach(r => bump(timeline, weekKey(r.submittedAt), 'registrations'))
-  pins.forEach(p => bump(timeline, weekKey(p.createdAt), 'pins'))
+  allPins.forEach(p => bump(timeline, weekKey(p.createdAt), 'pins'))
   enquiries.forEach(e => bump(timeline, weekKey(e.createdAt), 'enquiries'))
 
   const timelineArr = Array.from(timeline.entries()).sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([week, v]) => ({ week, ...v }))
@@ -166,20 +182,60 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
   // --- participation totals ----------------------------------------------
   const totals = {
-    pins: pins.length,
+    pins: allPins.length,
     survey: surveyTotal,
     enquiries: enquiries.length,
     registrations: registrations.length,
     stakeholders: stakeholders.length,
-    contributions: pins.length + surveyTotal + enquiries.length,
+    contributions: allPins.length + surveyTotal + enquiries.length,
   }
 
   // strip internal geometry before returning
   const plotsOut = (plots as any[]).map(({ _geometry, ...rest }) => rest)
 
+  // --- flexible breakdowns: slice the same feedback by plot / source / shape --
+  const mapTally = tally()
+  allPins.forEach(p => addStance(mapTally, stanceFromSentiment(p.id) ?? pinToStance(p.category)))
+  const enquiryTally = tally()
+  enquiries.forEach(e => addStance(enquiryTally, stanceFromSentiment(e.id) ?? 'neutral'))
+
+  const totalFeedback = mapTally.total + formTally.total + enquiryTally.total || 1
+  const pct = (n: number) => `${Math.round((n / totalFeedback) * 100)}% of all feedback`
+
+  const sourceSegments = [
+    { key: 'map', label: 'Map comments', color: '#0E7C86', t: mapTally },
+    { key: 'forms', label: 'Survey responses', color: '#2563EB', t: formTally },
+    { key: 'enquiries', label: 'Enquiries', color: '#D97706', t: enquiryTally },
+  ].filter(s => s.t.total > 0).map(s => ({ key: s.key, label: s.label, color: s.color, total: s.t.total, support: s.t.support, neutral: s.t.neutral, object: s.t.object, sublabel: pct(s.t.total) }))
+
+  const SHAPE_META: Record<string, { label: string; color: string }> = {
+    pin: { label: 'Pins', color: '#0E7C86' },
+    polygon: { label: 'Areas', color: '#7C3AED' },
+    line: { label: 'Routes', color: '#16A34A' },
+  }
+  const shapeTallies = new Map<string, Tally>()
+  allPins.forEach(p => {
+    const st = p.shapeType || 'pin'
+    if (!shapeTallies.has(st)) shapeTallies.set(st, tally())
+    addStance(shapeTallies.get(st)!, stanceFromSentiment(p.id) ?? pinToStance(p.category))
+  })
+  const shapeSegments = ['pin', 'polygon', 'line'].filter(st => shapeTallies.has(st)).map(st => {
+    const t = shapeTallies.get(st)!
+    return { key: st, label: SHAPE_META[st].label, color: SHAPE_META[st].color, total: t.total, support: t.support, neutral: t.neutral, object: t.object, sublabel: `${t.total} on the map` }
+  })
+
+  const plotSegments = plotsOut.map((p: any) => ({ key: p.key, label: p.name, color: p.color, total: p.pins + p.surveyResponses, support: p.support, neutral: p.neutral, object: p.object, sublabel: `${p.pins} map · ${p.surveyResponses} survey`, theme: p.theme, headline: p.headline }))
+
+  const breakdowns = [
+    plotSegments.length >= 2 ? { key: 'plot', label: 'By plot', segments: plotSegments } : null,
+    sourceSegments.length >= 2 ? { key: 'source', label: 'By source', segments: sourceSegments } : null,
+    shapeSegments.length >= 2 ? { key: 'shape', label: 'By map shape', segments: shapeSegments } : null,
+  ].filter(Boolean)
+
   return NextResponse.json({
     projectName: project.name,
     plots: plotsOut,
+    breakdowns,
     participation: { totals, timeline: timelineArr },
     audience: { segments: audience, organisations, stakeholdersByStance, stakeholdersByType, stakeholderTotal: stakeholders.length },
   })

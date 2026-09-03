@@ -24,7 +24,7 @@ import {
   ResponsesExplorer
 } from '@/components/analytics'
 import { AutoInsights } from '@/components/analytics/AutoInsights'
-import { PlotComparison } from '@/components/analytics/PlotComparison'
+import { FeedbackBreakdown } from '@/components/analytics/PlotComparison'
 
 /**
  * Summary text with validated citation chips. The server replaces the model's
@@ -497,8 +497,8 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
         </div>
       </div>
 
-      {/* Programme breakdown — per-plot comparison (multi-site projects only) */}
-      <PlotComparison projectId={projectId} />
+      {/* Flexible feedback breakdown — by plot, source, or map shape */}
+      <FeedbackBreakdown projectId={projectId} />
 
       {/* KPI Stats Row - Most Important Metrics at Top */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

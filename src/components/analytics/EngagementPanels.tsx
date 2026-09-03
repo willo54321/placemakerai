@@ -75,11 +75,11 @@ export function EngagementPanels({ projectId }: { projectId: string }) {
               ))}
             </div>
           </div>
-          <div className="flex h-44 items-end gap-1.5">
+          <div className="flex h-44 items-stretch gap-1.5">
             {participation.timeline.map(w => {
               const total = w.pins + w.forms + w.enquiries + w.registrations
               return (
-                <div key={w.week} className="group relative flex flex-1 flex-col items-center">
+                <div key={w.week} className="group relative flex flex-1 flex-col justify-end items-center h-full">
                   <div className="flex w-full max-w-[42px] flex-col-reverse overflow-hidden rounded-t" style={{ height: `${(total / maxWeek) * 100}%`, minHeight: total > 0 ? 4 : 0 }}>
                     {CHANNEL.map(c => {
                       const v = (w as any)[c.key] as number

@@ -693,9 +693,6 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
         <div className="card p-6">
           <div className="mb-4">
             <h3 className="font-semibold text-slate-900">Sentiment over time</h3>
-            <p className="text-sm text-slate-500">
-              Weekly responses by classified stance — a sudden objection spike often marks an organised campaign
-            </p>
           </div>
           <div style={{ height: 280 }}>
             <ResponsiveContainer width="100%" height="100%">

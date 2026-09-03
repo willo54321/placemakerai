@@ -25,18 +25,18 @@ interface SentimentHeatmapProps {
 // opaque tones — that turns clusters into solid discs.
 const POSITIVE_GRADIENT = [
   'rgba(16, 185, 129, 0)',
-  'rgba(16, 185, 129, 0.18)',
-  'rgba(16, 185, 129, 0.32)',
-  'rgba(5, 150, 105, 0.45)',
-  'rgba(5, 150, 105, 0.58)',
+  'rgba(16, 185, 129, 0.35)',
+  'rgba(16, 185, 129, 0.55)',
+  'rgba(5, 150, 105, 0.72)',
+  'rgba(4, 120, 87, 0.85)',
 ]
 
 const NEGATIVE_GRADIENT = [
   'rgba(239, 68, 68, 0)',
-  'rgba(239, 68, 68, 0.18)',
-  'rgba(239, 68, 68, 0.32)',
-  'rgba(220, 38, 38, 0.45)',
-  'rgba(220, 38, 38, 0.58)',
+  'rgba(239, 68, 68, 0.35)',
+  'rgba(239, 68, 68, 0.55)',
+  'rgba(220, 38, 38, 0.72)',
+  'rgba(185, 28, 28, 0.85)',
 ]
 
 // Quiet, desaturated basemap so the heat is the loudest thing on the map.
@@ -70,7 +70,7 @@ export function SentimentHeatmap({ clusters, height = '400px' }: SentimentHeatma
     const negative: google.maps.visualization.WeightedLocation[] = []
 
     clusters.forEach(cluster => {
-      const weight = 0.5 + (cluster.count / maxCount) * 0.5
+      const weight = 0.65 + (cluster.count / maxCount) * 0.35
       const location = new google.maps.LatLng(cluster.latitude, cluster.longitude)
 
       if (cluster.sentiment === 'positive') {
@@ -130,13 +130,13 @@ export function SentimentHeatmap({ clusters, height = '400px' }: SentimentHeatma
         {showPositive && positivePoints.length > 0 && (
           <HeatmapLayerF
             data={positivePoints}
-            options={{ gradient: POSITIVE_GRADIENT, radius: 26, maxIntensity: 1.5 }}
+            options={{ gradient: POSITIVE_GRADIENT, radius: 46, maxIntensity: 1.1 }}
           />
         )}
         {showNegative && negativePoints.length > 0 && (
           <HeatmapLayerF
             data={negativePoints}
-            options={{ gradient: NEGATIVE_GRADIENT, radius: 26, maxIntensity: 1.5 }}
+            options={{ gradient: NEGATIVE_GRADIENT, radius: 46, maxIntensity: 1.1 }}
           />
         )}
       </GoogleMap>

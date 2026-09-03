@@ -7,7 +7,7 @@ import { Spinner } from '@/components/Spinner'
 import { toast } from 'sonner'
 import {
   Users, Plus, Building2, Mail, Phone, Trash2, X, Pencil,
-  MessageSquare, CalendarDays, ArrowRight, Inbox,
+  MessageSquare, CalendarDays, ArrowRight, Inbox, Target,
 } from 'lucide-react'
 
 // ---- domain vocab -----------------------------------------------------------
@@ -67,6 +67,106 @@ function CategoryBadge({ category }: { category: Category }) {
     <span className={`inline-flex items-center text-xs px-2 py-0.5 rounded-full font-medium ${meta.className}`}>
       {meta.label}
     </span>
+  )
+}
+
+// ---- power / interest matrix ------------------------------------------------
+
+const STANCE_DOT: Record<Category, string> = {
+  supporter: '#16A34A',
+  opposed: '#DC2626',
+  neutral: '#64748B',
+  undecided: '#D97706',
+}
+
+const QUADRANTS = [
+  { label: 'Keep satisfied', hint: 'High influence · low interest', pos: 'top-0 left-0', bg: 'bg-amber-50/60' },
+  { label: 'Manage closely', hint: 'High influence · high interest', pos: 'top-0 right-0', bg: 'bg-green-50/70' },
+  { label: 'Monitor', hint: 'Low influence · low interest', pos: 'bottom-0 left-0', bg: 'bg-slate-50' },
+  { label: 'Keep informed', hint: 'Low influence · high interest', pos: 'bottom-0 right-0', bg: 'bg-blue-50/60' },
+]
+
+function StakeholderMatrix({
+  stakeholders,
+  onSelect,
+}: {
+  stakeholders: StakeholderRow[]
+  onSelect: (id: string) => void
+}) {
+  const mapped = stakeholders.filter(s => s.influence != null && s.interest != null)
+
+  return (
+    <div className="card p-5">
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
+        <div>
+          <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+            <Target size={18} className="text-green-600" aria-hidden="true" />
+            Power / interest matrix
+          </h3>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Where to focus engagement — each stakeholder plotted by influence and interest.
+          </p>
+        </div>
+        <span className="text-xs text-slate-400">{mapped.length} of {stakeholders.length} mapped</span>
+      </div>
+
+      <div className="flex gap-3">
+        {/* Y axis label */}
+        <div className="flex flex-col items-center justify-center">
+          <span className="text-xs font-medium text-slate-500 [writing-mode:vertical-rl] rotate-180">Influence →</span>
+        </div>
+
+        <div className="flex-1">
+          <div className="relative w-full aspect-square max-w-[520px] mx-auto rounded-lg border border-slate-200 overflow-hidden">
+            {/* quadrant backgrounds */}
+            {QUADRANTS.map(q => (
+              <div key={q.label} className={`absolute w-1/2 h-1/2 ${q.pos} ${q.bg} flex items-start justify-start`}>
+                <div className="p-2">
+                  <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">{q.label}</div>
+                  <div className="text-[10px] text-slate-400">{q.hint}</div>
+                </div>
+              </div>
+            ))}
+            {/* centre grid lines */}
+            <div className="absolute inset-y-0 left-1/2 w-px bg-slate-200" />
+            <div className="absolute inset-x-0 top-1/2 h-px bg-slate-200" />
+
+            {/* dots */}
+            {mapped.map((s, i) => {
+              // 1–5 → 0..100%. Interest = x, Influence = y (5 at top).
+              const jitter = ((i % 3) - 1) * 1.4
+              const x = ((s.interest! - 0.5) / 5) * 100 + jitter
+              const y = (1 - (s.influence! - 0.5) / 5) * 100 + jitter
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => onSelect(s.id)}
+                  title={`${s.name}${s.role ? ` · ${s.role}` : ''} (influence ${s.influence}, interest ${s.interest})`}
+                  className="group absolute -translate-x-1/2 -translate-y-1/2 h-3.5 w-3.5 rounded-full border-2 border-white shadow-sm transition-transform hover:scale-150 focus:scale-150 focus:outline-none z-10"
+                  style={{ left: `${x}%`, top: `${y}%`, background: STANCE_DOT[s.category] ?? STANCE_DOT.neutral }}
+                >
+                  <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 -top-7 hidden group-hover:block whitespace-nowrap rounded bg-slate-900 px-2 py-0.5 text-[10px] text-white">
+                    {s.name}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+          {/* X axis label */}
+          <div className="text-center mt-1.5 text-xs font-medium text-slate-500">Interest →</div>
+        </div>
+      </div>
+
+      {/* legend */}
+      <div className="flex flex-wrap gap-4 mt-4 pt-3 border-t border-slate-100">
+        {CATEGORIES.map(c => (
+          <span key={c} className="flex items-center gap-1.5 text-xs text-slate-500">
+            <span className="h-2.5 w-2.5 rounded-full" style={{ background: STANCE_DOT[c] }} />
+            {CATEGORY_META[c].label}
+          </span>
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -132,6 +232,10 @@ export function StakeholdersTab({ projectId, isAdmin }: { projectId: string; isA
           </button>
         )}
       </div>
+
+      {stakeholders.some(s => s.influence != null && s.interest != null) && (
+        <StakeholderMatrix stakeholders={stakeholders} onSelect={setSelectedId} />
+      )}
 
       {stakeholders.length === 0 && !adding ? (
         <div className="card p-10 text-center">

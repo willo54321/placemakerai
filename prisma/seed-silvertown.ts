@@ -550,10 +550,14 @@ async function main() {
   console.log(`Created ${ENQUIRIES.length} enquiries`)
 
   // --- stakeholders (best-effort) ----------------------------------------
+  // influence / interest (1–5) per stakeholder, aligned to STAKEHOLDERS order,
+  // spread across all four quadrants of the power/interest matrix.
+  const II: [number, number][] = [[4, 5], [5, 4], [5, 3], [3, 5], [3, 4], [3, 4], [2, 4], [4, 3]]
   try {
-    for (const s of STAKEHOLDERS) {
+    for (let si = 0; si < STAKEHOLDERS.length; si++) {
+      const s = STAKEHOLDERS[si]
       const sh = await (prisma as any).stakeholder.create({
-        data: { projectId: PROJECT_ID, name: s.name, organization: (s as any).org ?? null, type: s.type, category: s.category, email: s.email, role: (s as any).role ?? null, notes: s.notes },
+        data: { projectId: PROJECT_ID, name: s.name, organization: (s as any).org ?? null, type: s.type, category: s.category, email: s.email, role: (s as any).role ?? null, notes: s.notes, influence: II[si]?.[0] ?? null, interest: II[si]?.[1] ?? null },
       })
       for (const eng of s.engagements) {
         await (prisma as any).stakeholderEngagement.create({

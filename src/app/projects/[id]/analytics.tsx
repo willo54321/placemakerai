@@ -621,13 +621,6 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
 
       {view === 'sentiment' && (
       <div className="space-y-8">
-      {/* Campaign & Duplicate Detection */}
-      {analysis.campaignAnalysis && analysis.campaignAnalysis.campaigns.length > 0 && (
-        <div className="card p-6" data-tour="campaign-detection">
-          <CampaignDetection analysis={analysis.campaignAnalysis} />
-        </div>
-      )}
-
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Sentiment Donut Chart */}
@@ -774,6 +767,13 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
               Support
             </span>
           </div>
+        </div>
+      )}
+
+      {/* Campaign & Duplicate Detection */}
+      {analysis.campaignAnalysis && analysis.campaignAnalysis.campaigns.length > 0 && (
+        <div className="card p-6" data-tour="campaign-detection">
+          <CampaignDetection analysis={analysis.campaignAnalysis} />
         </div>
       )}
 

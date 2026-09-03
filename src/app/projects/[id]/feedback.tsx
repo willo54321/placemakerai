@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { MapPin, MessageCircle, ExternalLink, Copy, Check, Eye } from 'lucide-react'
+import { MapPin, MessageCircle, ExternalLink, Copy, Check, Eye, Shapes } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
 // Dynamic imports for map components to avoid SSR/chunk loading issues
@@ -35,7 +35,22 @@ const FeedbackPinsTab = dynamic(
   }
 )
 
-type SubTab = 'map' | 'responses' | 'preview'
+const ZoneEditor = dynamic(
+  () => import('@/components/ZoneEditor').then(mod => ({ default: mod.ZoneEditor })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-full w-full flex items-center justify-center bg-gray-50 p-6">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-3 border-green-600 border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm text-slate-500">Loading zones...</span>
+        </div>
+      </div>
+    )
+  }
+)
+
+type SubTab = 'map' | 'responses' | 'zones' | 'preview'
 
 export function FeedbackTab({
   projectId,
@@ -77,6 +92,12 @@ export function FeedbackTab({
       label: 'Responses',
       icon: MessageCircle,
       count: feedbackPinCount,
+    },
+    {
+      id: 'zones' as SubTab,
+      label: 'Zones',
+      icon: Shapes,
+      count: 0,
     },
     {
       id: 'preview' as SubTab,
@@ -182,6 +203,11 @@ export function FeedbackTab({
               focusPinId={focusPinId}
               onFocusHandled={onFocusHandled}
             />
+          </div>
+        )}
+        {activeSubTab === 'zones' && (
+          <div className="p-6">
+            <ZoneEditor projectId={projectId} project={project} />
           </div>
         )}
         {activeSubTab === 'preview' && (

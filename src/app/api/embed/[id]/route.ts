@@ -17,6 +17,10 @@ export async function GET(
       publicPins: {
         where: { approved: true },
         orderBy: { createdAt: 'desc' }
+      },
+      geoLayers: {
+        where: { type: 'plot', visible: true },
+        orderBy: { createdAt: 'asc' }
       }
     }
   })
@@ -64,6 +68,19 @@ export async function GET(
       name: p.name,
       votes: p.votes,
       createdAt: p.createdAt
-    }))
+    })),
+    zones: project.geoLayers.map(l => {
+      const feature = (l.geojson as any)?.type === 'FeatureCollection' ? (l.geojson as any).features?.[0] : (l.geojson as any)
+      const props = feature?.properties || {}
+      const style = (l.style as any) || {}
+      return {
+        id: l.id,
+        name: l.name,
+        status: props.status || '',
+        blurb: props.blurb || '',
+        color: style.fillColor || style.strokeColor || '#0E7C86',
+        geometry: feature?.geometry ?? null,
+      }
+    })
   })
 }

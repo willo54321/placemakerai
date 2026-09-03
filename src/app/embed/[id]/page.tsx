@@ -58,6 +58,15 @@ interface Overlay {
   rotation: number
 }
 
+interface Zone {
+  id: string
+  name: string
+  status: string
+  blurb: string
+  color: string
+  geometry: GeoJSONGeometry | null
+}
+
 interface ProjectData {
   id: string
   name: string
@@ -69,6 +78,7 @@ interface ProjectData {
   allowDrawing: boolean
   overlays: Overlay[]
   pins: PublicPin[]
+  zones?: Zone[]
   // Styling customization
   embedPrimaryColor: string | null
   embedFontFamily: string | null
@@ -398,6 +408,7 @@ export default function EmbedPage({ params }: { params: { id: string } }) {
           zoom={project.mapZoom || 15}
           overlays={project.overlays}
           pins={filteredPins}
+          zones={project.zones || []}
           pendingPin={pendingShape?.type === 'pin' ? { lat: pendingShape.lat!, lng: pendingShape.lng! } : null}
           pendingShape={pendingShape && pendingShape.type === 'polygon' ? { type: pendingShape.type, geometry: pendingShape.geometry } : null}
           isAddingPin={drawMode === 'pin'}

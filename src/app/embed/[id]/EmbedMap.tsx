@@ -37,11 +37,21 @@ interface PublicPin {
 
 type DrawMode = 'pin' | 'polygon' | null
 
+interface Zone {
+  id: string
+  name: string
+  status: string
+  blurb: string
+  color: string
+  geometry: GeoJSONGeometry | null
+}
+
 interface EmbedMapProps {
   center: [number, number]
   zoom: number
   overlays: Overlay[]
   pins: PublicPin[]
+  zones?: Zone[]
   pendingPin: { lat: number; lng: number } | null
   pendingShape: { type: 'polygon'; geometry?: GeoJSONGeometry } | null
   drawMode: DrawMode
@@ -189,6 +199,7 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
   zoom,
   overlays,
   pins,
+  zones = [],
   pendingPin,
   pendingShape,
   drawMode,
@@ -211,6 +222,7 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
 
   const [map, setMap] = useState<google.maps.Map | null>(null)
   const [selectedPin, setSelectedPin] = useState<string | null>(null)
+  const [selectedZone, setSelectedZone] = useState<string | null>(null)
   const [closingPin, setClosingPin] = useState<string | null>(null)
   const [hoveredPin, setHoveredPin] = useState<string | null>(null)
   const [showFullComment, setShowFullComment] = useState(false)
@@ -640,6 +652,31 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
           onPolygonComplete={handlePolygonComplete}
         />
 
+        {/* Plot zones — client-drawn boundaries, underneath feedback */}
+        {zones.map(zone => {
+          const geom = zone.geometry as any
+          if (!geom || geom.type !== 'Polygon') return null
+          const path = (geom.coordinates?.[0] ?? []).map(([lng, lat]: number[]) => ({ lat, lng }))
+          if (path.length < 3) return null
+          const isSelected = selectedZone === zone.id
+          return (
+            <PolygonF
+              key={`zone-${zone.id}`}
+              paths={path}
+              options={{
+                fillColor: zone.color,
+                fillOpacity: isSelected ? 0.28 : 0.16,
+                strokeColor: zone.color,
+                strokeWeight: isSelected ? 3 : 2,
+                strokeOpacity: 1,
+                clickable: true,
+                zIndex: 0,
+              }}
+              onClick={() => { setSelectedPin(null); setSelectedZone(zone.id) }}
+            />
+          )
+        })}
+
         {/* Existing Polygon Pins */}
         {polygonPins.map(pin => {
           const coords = polygonPaths.get(pin.id) || []
@@ -731,6 +768,27 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
             animation={google.maps.Animation.BOUNCE}
           />
         )}
+
+        {/* Selected Zone Popup */}
+        {selectedZone && (() => {
+          const zone = zones.find(z => z.id === selectedZone)
+          if (!zone || !zone.geometry) return null
+          const position = getShapeCentroid(zone.geometry)
+          return (
+            <OverlayView position={position} mapPaneName={OverlayView.FLOAT_PANE}>
+              <div style={{ transform: 'translate(-50%, -100%)' }} className="mb-2">
+                <div className="bg-white rounded-xl shadow-xl border border-slate-200 p-4 w-64">
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="font-semibold text-slate-900 leading-tight">{zone.name}</h3>
+                    <button onClick={() => setSelectedZone(null)} className="text-slate-400 hover:text-slate-600 text-lg leading-none" aria-label="Close">×</button>
+                  </div>
+                  {zone.status && <div className="mt-1 text-xs font-medium" style={{ color: zone.color }}>{zone.status}</div>}
+                  {zone.blurb && <p className="mt-2 text-sm text-slate-600 leading-relaxed">{zone.blurb}</p>}
+                </div>
+              </div>
+            </OverlayView>
+          )
+        })()}
 
         {/* Selected Pin Custom Popup */}
         {selectedPin && (() => {

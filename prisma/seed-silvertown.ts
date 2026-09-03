@@ -420,7 +420,7 @@ async function main() {
         type: 'plot',
         geojson: {
           type: 'FeatureCollection',
-          features: [ { type: 'Feature', properties: { name: p.name, plot: p.key, status: p.status }, geometry: { type: 'Polygon', coordinates: [plotRing(p)] } } ],
+          features: [ { type: 'Feature', properties: { name: p.name, plot: p.key, status: p.status, blurb: p.blurb }, geometry: { type: 'Polygon', coordinates: [plotRing(p)] } } ],
         },
         style: { fillColor: p.color, strokeColor: p.color, fillOpacity: 0.18, strokeWidth: 2 },
         visible: true,
@@ -441,29 +441,8 @@ async function main() {
     return mat && non ? 'mixed' : mat ? 'material' : 'non-material'
   }
 
-  // --- plot polygon pins for the public embed (clickable info) ------------
-  for (const p of PLOTS) {
-    const pin = await prisma.publicPin.create({
-      data: {
-        projectId: PROJECT_ID,
-        shapeType: 'polygon',
-        latitude: null,
-        longitude: null,
-        geometry: { type: 'Polygon', coordinates: [plotRing(p)] },
-        category: 'comment',
-        comment: `${p.name}. ${p.blurb} (${p.status})`,
-        name: 'Silvertown programme team',
-        approved: true,
-        votes: 0,
-        gdprConsent: true,
-        gdprConsentDate: ago(56),
-        createdAt: ago(56),
-      },
-    })
-    // Plot markers join the corpus (approved pins do) but carry no theme, so
-    // they don't skew theme counts. Neutral, no coordinates.
-    corpus.push({ id: pin.id, content: pin.comment, type: 'pin', latitude: null, longitude: null, createdAt: ago(56), sentiment: 'neutral', themes: [], material: 'non-material', source: 'pin' })
-  }
+  // Zones are the GeoLayers above — the embed renders them directly and admins
+  // edit them in the Zones tab, so no polygon "pins" are needed for the plots.
 
   // --- feedback pins ------------------------------------------------------
   const perPlotCount: Record<string, number> = {}

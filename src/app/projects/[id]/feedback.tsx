@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { MapPin, MessageCircle, ExternalLink, Copy, Check } from 'lucide-react'
+import { MapPin, MessageCircle, ExternalLink, Copy, Check, Eye } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
 // Dynamic imports for map components to avoid SSR/chunk loading issues
@@ -35,7 +35,7 @@ const FeedbackPinsTab = dynamic(
   }
 )
 
-type SubTab = 'map' | 'responses'
+type SubTab = 'map' | 'responses' | 'preview'
 
 export function FeedbackTab({
   projectId,
@@ -78,6 +78,12 @@ export function FeedbackTab({
       icon: MessageCircle,
       count: feedbackPinCount,
     },
+    {
+      id: 'preview' as SubTab,
+      label: 'Preview',
+      icon: Eye,
+      count: 0,
+    },
   ]
 
   const embedUrl = typeof window !== 'undefined'
@@ -117,7 +123,7 @@ export function FeedbackTab({
                 data-tour="preview-public"
                 className="flex items-center gap-1 text-xs text-green-600 hover:text-green-700 px-2 py-1 bg-white rounded border border-green-200"
               >
-                <ExternalLink size={12} /> Preview
+                <ExternalLink size={12} /> Open
               </a>
               <button
                 onClick={copyEmbedCode}
@@ -175,6 +181,28 @@ export function FeedbackTab({
               project={project}
               focusPinId={focusPinId}
               onFocusHandled={onFocusHandled}
+            />
+          </div>
+        )}
+        {activeSubTab === 'preview' && (
+          <div className="h-full p-4 flex flex-col">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-sm text-slate-500">Live public view — exactly what visitors see on your website.</p>
+              <a
+                href={embedUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-xs text-green-600 hover:text-green-700"
+              >
+                <ExternalLink size={12} /> Open in new tab
+              </a>
+            </div>
+            <iframe
+              src={embedUrl}
+              title="Public map preview"
+              className="w-full flex-1 min-h-[600px] rounded-lg border border-slate-200"
+              loading="lazy"
+              allow="geolocation"
             />
           </div>
         )}

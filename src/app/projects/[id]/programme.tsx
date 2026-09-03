@@ -2,9 +2,9 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { Layers, Users, TrendingUp, MapPin, FileText, Inbox, BellRing, Building2 } from 'lucide-react'
+import { PlotComparisonCards, STANCE_COLORS, type Plot } from '@/components/analytics/PlotComparison'
 
 // ---- types (mirror /api/projects/[id]/programme) -------------------------
-type Plot = { key: string; name: string; color: string; pins: number; support: number; neutral: number; object: number; surveyResponses: number; theme: string | null; headline: string | null }
 type TimelineWeek = { week: string; pins: number; forms: number; enquiries: number; registrations: number }
 type Totals = { pins: number; survey: number; enquiries: number; registrations: number; stakeholders: number; contributions: number }
 type AudienceSeg = { label: string; count: number; support: number; neutral: number; object: number }
@@ -15,25 +15,12 @@ type ProgrammeData = {
   audience: { segments: AudienceSeg[]; organisations: number; stakeholdersByStance: Record<string, number>; stakeholdersByType: Record<string, number>; stakeholderTotal: number }
 }
 
-const STANCE_COLORS = { support: '#16A34A', neutral: '#94A3B8', object: '#DC2626' }
 const CHANNEL = [
   { key: 'pins', label: 'Map comments', color: '#0E7C86' },
   { key: 'forms', label: 'Survey', color: '#2563EB' },
   { key: 'enquiries', label: 'Enquiries', color: '#D97706' },
   { key: 'registrations', label: 'Registrations', color: '#7C3AED' },
 ] as const
-
-function StanceBar({ support, neutral, object }: { support: number; neutral: number; object: number }) {
-  const total = support + neutral + object || 1
-  const seg = (n: number, c: string) => (n > 0 ? <div style={{ width: `${(n / total) * 100}%`, background: c }} className="h-full" /> : null)
-  return (
-    <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
-      {seg(support, STANCE_COLORS.support)}
-      {seg(neutral, STANCE_COLORS.neutral)}
-      {seg(object, STANCE_COLORS.object)}
-    </div>
-  )
-}
 
 function StatTile({ icon: Icon, label, value, tint }: { icon: any; label: string; value: number; tint: string }) {
   return (
@@ -87,39 +74,7 @@ export function ProgrammeTab({ projectId }: { projectId: string }) {
       </div>
 
       {/* per-plot cards */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {plots.map(p => {
-          const participationCount = p.pins + p.surveyResponses
-          return (
-            <div key={p.key} className="flex flex-col rounded-xl border border-slate-200 bg-white p-5">
-              <div className="flex items-center gap-2">
-                <span className="inline-block h-3 w-3 rounded-full" style={{ background: p.color }} />
-                <h3 className="font-semibold text-slate-900">{p.name}</h3>
-              </div>
-              <div className="mt-4 flex items-baseline gap-2">
-                <span className="text-3xl font-semibold text-slate-900">{participationCount}</span>
-                <span className="text-sm text-slate-500">contributions</span>
-              </div>
-              <div className="mt-1 text-xs text-slate-400">{p.pins} map comments · {p.surveyResponses} survey responses</div>
-              <div className="mt-4">
-                <StanceBar support={p.support} neutral={p.neutral} object={p.object} />
-                <div className="mt-1.5 flex justify-between text-xs text-slate-500">
-                  <span>{p.support} support</span>
-                  <span>{p.neutral} neutral</span>
-                  <span>{p.object} object</span>
-                </div>
-              </div>
-              {p.theme && (
-                <div className="mt-4 border-t border-slate-100 pt-3">
-                  <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Leading theme</div>
-                  <div className="mt-0.5 text-sm font-medium text-slate-700">{p.theme}</div>
-                  {p.headline && <p className="mt-1 text-xs leading-relaxed text-slate-500">{p.headline}</p>}
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
+      <PlotComparisonCards plots={plots} />
 
       {/* participation metrics */}
       <section>

@@ -177,6 +177,7 @@ export function StakeholdersTab({ projectId, isAdmin }: { projectId: string; isA
   const [categoryFilter, setCategoryFilter] = useState<'all' | Category>('all')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
+  const [view, setView] = useState<'register' | 'matrix'>('register')
 
   const listKey = ['stakeholders', projectId]
   const { data, isLoading, error } = useQuery<{ stakeholders: StakeholderRow[] }>({
@@ -233,11 +234,30 @@ export function StakeholdersTab({ projectId, isAdmin }: { projectId: string; isA
         )}
       </div>
 
-      {stakeholders.some(s => s.influence != null && s.interest != null) && (
-        <StakeholderMatrix stakeholders={stakeholders} onSelect={setSelectedId} />
+      {stakeholders.length > 0 && (
+        <div className="flex items-center gap-1 border-b border-slate-200" role="tablist" aria-label="Stakeholder views">
+          {(['register', 'matrix'] as const).map(v => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              role="tab"
+              aria-selected={view === v}
+              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                view === v ? 'border-green-600 text-green-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {v === 'register' ? 'Register' : 'Power / interest matrix'}
+            </button>
+          ))}
+        </div>
       )}
 
-      {stakeholders.length === 0 && !adding ? (
+      {view === 'matrix' ? (
+        <StakeholderMatrix
+          stakeholders={stakeholders}
+          onSelect={(id) => { setSelectedId(id); setView('register') }}
+        />
+      ) : stakeholders.length === 0 && !adding ? (
         <div className="card p-10 text-center">
           <Users size={32} className="mx-auto text-slate-300 mb-3" aria-hidden="true" />
           <p className="text-slate-600 font-medium">No stakeholders yet</p>

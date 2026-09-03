@@ -57,6 +57,10 @@ export function ZoneEditor({ projectId, project }: { projectId: string; project:
     queryFn: () => fetchJson(`/api/projects/${projectId}/layers`),
   })
   const zones = useMemo(() => (layers ?? []).filter(l => l.type === 'plot'), [layers])
+  // Latest zones for use inside long-lived Google Maps event listeners.
+  const zonesRef = useRef<Layer[]>(zones)
+  zonesRef.current = zones
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: layersKey })
 
@@ -79,13 +83,35 @@ export function ZoneEditor({ projectId, project }: { projectId: string; project:
   })
 
   // Read the (possibly edited) path back off the live polygon and persist it.
-  const saveGeometry = useCallback((zone: Layer) => {
-    const poly = polyRefs.current[zone.id]
-    if (!poly) return
+  // Optimistically update the query cache first so the controlled <PolygonF>
+  // path prop reflects the edit and never snaps back to the old shape.
+  const saveGeometry = useCallback((id: string) => {
+    const poly = polyRefs.current[id]
+    const zone = zonesRef.current.find(z => z.id === id)
+    if (!poly || !zone) return
     const path: LatLng[] = poly.getPath().getArray().map(ll => ({ lat: ll.lat(), lng: ll.lng() }))
     if (path.length < 3) return
-    updateZone.mutate({ id: zone.id, geojson: buildGeojson(pathToRing(path), getProps(zone)) })
-  }, [updateZone])
+    const geojson = buildGeojson(pathToRing(path), getProps(zone))
+    queryClient.setQueryData<Layer[]>(layersKey, old => (old ?? []).map(l => (l.id === id ? { ...l, geojson } : l)))
+    updateZone.mutate({ id, geojson })
+  }, [updateZone, queryClient])
+
+  const scheduleSave = useCallback((id: string) => {
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(() => saveGeometry(id), 500)
+  }, [saveGeometry])
+
+  // Attach path-change listeners so vertex drags/inserts/removes (which don't
+  // fire onMouseUp) and whole-shape drags all persist.
+  const attachEditListeners = useCallback((id: string, poly: google.maps.Polygon) => {
+    polyRefs.current[id] = poly
+    const path = poly.getPath()
+    const onEdit = () => scheduleSave(id)
+    path.addListener('set_at', onEdit)
+    path.addListener('insert_at', onEdit)
+    path.addListener('remove_at', onEdit)
+    poly.addListener('dragend', onEdit)
+  }, [scheduleSave])
 
   const onPolygonComplete = useCallback((poly: google.maps.Polygon) => {
     const path: LatLng[] = poly.getPath().getArray().map(ll => ({ lat: ll.lat(), lng: ll.lng() }))
@@ -135,11 +161,9 @@ export function ZoneEditor({ projectId, project }: { projectId: string; project:
                 path={ringToPath(getRing(z))}
                 editable={selected}
                 draggable={selected}
-                onLoad={poly => { polyRefs.current[z.id] = poly }}
-                onUnmount={() => { delete polyRefs.current[z.id] }}
+                onLoad={poly => attachEditListeners(z.id, poly)}
+                onUnmount={poly => { window.google?.maps?.event?.clearInstanceListeners(poly.getPath()); window.google?.maps?.event?.clearInstanceListeners(poly); delete polyRefs.current[z.id] }}
                 onClick={() => setSelectedId(z.id)}
-                onMouseUp={() => { if (selected) saveGeometry(z) }}
-                onDragEnd={() => { if (selected) saveGeometry(z) }}
                 options={{
                   fillColor: color,
                   fillOpacity: selected ? 0.32 : 0.18,

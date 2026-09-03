@@ -195,14 +195,26 @@ const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<
   return null
 }
 
+const ANALYTICS_VIEWS = [
+  { id: 'summary', label: 'Summary' },
+  { id: 'sentiment', label: 'Sentiment' },
+  { id: 'themes', label: 'Themes' },
+  { id: 'engagement', label: 'Engagement & map' },
+  { id: 'responses', label: 'Responses' },
+] as const
+type AnalyticsView = typeof ANALYTICS_VIEWS[number]['id']
+
 export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
   const queryClient = useQueryClient()
   const [selectedTheme, setSelectedTheme] = useState<Theme | null>(null)
   const [showAllFindings, setShowAllFindings] = useState(false)
   const [focusResponse, setFocusResponse] = useState<{ id: string; nonce: number } | null>(null)
+  const [view, setView] = useState<AnalyticsView>('summary')
 
-  const handleCite = (id: string) =>
+  const handleCite = (id: string) => {
     setFocusResponse(current => ({ id, nonce: (current?.nonce ?? 0) + 1 }))
+    setView('responses')
+  }
 
   // Latch so the auto-run effect fires AT MOST ONCE per mount and never
   // re-fires after a failure (which would otherwise loop forever since
@@ -460,6 +472,25 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
         </div>
       </div>
 
+      {/* Insight section menu */}
+      <div className="border-b border-slate-200">
+        <nav className="flex gap-1 overflow-x-auto" aria-label="Insight sections">
+          {ANALYTICS_VIEWS.map(v => (
+            <button
+              key={v.id}
+              onClick={() => setView(v.id)}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition-colors ${
+                view === v.id ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {v.label}
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {view === 'summary' && (
+      <div className="space-y-8">
       {/* Executive Summary - Hero Card */}
       <div className="card p-8">
         <div className="flex items-start gap-5">
@@ -585,6 +616,11 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
         </div>
       </div>
 
+      </div>
+      )}
+
+      {view === 'sentiment' && (
+      <div className="space-y-8">
       {/* Campaign & Duplicate Detection */}
       {analysis.campaignAnalysis && analysis.campaignAnalysis.campaigns.length > 0 && (
         <div className="card p-6" data-tour="campaign-detection">
@@ -741,6 +777,11 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
         </div>
       )}
 
+      </div>
+      )}
+
+      {view === 'themes' && (
+      <div className="space-y-8">
       {/* Interactive Theme Bar Chart */}
       <div className="card p-6">
         <ThemeBarChart
@@ -827,6 +868,11 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
       </div>
 
 
+      </div>
+      )}
+
+      {view === 'engagement' && (
+      <div className="space-y-8">
       {/* Participation metrics + audience segmentation */}
       <EngagementPanels projectId={projectId} />
 
@@ -837,9 +883,7 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
             <MapPin className="w-5 h-5 text-brand-600" />
             Support & opposition map
           </h3>
-          <p className="text-sm text-slate-500 mb-6">
-            Where classified support (green) and opposition (red) concentrate across the project area
-          </p>
+          <div className="mt-4" />
           <SentimentHeatmap clusters={analysis.geographic.clusters} height="400px" />
         </div>
       )}
@@ -847,15 +891,22 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
       {/* Significance-tested patterns: statements + starred heatmap */}
       <AutoInsights
         projectId={projectId}
-        onViewTheme={(name) => setSelectedTheme({ name } as Theme)}
+        onViewTheme={(name) => { setSelectedTheme({ name } as Theme); setView('themes') }}
       />
 
+      </div>
+      )}
+
+      {view === 'responses' && (
+      <div className="space-y-8">
       {/* All responses, filterable by theme; a theme clicked in the chart above jumps here */}
       <ResponsesExplorer
         projectId={projectId}
         focusTheme={selectedTheme?.name ?? null}
         focusResponse={focusResponse}
       />
+      </div>
+      )}
     </div>
   )
 }

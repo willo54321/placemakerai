@@ -152,7 +152,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
       // plot attribution
       if (plotField) {
         const val = String(data[plotField.id] ?? data[plotField.label] ?? '').trim()
-        const plot = (plots as any[]).find(p => p.name === val || val.includes(p.key))
+        const plot = (plots as any[]).find(p => p.name === val)
         if (plot) { plot.surveyResponses++; plot[stance]++ }
       }
       bump(timeline, weekKey(resp.submittedAt), 'forms')

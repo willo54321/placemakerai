@@ -51,7 +51,7 @@ const TAXONOMY = [
 // Polygon rings are [lng, lat], closed.
 // ---------------------------------------------------------------------------
 type Plot = {
-  key: 'A' | 'B' | 'C'
+  key: '1' | '1JC' | 'D'
   name: string
   blurb: string
   status: string
@@ -62,31 +62,31 @@ type Plot = {
 
 const PLOTS: Plot[] = [
   {
-    key: 'A',
-    name: 'Plot A — Millennium Mills',
-    blurb: 'Heritage-led restoration of the listed Millennium Mills and Silo D, delivering affordable workspace, makers’ studios and around 350 homes around a new dockside square.',
-    status: 'Outline proposals — consultation open',
+    key: '1',
+    name: 'Plot 1',
+    blurb: 'The gateway plot on the north-west corner, fronting Royal Victoria Dock at the new dock bridge landing and next to the Grade II listed Millennium Mills. A residential-led, mixed-use building of around 265–304 homes (1–2 bed) with ground-floor retail and a dockside restaurant, at the northern end of Spillers Street.',
+    status: 'Outline (HPA 22/02855/OUT) — awaiting consent; RMA to follow',
     color: '#0E7C86',
-    centroid: [51.5025, 0.0250],
-    bounds: { latMin: 51.5019, latMax: 51.5031, lngMin: 0.0236, lngMax: 0.0264 },
+    centroid: [51.5031, 0.0250],
+    bounds: { latMin: 51.5026, latMax: 51.5036, lngMin: 0.0238, lngMax: 0.0262 },
   },
   {
-    key: 'B',
-    name: 'Plot B — Dock Wharf',
-    blurb: 'A new waterfront neighbourhood of around 620 homes, including family and affordable housing, with ground-floor shops and a dockside promenade.',
-    status: 'Emerging masterplan — consultation open',
+    key: '1JC',
+    name: 'Plot 1J&C',
+    blurb: 'The central plot on Spillers Street — south of Millennium Mills, west of Silo D, north of the Finger Dock. Around 676 homes (studios to 3-bed) with ground-floor commercial on Mills Street and Spillers Street, and an active, F&B-lined dock edge onto Silo D Park.',
+    status: 'Outline consented Dec 2025 — RMA due by March 2027',
     color: '#2563EB',
-    centroid: [51.5020, 0.0285],
-    bounds: { latMin: 51.5014, latMax: 51.5026, lngMin: 0.0271, lngMax: 0.0299 },
+    centroid: [51.5023, 0.0275],
+    bounds: { latMin: 51.5017, latMax: 51.5029, lngMin: 0.0262, lngMax: 0.0290 },
   },
   {
-    key: 'C',
-    name: 'Plot C — Thameside Green',
-    blurb: 'A two-acre public park, a community pavilion and a new two-form-entry primary school at the eastern end of the site, framed by low-rise homes.',
-    status: 'Concept stage — early engagement',
+    key: 'D',
+    name: 'Silo D',
+    blurb: 'The historically listed Silo D building and Silo D Park by the Finger Dock — an active ground floor for events and community use, with the residential Silo D Quarter above. Planning strategy still to be confirmed.',
+    status: 'Early stage — planning strategy to be confirmed',
     color: '#16A34A',
-    centroid: [51.5022, 0.0320],
-    bounds: { latMin: 51.5016, latMax: 51.5028, lngMin: 0.0306, lngMax: 0.0334 },
+    centroid: [51.5024, 0.0308],
+    bounds: { latMin: 51.5018, latMax: 51.5030, lngMin: 0.0296, lngMax: 0.0322 },
   },
 ]
 
@@ -125,63 +125,62 @@ type PinSeed = {
 }
 
 const PINS: PinSeed[] = [
-  // --- Plot A — Millennium Mills (heritage / workspace, broadly positive) ---
-  { plot: 'A', category: 'positive', comment: 'Fantastic to see the Millennium Mills finally being brought back to life instead of rotting. The heritage matters.', sentiment: 'positive', themes: [5], votes: 24, daysAgo: 52 },
-  { plot: 'A', category: 'positive', comment: 'Affordable workspace for makers is exactly what Silvertown needs. Please keep the rents genuinely affordable, not just "discounted".', sentiment: 'positive', themes: [4], votes: 19, daysAgo: 48 },
-  { plot: 'A', category: 'positive', comment: 'The dockside square looks brilliant. Somewhere to actually sit by the water.', sentiment: 'positive', themes: [3, 5], votes: 15, daysAgo: 40 },
-  { plot: 'A', category: 'negative', comment: 'Please do not let them demolish the silo. Once the industrial heritage is gone it never comes back.', sentiment: 'negative', themes: [5], votes: 31, daysAgo: 44 },
-  { plot: 'A', category: 'question', comment: 'Which parts of the mills are actually listed and being kept, and which are being rebuilt?', sentiment: 'neutral', themes: [5], votes: 6, daysAgo: 30 },
-  { plot: 'A', category: 'comment', comment: 'Would love a small heritage exhibition on the dock’s working history inside the restored mill.', sentiment: 'neutral', themes: [5], votes: 9, daysAgo: 26 },
-  { plot: 'A', category: 'positive', comment: 'Great that some of the units are set aside for start-ups. That’s real local economy stuff.', sentiment: 'positive', themes: [4], votes: 12, daysAgo: 22 },
-  { plot: 'A', category: 'negative', comment: 'Worried the "workspace" will just end up as expensive offices with none of it for local people.', sentiment: 'negative', themes: [4], votes: 14, daysAgo: 18 },
-  { plot: 'A', category: 'question', comment: 'Will there be step-free access from Pontoon Dock DLR to the new square?', sentiment: 'neutral', themes: [1], votes: 5, daysAgo: 12 },
-  { plot: 'A', category: 'comment', comment: 'The proposed brick and steel palette is sympathetic to the industrial character. Well judged.', sentiment: 'positive', themes: [2, 5], votes: 8, daysAgo: 9 },
-  { plot: 'A', category: 'negative', comment: 'Construction lorries down North Woolwich Road are already a nightmare. How much worse will this make it?', sentiment: 'negative', themes: [7, 1], votes: 17, daysAgo: 6 },
-  { plot: 'A', category: 'positive', comment: 'Reopening the dock edge to the public is the single best thing in these plans.', sentiment: 'positive', themes: [3, 5], votes: 21, daysAgo: 4 },
-  { plot: 'A', category: 'comment', comment: 'Please include some genuinely family-sized homes here, not just studios and one-beds.', sentiment: 'neutral', themes: [0], votes: 11, daysAgo: 3 },
-  { plot: 'A', category: 'question', comment: 'What are the proposed building heights next to the listed mill?', sentiment: 'neutral', themes: [2, 5], votes: 4, daysAgo: 2 },
+  // --- Plot 1 (gateway, Millennium Mills, dock frontage, retail — broadly positive) ---
+  { plot: '1', category: 'positive', comment: 'Brilliant that Plot 1 sits right next to Millennium Mills — the gateway building must respect that heritage.', sentiment: 'positive', themes: [5, 2], votes: 24, daysAgo: 52 },
+  { plot: '1', category: 'positive', comment: 'Love that the dock edge will have cafes and a restaurant. Somewhere to sit by Royal Victoria Dock at last.', sentiment: 'positive', themes: [3, 4], votes: 19, daysAgo: 48 },
+  { plot: '1', category: 'negative', comment: 'A tall "gateway" tower here will block views across the dock. Keep the height sensible next to the Mills.', sentiment: 'negative', themes: [2], votes: 31, daysAgo: 44 },
+  { plot: '1', category: 'question', comment: 'Will the new Royal Victoria Dock Bridge be step-free and open at all hours?', sentiment: 'neutral', themes: [1], votes: 6, daysAgo: 40 },
+  { plot: '1', category: 'positive', comment: 'Retail on Spillers Street with florists and small shops sounds lovely — please keep it independent.', sentiment: 'positive', themes: [4], votes: 15, daysAgo: 34 },
+  { plot: '1', category: 'comment', comment: 'Please make sure the ground-floor retail is genuinely affordable for local traders, not just chains.', sentiment: 'neutral', themes: [4], votes: 9, daysAgo: 30 },
+  { plot: '1', category: 'negative', comment: '300 private flats and no affordable homes on Plot 1? That is disappointing for a gateway plot.', sentiment: 'negative', themes: [0], votes: 27, daysAgo: 26 },
+  { plot: '1', category: 'positive', comment: 'Great connectivity — Elizabeth line at Custom House and DLR at Pontoon Dock. Right place for homes.', sentiment: 'positive', themes: [1, 0], votes: 12, daysAgo: 22 },
+  { plot: '1', category: 'question', comment: 'How tall is the proposed Plot 1 building compared to Millennium Mills?', sentiment: 'neutral', themes: [2, 5], votes: 5, daysAgo: 18 },
+  { plot: '1', category: 'comment', comment: 'A restaurant on the dock would be a real destination — just get the servicing and deliveries right.', sentiment: 'neutral', themes: [4, 1], votes: 8, daysAgo: 14 },
+  { plot: '1', category: 'positive', comment: 'The brick-and-steel palette responding to the industrial character is well judged.', sentiment: 'positive', themes: [2, 5], votes: 10, daysAgo: 9 },
+  { plot: '1', category: 'negative', comment: 'Construction traffic on North Woolwich Road is already awful — building Plot 1 first will make it worse.', sentiment: 'negative', themes: [7, 1], votes: 17, daysAgo: 6 },
+  { plot: '1', category: 'positive', comment: 'Opening the dock edge to the public at the bridge landing is the best thing in these plans.', sentiment: 'positive', themes: [3], votes: 21, daysAgo: 4 },
+  { plot: '1', category: 'comment', comment: 'Please include some family-sized homes, not only 1 and 2-beds.', sentiment: 'neutral', themes: [0], votes: 11, daysAgo: 2 },
 
-  // --- Plot B — Dock Wharf (waterfront homes, height/density, more mixed) ---
-  { plot: 'B', category: 'negative', comment: 'Twenty-six storeys is far too tall for the waterfront. It will wall off the dock and overshadow everything.', sentiment: 'negative', themes: [2], votes: 38, daysAgo: 50 },
-  { plot: 'B', category: 'negative', comment: '620 homes and only 90 parking spaces? Where is everyone supposed to park? The side streets are already full.', sentiment: 'negative', themes: [1], votes: 42, daysAgo: 49 },
-  { plot: 'B', category: 'negative', comment: 'Density is just too high. This is a suburb being turned into Manhattan.', sentiment: 'negative', themes: [2], votes: 27, daysAgo: 46 },
-  { plot: 'B', category: 'positive', comment: 'We badly need more homes and this is right next to the DLR. Build them.', sentiment: 'positive', themes: [0, 1], votes: 23, daysAgo: 45 },
-  { plot: 'B', category: 'negative', comment: 'Only 25% affordable is not good enough for public dock land. Should be 50%.', sentiment: 'negative', themes: [0], votes: 34, daysAgo: 41 },
-  { plot: 'B', category: 'positive', comment: 'The dockside promenade and cafes would transform this dead stretch of water. Yes please.', sentiment: 'positive', themes: [3], votes: 18, daysAgo: 38 },
-  { plot: 'B', category: 'question', comment: 'What is the affordable housing split between social rent and shared ownership?', sentiment: 'neutral', themes: [0], votes: 7, daysAgo: 33 },
-  { plot: 'B', category: 'negative', comment: 'The towers will cast the whole promenade into shadow every afternoon. Has a daylight study been done?', sentiment: 'negative', themes: [2, 3], votes: 20, daysAgo: 28 },
-  { plot: 'B', category: 'comment', comment: 'If you step the heights down towards the existing houses it would be far more acceptable.', sentiment: 'neutral', themes: [2], votes: 16, daysAgo: 24 },
-  { plot: 'B', category: 'negative', comment: 'The DLR is already crammed at rush hour. Adding thousands of residents with no transport upgrade is reckless.', sentiment: 'negative', themes: [1], votes: 29, daysAgo: 20 },
-  { plot: 'B', category: 'positive', comment: 'Really like that the ground floors are shops and not blank walls. Makes it feel like a place.', sentiment: 'positive', themes: [4, 2], votes: 10, daysAgo: 15 },
-  { plot: 'B', category: 'question', comment: 'Will the promenade be publicly accessible 24/7 or gated for residents only?', sentiment: 'neutral', themes: [3], votes: 8, daysAgo: 11 },
-  { plot: 'B', category: 'negative', comment: 'Flood risk on the dock edge worries me. What happens with rising river levels in 30 years?', sentiment: 'negative', themes: [8], votes: 13, daysAgo: 7 },
-  { plot: 'B', category: 'comment', comment: 'Please make sure there is proper cycle parking, not a token rack for 600 homes.', sentiment: 'neutral', themes: [1, 8], votes: 9, daysAgo: 5 },
-  { plot: 'B', category: 'negative', comment: 'My flat will be directly overlooked by the tallest block. This will devalue our home.', sentiment: 'negative', themes: [2], votes: 15, daysAgo: 2 },
+  // --- Plot 1J&C (676 homes, density/height, Spillers St, dock edge — more mixed/negative) ---
+  { plot: '1JC', category: 'negative', comment: '676 homes on Plot 1J&C is far too dense. This stretch of Spillers Street will feel like a canyon.', sentiment: 'negative', themes: [2], votes: 38, daysAgo: 50 },
+  { plot: '1JC', category: 'negative', comment: 'Where will everyone park? The DLR is already rammed at rush hour and there is barely any parking.', sentiment: 'negative', themes: [1], votes: 42, daysAgo: 49 },
+  { plot: '1JC', category: 'positive', comment: 'The active dock edge with F&B onto Silo D Park could be wonderful — a proper waterside destination.', sentiment: 'positive', themes: [3, 4], votes: 18, daysAgo: 46 },
+  { plot: '1JC', category: 'negative', comment: 'The tallest blocks on Plot 1J&C will overshadow Silo D Park all afternoon. Has a daylight study been done?', sentiment: 'negative', themes: [2, 3], votes: 20, daysAgo: 43 },
+  { plot: '1JC', category: 'positive', comment: 'We badly need homes and this is right by the transport. Build them — but get the mix right.', sentiment: 'positive', themes: [0], votes: 23, daysAgo: 40 },
+  { plot: '1JC', category: 'negative', comment: 'Only a fraction affordable on 676 homes? For consented dock land that is not good enough.', sentiment: 'negative', themes: [0], votes: 34, daysAgo: 36 },
+  { plot: '1JC', category: 'question', comment: 'What is the affordable tenure split — social rent vs shared ownership — on Plot 1J&C?', sentiment: 'neutral', themes: [0], votes: 7, daysAgo: 31 },
+  { plot: '1JC', category: 'comment', comment: 'Step the heights down towards the existing Britannia Village homes and it would be far more acceptable.', sentiment: 'neutral', themes: [2], votes: 16, daysAgo: 26 },
+  { plot: '1JC', category: 'positive', comment: 'Studios to 3-beds is a good mix. Please make the 3-beds genuinely family-friendly.', sentiment: 'positive', themes: [0], votes: 10, daysAgo: 22 },
+  { plot: '1JC', category: 'negative', comment: 'Commercial units along Mills Street are welcome, but blank servicing yards would kill the street.', sentiment: 'negative', themes: [4, 2], votes: 12, daysAgo: 17 },
+  { plot: '1JC', category: 'question', comment: 'Will the dock-edge public realm be open to everyone, or gated for residents?', sentiment: 'neutral', themes: [3], votes: 8, daysAgo: 12 },
+  { plot: '1JC', category: 'positive', comment: 'Ground-floor commercial on Spillers Street will bring the high street to life.', sentiment: 'positive', themes: [4], votes: 11, daysAgo: 8 },
+  { plot: '1JC', category: 'negative', comment: 'Cumulative construction across Plot 1J&C and the rest of Phase 1 needs a proper logistics plan.', sentiment: 'negative', themes: [7], votes: 13, daysAgo: 5 },
+  { plot: '1JC', category: 'comment', comment: 'Please provide generous secure cycle parking for 676 homes, not a token rack.', sentiment: 'neutral', themes: [1, 8], votes: 9, daysAgo: 2 },
 
-  // --- Plot C — Thameside Green (park / school / community, mostly positive) ---
-  { plot: 'C', category: 'positive', comment: 'A proper two-acre park is exactly what this end of Silvertown is missing. Brilliant.', sentiment: 'positive', themes: [3], votes: 33, daysAgo: 47 },
-  { plot: 'C', category: 'positive', comment: 'A new primary school is desperately needed. Ours is oversubscribed and we’re on the waiting list.', sentiment: 'positive', themes: [6], votes: 28, daysAgo: 43 },
-  { plot: 'C', category: 'positive', comment: 'The community pavilion could be amazing if it’s genuinely for community use and not hired out to the highest bidder.', sentiment: 'positive', themes: [6, 3], votes: 17, daysAgo: 37 },
-  { plot: 'C', category: 'question', comment: 'When would the park actually open? Would it be first or last in the phasing?', sentiment: 'neutral', themes: [3, 7], votes: 12, daysAgo: 31 },
-  { plot: 'C', category: 'negative', comment: 'Worried the park will be delivered last, years after the flats, like every other scheme round here.', sentiment: 'negative', themes: [7, 3], votes: 24, daysAgo: 29 },
-  { plot: 'C', category: 'positive', comment: 'Please include a proper playground for older kids, not just toddlers. Teenagers have nowhere to go.', sentiment: 'positive', themes: [3, 6], votes: 14, daysAgo: 25 },
-  { plot: 'C', category: 'comment', comment: 'Native planting and a wetland edge would be great for biodiversity and the kids’ nature lessons.', sentiment: 'neutral', themes: [8, 3], votes: 11, daysAgo: 19 },
-  { plot: 'C', category: 'positive', comment: 'Low-rise homes framing the park is the right scale here. Much better than the towers on Plot B.', sentiment: 'positive', themes: [2, 3], votes: 16, daysAgo: 16 },
-  { plot: 'C', category: 'question', comment: 'Will the school have a nursery / early years places attached?', sentiment: 'neutral', themes: [6], votes: 6, daysAgo: 13 },
-  { plot: 'C', category: 'negative', comment: 'Construction next to a new school worries me — dust and lorries around children needs a real plan.', sentiment: 'negative', themes: [7, 6], votes: 13, daysAgo: 8 },
-  { plot: 'C', category: 'positive', comment: 'Good access to the park from the existing estate too, not just the new homes, please.', sentiment: 'positive', themes: [3], votes: 10, daysAgo: 5 },
-  { plot: 'C', category: 'comment', comment: 'A weekly market or events on the green would really bring the community together.', sentiment: 'neutral', themes: [6, 4], votes: 8, daysAgo: 3 },
-  { plot: 'C', category: 'positive', comment: 'Genuinely encouraged that you’re engaging this early on Plot C. Keep listening.', sentiment: 'positive', themes: [6], votes: 9, daysAgo: 1 },
+  // --- Silo D (listed Silo D, Silo D Park, community, heritage — mostly positive) ---
+  { plot: 'D', category: 'positive', comment: 'Restoring the historic Silo D instead of demolishing it is exactly right. Do not lose the industrial heritage.', sentiment: 'positive', themes: [5], votes: 33, daysAgo: 47 },
+  { plot: 'D', category: 'positive', comment: 'Silo D Park by the Finger Dock could be a fantastic community space — please make it genuinely public.', sentiment: 'positive', themes: [3, 6], votes: 28, daysAgo: 43 },
+  { plot: 'D', category: 'question', comment: 'When will Silo D’s planning strategy be confirmed? It feels the least developed of the three plots.', sentiment: 'neutral', themes: [6], votes: 12, daysAgo: 37 },
+  { plot: 'D', category: 'positive', comment: 'An active ground floor for events in Silo D would give the community a real home.', sentiment: 'positive', themes: [6], votes: 17, daysAgo: 33 },
+  { plot: 'D', category: 'comment', comment: 'Native planting and a wetland edge in Silo D Park would be great for biodiversity.', sentiment: 'neutral', themes: [8, 3], votes: 11, daysAgo: 29 },
+  { plot: 'D', category: 'positive', comment: 'Keep Silo D’s raw industrial character — do not over-polish the restoration.', sentiment: 'positive', themes: [5, 2], votes: 14, daysAgo: 25 },
+  { plot: 'D', category: 'negative', comment: 'Worried Silo D Park will be delivered last, years after the flats, like every other scheme here.', sentiment: 'negative', themes: [7, 3], votes: 24, daysAgo: 20 },
+  { plot: 'D', category: 'positive', comment: 'A café and space for markets or events on Silo D Park would bring people together.', sentiment: 'positive', themes: [6, 4], votes: 16, daysAgo: 16 },
+  { plot: 'D', category: 'question', comment: 'Will homes above Silo D overlook the park, and will the park stay open in the evenings?', sentiment: 'neutral', themes: [3, 2], votes: 6, daysAgo: 13 },
+  { plot: 'D', category: 'positive', comment: 'Great to be engaged this early on Silo D — keep listening as the plans develop.', sentiment: 'positive', themes: [6], votes: 10, daysAgo: 8 },
+  { plot: 'D', category: 'comment', comment: 'Please include a proper playground and space for teenagers in Silo D Park, not just lawns.', sentiment: 'neutral', themes: [3, 6], votes: 8, daysAgo: 5 },
+  { plot: 'D', category: 'negative', comment: 'Events on Silo D Park must not mean noise late into the night for nearby homes.', sentiment: 'negative', themes: [6], votes: 9, daysAgo: 3 },
+  { plot: 'D', category: 'positive', comment: 'The listed Silo D as a landmark at the Finger Dock is a real asset — celebrate it.', sentiment: 'positive', themes: [5], votes: 13, daysAgo: 1 },
 ]
 
 // ---------------------------------------------------------------------------
-// An organised campaign: a shared template objection to Plot B with one
+// An organised campaign: a shared template objection to Plot 1J&C with one
 // personal line each. Drives the campaign / duplicate detection panel.
 // ---------------------------------------------------------------------------
 const CAMPAIGN_TEMPLATE =
-  'I strongly object to the proposals for Plot B (Dock Wharf). 620 homes with only 90 parking spaces will overwhelm our already-full streets, and the DLR is at capacity at peak times. The scheme must not go ahead without a binding transport and parking plan.'
+  'I strongly object to the proposals for Plot 1J&C. 676 homes at this density, with far too little parking and a DLR that is already at capacity at peak times, will overwhelm Silvertown. The scheme must not go ahead without a binding transport and parking plan.'
 const CAMPAIGN_PERSONAL = [
-  'I have lived on Evelyn Road for twelve years and already cannot park near my own home.',
+  'I have lived in Britannia Village for twelve years and already cannot park near my own home.',
   'As a parent doing the school run, the extra rat-running traffic frightens me.',
   'I depend on the DLR every day and it is already unbearable at rush hour.',
   'My elderly mother needs a Blue Badge space and there are none to be found now.',
@@ -193,7 +192,7 @@ const CAMPAIGN_PERSONAL = [
 // Consultation survey responses. Fields chosen so the audience + plot cuts work.
 // ---------------------------------------------------------------------------
 const AUDIENCE_OPTIONS = ['Local resident', 'Business / worker', 'Community group', 'Landowner / developer', 'Visitor', 'Other']
-const PLOT_OPTIONS = ['Plot A — Millennium Mills', 'Plot B — Dock Wharf', 'Plot C — Thameside Green', 'The whole programme']
+const PLOT_OPTIONS = ['Plot 1', 'Plot 1J&C', 'Silo D', 'The whole programme']
 const SUPPORT_OPTIONS = ['Strongly support', 'Support', 'Neutral', 'Oppose', 'Strongly oppose']
 
 type SurveySeed = {
@@ -209,26 +208,26 @@ type SurveySeed = {
 }
 
 const SURVEY: SurveySeed[] = [
-  { audience: 'Local resident', plot: PLOT_OPTIONS[0], support: 'Strongly support', likes: 'Restoring the Millennium Mills and opening the dock edge to the public is exactly what we need.', concerns: 'Just make sure the affordable workspace stays affordable in ten years’ time.', suggestions: 'A heritage trail along the dock explaining the site’s history.', sentiment: 'positive', themes: [5, 4], daysAgo: 51 },
-  { audience: 'Local resident', plot: PLOT_OPTIONS[1], support: 'Oppose', likes: 'The promenade idea is nice.', concerns: 'The towers are far too tall and there is nowhere near enough parking for 620 homes.', suggestions: 'Reduce the height to a maximum of twelve storeys and provide one space per home.', sentiment: 'negative', themes: [2, 1], daysAgo: 50 },
-  { audience: 'Business / worker', plot: PLOT_OPTIONS[0], support: 'Support', likes: 'Affordable studios for makers and small businesses would be transformational for the area.', concerns: 'Construction disruption to existing businesses on North Woolwich Road.', suggestions: 'Phase the works so the road isn’t closed for years.', sentiment: 'positive', themes: [4, 7], daysAgo: 46 },
-  { audience: 'Local resident', plot: PLOT_OPTIONS[2], support: 'Strongly support', likes: 'A park and a primary school. Finally. Both are desperately needed at this end.', concerns: 'That the park and school arrive years after the flats.', suggestions: 'Commit to delivering the park in the first phase, in writing.', sentiment: 'positive', themes: [3, 6, 7], daysAgo: 45 },
-  { audience: 'Community group', plot: PLOT_OPTIONS[3], support: 'Neutral', likes: 'Ambition is good and the heritage approach on Plot A is sensitive.', concerns: 'Cumulative traffic and school places across all three plots have not been addressed together.', suggestions: 'Publish a programme-wide transport and school-places plan, not three separate ones.', sentiment: 'neutral', themes: [1, 6], daysAgo: 42 },
-  { audience: 'Local resident', plot: PLOT_OPTIONS[1], support: 'Strongly oppose', likes: 'Honestly very little.', concerns: 'Overdevelopment, loss of light to existing homes, and pressure on GP surgeries that are already full.', suggestions: 'Go back and design something at a human scale.', sentiment: 'negative', themes: [2, 6], daysAgo: 41 },
-  { audience: 'Local resident', plot: PLOT_OPTIONS[1], support: 'Support', likes: 'We need the homes and it’s right by the DLR.', concerns: 'Affordable housing should be higher than 25%.', suggestions: 'Push the affordable share to at least 40% social rent.', sentiment: 'positive', themes: [0], daysAgo: 38 },
-  { audience: 'Visitor', plot: PLOT_OPTIONS[0], support: 'Support', likes: 'I’d come to Silvertown for a restored dockside with cafes and workspace. Great destination potential.', concerns: 'Keep some of the raw industrial character, don’t over-polish it.', suggestions: 'Retain the crane and silo as landmarks.', sentiment: 'positive', themes: [5, 4], daysAgo: 35 },
-  { audience: 'Local resident', plot: PLOT_OPTIONS[2], support: 'Support', likes: 'The community pavilion and green space.', concerns: 'Will the pavilion be genuinely affordable for local groups to book?', suggestions: 'Ring-fence subsidised community hours in the pavilion.', sentiment: 'positive', themes: [6, 3], daysAgo: 33 },
-  { audience: 'Business / worker', plot: PLOT_OPTIONS[1], support: 'Neutral', likes: 'Ground-floor retail could bring footfall.', concerns: 'Construction access and loss of parking for customers during the build.', suggestions: 'A construction logistics plan agreed with local traders.', sentiment: 'neutral', themes: [7, 1], daysAgo: 30 },
-  { audience: 'Local resident', plot: PLOT_OPTIONS[1], support: 'Oppose', likes: 'Nothing about the height.', concerns: 'Twenty-six storeys will overshadow the promenade every afternoon.', suggestions: 'Commission and publish a daylight and sunlight study.', sentiment: 'negative', themes: [2, 3], daysAgo: 27 },
-  { audience: 'Community group', plot: PLOT_OPTIONS[2], support: 'Strongly support', likes: 'Early engagement on Plot C is welcome and the school is vital.', concerns: 'Dust and HGV movements next to a new school.', suggestions: 'A dedicated construction management plan around the school.', sentiment: 'positive', themes: [6, 7], daysAgo: 24 },
-  { audience: 'Local resident', plot: PLOT_OPTIONS[0], support: 'Support', likes: 'Sympathetic restoration of the mills and new jobs.', concerns: 'Building heights right next to the listed structures.', suggestions: 'Keep new blocks lower than the mill roofline.', sentiment: 'positive', themes: [5, 2], daysAgo: 21 },
+  { audience: 'Local resident', plot: PLOT_OPTIONS[0], support: 'Strongly support', likes: 'A gateway building next to Millennium Mills, opening the dock edge to the public at the new bridge landing.', concerns: 'That there are no affordable homes at all in Plot 1.', suggestions: 'Add some affordable homes, and a heritage trail along the dock.', sentiment: 'positive', themes: [5, 0], daysAgo: 51 },
+  { audience: 'Local resident', plot: PLOT_OPTIONS[1], support: 'Oppose', likes: 'The active dock edge idea is nice.', concerns: '676 homes is far too dense and there is nowhere near enough parking.', suggestions: 'Reduce the density and provide proper parking and a transport plan.', sentiment: 'negative', themes: [2, 1], daysAgo: 50 },
+  { audience: 'Business / worker', plot: PLOT_OPTIONS[0], support: 'Support', likes: 'Ground-floor retail and a dockside restaurant on Plot 1 would be transformational for footfall.', concerns: 'Construction disruption to existing businesses on North Woolwich Road.', suggestions: 'Phase the works so the road isn’t closed for years.', sentiment: 'positive', themes: [4, 7], daysAgo: 46 },
+  { audience: 'Local resident', plot: PLOT_OPTIONS[2], support: 'Strongly support', likes: 'Restoring the historic Silo D and creating Silo D Park. Both are desperately needed at this end.', concerns: 'That Silo D Park arrives years after the flats.', suggestions: 'Commit to delivering Silo D Park early, in writing.', sentiment: 'positive', themes: [5, 3, 7], daysAgo: 45 },
+  { audience: 'Community group', plot: PLOT_OPTIONS[3], support: 'Neutral', likes: 'Ambition is good and the heritage approach around Millennium Mills and Silo D is sensitive.', concerns: 'Cumulative traffic and healthcare capacity across all three plots have not been addressed together.', suggestions: 'Publish a programme-wide transport and healthcare capacity plan, not three separate ones.', sentiment: 'neutral', themes: [1, 6], daysAgo: 42 },
+  { audience: 'Local resident', plot: PLOT_OPTIONS[1], support: 'Strongly oppose', likes: 'Honestly very little.', concerns: 'Overdevelopment, loss of light to existing homes and to Silo D Park, and pressure on GP surgeries that are already full.', suggestions: 'Go back and design something at a human scale.', sentiment: 'negative', themes: [2, 6], daysAgo: 41 },
+  { audience: 'Local resident', plot: PLOT_OPTIONS[1], support: 'Support', likes: 'We need the homes and it’s right by the DLR and Spillers Street high street.', concerns: 'The affordable housing share should be higher.', suggestions: 'Push the affordable share up, with a proper social rent element.', sentiment: 'positive', themes: [0], daysAgo: 38 },
+  { audience: 'Visitor', plot: PLOT_OPTIONS[0], support: 'Support', likes: 'I’d come to Silvertown for a restored dockside with cafes next to Millennium Mills. Great destination potential.', concerns: 'Keep some of the raw industrial character, don’t over-polish it.', suggestions: 'Retain and celebrate the Mills and Silo D as landmarks.', sentiment: 'positive', themes: [5, 4], daysAgo: 35 },
+  { audience: 'Local resident', plot: PLOT_OPTIONS[2], support: 'Support', likes: 'The active ground floor of Silo D and Silo D Park for community use.', concerns: 'Will Silo D be genuinely affordable for local groups to book?', suggestions: 'Ring-fence subsidised community hours in Silo D.', sentiment: 'positive', themes: [6, 3], daysAgo: 33 },
+  { audience: 'Business / worker', plot: PLOT_OPTIONS[1], support: 'Neutral', likes: 'Ground-floor commercial on Spillers Street could bring footfall.', concerns: 'Construction access and loss of parking for customers during the build.', suggestions: 'A construction logistics plan agreed with local traders.', sentiment: 'neutral', themes: [7, 1], daysAgo: 30 },
+  { audience: 'Local resident', plot: PLOT_OPTIONS[1], support: 'Oppose', likes: 'Nothing about the height.', concerns: 'The tallest blocks will overshadow Silo D Park every afternoon.', suggestions: 'Commission and publish a daylight and sunlight study.', sentiment: 'negative', themes: [2, 3], daysAgo: 27 },
+  { audience: 'Community group', plot: PLOT_OPTIONS[2], support: 'Strongly support', likes: 'Early engagement on Silo D is welcome and keeping the listed building is vital.', concerns: 'Noise from events on Silo D Park late at night.', suggestions: 'An events management plan agreed with residents.', sentiment: 'positive', themes: [5, 6], daysAgo: 24 },
+  { audience: 'Local resident', plot: PLOT_OPTIONS[0], support: 'Support', likes: 'Sympathetic gateway design next to the Mills, and new dockside life.', concerns: 'Building height right next to the listed Millennium Mills.', suggestions: 'Keep the new block below the Mills roofline.', sentiment: 'positive', themes: [5, 2], daysAgo: 21 },
   { audience: 'Local resident', plot: PLOT_OPTIONS[3], support: 'Neutral', likes: 'Some good ideas across the plots.', concerns: 'Flood risk and drainage on reclaimed dock land over the long term.', suggestions: 'Independent flood modelling published for consultation.', sentiment: 'neutral', themes: [8], daysAgo: 18 },
-  { audience: 'Landowner / developer', plot: PLOT_OPTIONS[3], support: 'Support', likes: 'A coordinated masterplan across the three plots is the right approach.', concerns: 'Certainty on infrastructure timing to support delivery.', suggestions: 'A clear phasing and infrastructure trigger schedule.', sentiment: 'positive', themes: [7, 1], daysAgo: 16 },
+  { audience: 'Landowner / developer', plot: PLOT_OPTIONS[3], support: 'Support', likes: 'A coordinated Phase 1 masterplan across Plot 1, Plot 1J&C and Silo D is the right approach.', concerns: 'Certainty on infrastructure timing to support delivery.', suggestions: 'A clear phasing and infrastructure trigger schedule.', sentiment: 'positive', themes: [7, 1], daysAgo: 16 },
   { audience: 'Local resident', plot: PLOT_OPTIONS[1], support: 'Oppose', likes: 'The homes are needed in principle.', concerns: 'But not at this density with no transport upgrade. The DLR cannot cope.', suggestions: 'Fund a DLR frequency increase as part of the scheme.', sentiment: 'negative', themes: [1, 2], daysAgo: 13 },
-  { audience: 'Local resident', plot: PLOT_OPTIONS[2], support: 'Strongly support', likes: 'The park, the school, and the lower-rise homes. All good.', concerns: 'Just deliver the park early.', suggestions: 'Park first, please.', sentiment: 'positive', themes: [3, 6], daysAgo: 10 },
-  { audience: 'Business / worker', plot: PLOT_OPTIONS[0], support: 'Strongly support', likes: 'Affordable maker workspace is a real draw and will keep small firms in the area.', concerns: 'Rent levels once it opens.', suggestions: 'Cap workspace rents at a genuinely affordable level for a fixed period.', sentiment: 'positive', themes: [4], daysAgo: 7 },
-  { audience: 'Local resident', plot: PLOT_OPTIONS[1], support: 'Neutral', likes: 'Promenade and shops.', concerns: 'Overlooking and privacy for existing residents.', suggestions: 'Greater set-backs from existing homes.', sentiment: 'neutral', themes: [2], daysAgo: 4 },
-  { audience: 'Local resident', plot: PLOT_OPTIONS[3], support: 'Support', likes: 'Overall the programme could be great for Silvertown if it’s done properly.', concerns: 'Keeping the community informed as it moves through each phase.', suggestions: 'Regular updates and keep this map open throughout.', sentiment: 'positive', themes: [6], daysAgo: 2 },
+  { audience: 'Local resident', plot: PLOT_OPTIONS[2], support: 'Strongly support', likes: 'The restored Silo D, the park and the lower-rise homes around it. All good.', concerns: 'Just deliver Silo D Park early.', suggestions: 'Park first, please.', sentiment: 'positive', themes: [3, 5], daysAgo: 10 },
+  { audience: 'Business / worker', plot: PLOT_OPTIONS[0], support: 'Strongly support', likes: 'Independent retail on Spillers Street would keep small firms in the area.', concerns: 'Rent levels once the units open.', suggestions: 'Reserve some units for local independents at affordable rents.', sentiment: 'positive', themes: [4], daysAgo: 7 },
+  { audience: 'Local resident', plot: PLOT_OPTIONS[1], support: 'Neutral', likes: 'Dock edge and shops.', concerns: 'Overlooking and privacy for existing Britannia Village residents.', suggestions: 'Greater set-backs from existing homes.', sentiment: 'neutral', themes: [2], daysAgo: 4 },
+  { audience: 'Local resident', plot: PLOT_OPTIONS[3], support: 'Support', likes: 'Overall the Phase 1 programme could be great for Silvertown if it’s done properly.', concerns: 'Keeping the community informed as it moves through each phase.', suggestions: 'Regular updates and keep this map open throughout.', sentiment: 'positive', themes: [6], daysAgo: 2 },
 ]
 
 // ---------------------------------------------------------------------------
@@ -266,19 +265,19 @@ type EnquirySeed = {
 }
 
 const ENQUIRIES: EnquirySeed[] = [
-  { name: 'Sandra Okoro', email: 'sandra.okoro@email.com', subject: 'Parking permits for existing residents', org: undefined, phone: '07700 900123', message: 'I have lived on Evelyn Road for 20 years. With 620 new homes on Plot B and almost no parking, where will the new residents park? On our streets. What protection is there for existing residents — will there be a controlled parking zone?', category: 'objection', sentiment: 'negative', themes: [1], daysAgo: 48 },
-  { name: 'Royal Docks Traders Forum', email: 'info@rdtraders.org', org: 'Royal Docks Traders Forum', subject: 'Support and construction logistics for local businesses', message: 'On behalf of local traders we broadly welcome the affordable workspace on Plot A. However we need a construction logistics plan that keeps North Woolwich Road open and protects footfall during the build. Can we meet to discuss a traders’ liaison group?', category: 'general', sentiment: 'positive', themes: [4, 7], daysAgo: 44 },
-  { name: 'Dr Helen Marsh', email: 'h.marsh@nhs.net', org: 'Pontoon Dock Surgery', subject: 'Healthcare capacity across the programme', message: 'As a local GP I am concerned that the cumulative impact of all three plots on primary care has not been assessed. Our list is already at capacity. Has a health impact assessment been done for the whole programme, and is space allocated for a branch surgery?', category: 'planning', sentiment: 'negative', themes: [6], daysAgo: 41 },
-  { name: 'Silvertown Heritage Society', email: 'contact@silvertownheritage.org', org: 'Silvertown Heritage Society', subject: 'Protection of the listed mills and silo', message: 'We strongly support restoration but need clarity on exactly which structures are retained. The Grade II* Millennium Mills and Silo D must be protected in full. We request a meeting and sight of the heritage statement.', category: 'planning', sentiment: 'neutral', themes: [5], daysAgo: 37 },
-  { name: 'James Whitfield', email: 'j.whitfield@outlook.com', subject: 'Building heights on Plot B', message: 'Twenty-six storeys on the waterfront is completely out of character. Has a daylight and sunlight assessment been carried out for neighbouring homes and the promenade? I would like to see it before the next stage.', category: 'objection', sentiment: 'negative', themes: [2, 3], daysAgo: 32 },
-  { name: 'Grace Adeyemi', email: 'grace.a@gmail.com', subject: 'School places and the new primary', message: 'We are delighted about the proposed primary school on Plot C. Can you confirm the entry size, whether there will be nursery places, and when it would open relative to the homes being occupied?', category: 'support', sentiment: 'positive', themes: [6], daysAgo: 28 },
-  { name: 'Newham Cyclists', email: 'hello@newhamcyclists.org', org: 'Newham Cyclists', subject: 'Active travel and cycle parking', message: 'Please ensure secure, generous cycle parking across all three plots and a continuous cycle route along the dockside. Token provision for 600+ homes will not do. We would welcome involvement in the transport design.', category: 'general', sentiment: 'neutral', themes: [1, 8], daysAgo: 24 },
-  { name: 'Michael Brennan', email: 'm.brennan@email.com', subject: 'Construction hours and night shifts', message: 'I work nights at the hospital. The proposed 7am start for construction will make it impossible to sleep. Please confirm the working hours, weekend policy and how noise will be controlled, especially near Plot C.', category: 'complaint', sentiment: 'negative', themes: [7], daysAgo: 19 },
-  { name: 'Priya Nair', email: 'priya.nair@email.com', subject: 'Affordable housing tenure', message: 'Can you set out the affordable housing tenure split for Plot B? How much is social rent versus shared ownership, and how were the income thresholds set? 25% overall feels low for public dock land.', category: 'planning', sentiment: 'negative', themes: [0], daysAgo: 15 },
-  { name: 'Thames Estuary Partnership', email: 'info@thamesestuary.org', org: 'Thames Estuary Partnership', subject: 'Flood resilience and biodiversity', message: 'We would like to understand the flood resilience strategy for the dock edge and how biodiversity net gain will be delivered, particularly the wetland edge suggested for the Plot C park. Please share the environmental documents.', category: 'general', sentiment: 'neutral', themes: [8, 3], daysAgo: 11 },
-  { name: 'Anthony Cole', email: 'a.cole@email.com', subject: 'Overlooking and privacy', message: 'My flat directly faces the tallest proposed block on Plot B. I am very concerned about overlooking and loss of privacy. What set-back distances are proposed and will there be screening?', category: 'objection', sentiment: 'negative', themes: [2], daysAgo: 8 },
-  { name: 'Ruth Bello', email: 'ruth.bello@email.com', org: 'Silvertown Community Network', subject: 'Community pavilion booking', message: 'The community pavilion on Plot C is a great idea. Will local groups be able to book it at subsidised rates, and will the community have a say in how it is run? We run activities for older residents and would love a home for them.', category: 'support', sentiment: 'positive', themes: [6, 3], daysAgo: 5 },
-  { name: 'David Osei', email: 'd.osei@email.com', subject: 'Jobs for local people', message: 'Will there be a commitment to local jobs and apprenticeships during construction and in the new workspace? Silvertown has high unemployment and this programme should benefit residents first.', category: 'general', sentiment: 'positive', themes: [4], daysAgo: 3 },
+  { name: 'Sandra Okoro', email: 'sandra.okoro@email.com', subject: 'Parking permits for existing residents', org: undefined, phone: '07700 900123', message: 'I have lived in Britannia Village for 20 years. With 676 new homes on Plot 1J&C and almost no parking, where will the new residents park? On our streets. What protection is there for existing residents — will there be a controlled parking zone?', category: 'objection', sentiment: 'negative', themes: [1], daysAgo: 48 },
+  { name: 'Royal Docks Traders Forum', email: 'info@rdtraders.org', org: 'Royal Docks Traders Forum', subject: 'Retail units and construction logistics for local businesses', message: 'On behalf of local traders we welcome the ground-floor retail on Plot 1 and Spillers Street. However we need a construction logistics plan that keeps North Woolwich Road open and protects footfall during the build. Can we meet to discuss a traders’ liaison group?', category: 'general', sentiment: 'positive', themes: [4, 7], daysAgo: 44 },
+  { name: 'Dr Helen Marsh', email: 'h.marsh@nhs.net', org: 'Pontoon Dock Surgery', subject: 'Healthcare capacity across Phase 1', message: 'As a local GP I am concerned that the cumulative impact of Plot 1, Plot 1J&C and Silo D on primary care has not been assessed. Our list is already at capacity. Has a health impact assessment been done for the whole of Phase 1, and is space allocated for a branch surgery?', category: 'planning', sentiment: 'negative', themes: [6], daysAgo: 41 },
+  { name: 'Silvertown Heritage Society', email: 'contact@silvertownheritage.org', org: 'Silvertown Heritage Society', subject: 'Protection of Millennium Mills and Silo D', message: 'We strongly support restoration but need clarity on exactly which structures are retained. The Grade II listed Millennium Mills and the historic Silo D must be protected in full. We request a meeting and sight of the heritage statement.', category: 'planning', sentiment: 'neutral', themes: [5], daysAgo: 37 },
+  { name: 'James Whitfield', email: 'j.whitfield@outlook.com', subject: 'Building heights on Plot 1J&C', message: 'The tallest blocks on Plot 1J&C look completely out of scale next to Silo D Park. Has a daylight and sunlight assessment been carried out for neighbouring homes and the park? I would like to see it before the RMA is submitted.', category: 'objection', sentiment: 'negative', themes: [2, 3], daysAgo: 32 },
+  { name: 'Grace Adeyemi', email: 'grace.a@gmail.com', subject: 'Silo D Park and community use', message: 'We are delighted about Silo D Park and the active ground floor of Silo D. Can you confirm how much of Silo D will be for community use, whether local groups can book it, and when the park would open relative to the homes being occupied?', category: 'support', sentiment: 'positive', themes: [6, 3], daysAgo: 28 },
+  { name: 'Newham Cyclists', email: 'hello@newhamcyclists.org', org: 'Newham Cyclists', subject: 'Active travel and cycle parking', message: 'Please ensure secure, generous cycle parking across all three plots and a continuous cycle route along the dockside and Spillers Street. Token provision for 676 homes will not do. We would welcome involvement in the transport design.', category: 'general', sentiment: 'neutral', themes: [1, 8], daysAgo: 24 },
+  { name: 'Michael Brennan', email: 'm.brennan@email.com', subject: 'Construction hours and night shifts', message: 'I work nights at the hospital. The proposed 7am start for construction will make it impossible to sleep. Please confirm the working hours, weekend policy and how noise will be controlled across the Phase 1 plots.', category: 'complaint', sentiment: 'negative', themes: [7], daysAgo: 19 },
+  { name: 'Priya Nair', email: 'priya.nair@email.com', subject: 'Affordable housing tenure on Plot 1J&C', message: 'Can you set out the affordable housing tenure split for Plot 1J&C? How much is social rent versus shared ownership, and how were the income thresholds set? The affordable share feels low for consented dock land.', category: 'planning', sentiment: 'negative', themes: [0], daysAgo: 15 },
+  { name: 'Thames Estuary Partnership', email: 'info@thamesestuary.org', org: 'Thames Estuary Partnership', subject: 'Flood resilience and biodiversity', message: 'We would like to understand the flood resilience strategy for the dock edge and how biodiversity net gain will be delivered, particularly the planting and wetland edge suggested for Silo D Park. Please share the environmental documents.', category: 'general', sentiment: 'neutral', themes: [8, 3], daysAgo: 11 },
+  { name: 'Anthony Cole', email: 'a.cole@email.com', subject: 'Overlooking and privacy', message: 'My flat directly faces the tallest proposed block on Plot 1J&C. I am very concerned about overlooking and loss of privacy. What set-back distances are proposed and will there be screening?', category: 'objection', sentiment: 'negative', themes: [2], daysAgo: 8 },
+  { name: 'Ruth Bello', email: 'ruth.bello@email.com', org: 'Silvertown Community Network', subject: 'Booking space in Silo D', message: 'The active ground floor of Silo D is a great idea. Will local groups be able to book space at subsidised rates, and will the community have a say in how it is run? We run activities for older residents and would love a home for them.', category: 'support', sentiment: 'positive', themes: [6, 5], daysAgo: 5 },
+  { name: 'David Osei', email: 'd.osei@email.com', subject: 'Jobs for local people', message: 'Will there be a commitment to local jobs and apprenticeships during construction and in the new ground-floor retail and commercial units? Silvertown has high unemployment and Phase 1 should benefit residents first.', category: 'general', sentiment: 'positive', themes: [4], daysAgo: 3 },
 ]
 
 // ---------------------------------------------------------------------------
@@ -286,14 +285,14 @@ const ENQUIRIES: EnquirySeed[] = [
 // in every environment).
 // ---------------------------------------------------------------------------
 const STAKEHOLDERS = [
-  { name: 'Silvertown Residents’ Association', type: 'community', category: 'undecided', email: 'chair@silvertownra.org', role: 'Residents’ association', notes: 'Key local voice. Concerned about height and parking on Plot B; supportive of park and school on Plot C.', engagements: [ { type: 'meeting', summary: 'Introductory meeting — walked through the three plots and the consultation timeline.', daysAgo: 50 }, { type: 'email', summary: 'Sent draft masterplan boards and invited comments on Plot B height.', daysAgo: 30 }, { type: 'meeting', summary: 'Follow-up on parking and CPZ concerns; agreed to feed into transport work.', daysAgo: 9 } ] },
-  { name: 'Cllr Farida Hussain', type: 'authority', category: 'neutral', email: 'farida.hussain@newham.gov.uk', role: 'Ward councillor (Royal Docks)', notes: 'Wants cumulative infrastructure impacts across all three plots addressed together.', engagements: [ { type: 'meeting', summary: 'Briefing on programme-wide approach; stressed schools and GP capacity.', daysAgo: 40 }, { type: 'call', summary: 'Update call ahead of public drop-in.', daysAgo: 12 } ] },
-  { name: 'Royal Docks Team (GLA/Newham)', type: 'authority', category: 'supporter', email: 'team@royaldocks.london', role: 'Regeneration partnership', notes: 'Broadly supportive; keen on affordable workspace and public realm outcomes.', engagements: [ { type: 'meeting', summary: 'Design review of Plot A heritage approach and dock-edge public realm.', daysAgo: 34 } ] },
-  { name: 'Silvertown Heritage Society', type: 'community', category: 'undecided', email: 'contact@silvertownheritage.org', role: 'Heritage group', notes: 'Supports restoration but wants cast-iron protection for the listed mills and silo.', engagements: [ { type: 'email', summary: 'Requested heritage statement and list of retained structures.', daysAgo: 37 }, { type: 'meeting', summary: 'Site walkover of the mills; discussed which elements are retained.', daysAgo: 20 } ] },
-  { name: 'Pontoon Dock Surgery', type: 'authority', category: 'opposed', email: 'h.marsh@nhs.net', role: 'Local GP practice', notes: 'Concerned about primary care capacity; open to hosting a branch surgery if space provided.', engagements: [ { type: 'enquiry', summary: 'Raised healthcare capacity concern via public enquiry; logged for HIA follow-up.', daysAgo: 41 } ] },
-  { name: 'Royal Docks Traders Forum', type: 'business', category: 'supporter', email: 'info@rdtraders.org', role: 'Local business network', notes: 'Welcomes affordable workspace; wants a traders’ liaison group during construction.', engagements: [ { type: 'meeting', summary: 'Agreed to set up a traders’ liaison group for construction logistics.', daysAgo: 26 } ] },
+  { name: 'Silvertown Residents’ Association', type: 'community', category: 'undecided', email: 'chair@silvertownra.org', role: 'Residents’ association', notes: 'Key local voice. Concerned about height and parking on Plot 1J&C; supportive of the Silo D restoration and Silo D Park.', engagements: [ { type: 'meeting', summary: 'Introductory meeting — walked through Plot 1, Plot 1J&C and Silo D and the consultation timeline.', daysAgo: 50 }, { type: 'email', summary: 'Sent draft masterplan boards and invited comments on Plot 1J&C height.', daysAgo: 30 }, { type: 'meeting', summary: 'Follow-up on parking and CPZ concerns; agreed to feed into transport work.', daysAgo: 9 } ] },
+  { name: 'Cllr Farida Hussain', type: 'authority', category: 'neutral', email: 'farida.hussain@newham.gov.uk', role: 'Ward councillor (Royal Docks)', notes: 'Wants cumulative infrastructure impacts across all three Phase 1 plots addressed together.', engagements: [ { type: 'meeting', summary: 'Briefing on the Phase 1 approach; stressed healthcare and transport capacity.', daysAgo: 40 }, { type: 'call', summary: 'Update call ahead of public drop-in.', daysAgo: 12 } ] },
+  { name: 'Royal Docks Team (GLA/Newham)', type: 'authority', category: 'supporter', email: 'team@royaldocks.london', role: 'Regeneration partnership', notes: 'Broadly supportive; keen on the dock-edge public realm and the Silo D heritage outcome.', engagements: [ { type: 'meeting', summary: 'Design review of the Plot 1 gateway approach and the dock-edge public realm.', daysAgo: 34 } ] },
+  { name: 'Silvertown Heritage Society', type: 'community', category: 'undecided', email: 'contact@silvertownheritage.org', role: 'Heritage group', notes: 'Supports restoration but wants cast-iron protection for Millennium Mills and Silo D.', engagements: [ { type: 'email', summary: 'Requested heritage statement and list of retained structures.', daysAgo: 37 }, { type: 'meeting', summary: 'Site walkover of Millennium Mills and Silo D; discussed which elements are retained.', daysAgo: 20 } ] },
+  { name: 'Pontoon Dock Surgery', type: 'authority', category: 'opposed', email: 'h.marsh@nhs.net', role: 'Local GP practice', notes: 'Concerned about primary care capacity across Phase 1; open to hosting a branch surgery if space provided.', engagements: [ { type: 'enquiry', summary: 'Raised healthcare capacity concern via public enquiry; logged for HIA follow-up.', daysAgo: 41 } ] },
+  { name: 'Royal Docks Traders Forum', type: 'business', category: 'supporter', email: 'info@rdtraders.org', role: 'Local business network', notes: 'Welcomes the ground-floor retail on Plot 1; wants a traders’ liaison group during construction.', engagements: [ { type: 'meeting', summary: 'Agreed to set up a traders’ liaison group for construction logistics.', daysAgo: 26 } ] },
   { name: 'Newham Cyclists', type: 'community', category: 'neutral', email: 'hello@newhamcyclists.org', role: 'Active travel group', notes: 'Pushing for generous cycle parking and a continuous dockside cycle route.', engagements: [ { type: 'email', summary: 'Shared active travel asks; invited to transport design workshop.', daysAgo: 22 } ] },
-  { name: 'Thameside Green Primary (proposed)', type: 'authority', category: 'supporter', email: 'admissions@newham.gov.uk', role: 'Education / school places', notes: 'Two-form-entry primary proposed on Plot C; strong local need.', engagements: [ { type: 'meeting', summary: 'Discussed entry size, nursery places and delivery phasing.', daysAgo: 18 } ] },
+  { name: 'The Crown Estate', type: 'business', category: 'supporter', email: 'silvertown@thecrownestate.co.uk', role: 'Joint venture partner (Plot 1J&C)', notes: 'JV partner on Plot 1J&C; focused on the RMA due by March 2027 and delivery of Silo D Park.', engagements: [ { type: 'meeting', summary: 'JV coordination on Plot 1J&C RMA timeline and public-realm commitments.', daysAgo: 18 } ] },
 ]
 
 // ---------------------------------------------------------------------------
@@ -369,7 +368,7 @@ async function main() {
     where: { id: PROJECT_ID },
     update: {
       name: 'Silvertown Demo',
-      description: 'A three-plot regeneration programme on the Silvertown dockside, Royal Docks, E16. Demonstration consultation.',
+      description: 'Phase 1 of the Silvertown Masterplan — Plot 1, Plot 1J&C and Silo D, on the south side of Royal Victoria Dock, E16. Demonstration consultation.',
       latitude: 51.5022,
       longitude: 0.0285,
       mapZoom: 16,
@@ -384,7 +383,7 @@ async function main() {
     create: {
       id: PROJECT_ID,
       name: 'Silvertown Demo',
-      description: 'A three-plot regeneration programme on the Silvertown dockside, Royal Docks, E16. Demonstration consultation.',
+      description: 'Phase 1 of the Silvertown Masterplan — Plot 1, Plot 1J&C and Silo D, on the south side of Royal Victoria Dock, E16. Demonstration consultation.',
       latitude: 51.5022,
       longitude: 0.0285,
       mapZoom: 16,
@@ -469,7 +468,7 @@ async function main() {
   // --- feedback pins ------------------------------------------------------
   const perPlotCount: Record<string, number> = {}
   PINS.forEach(pin => { perPlotCount[pin.plot] = (perPlotCount[pin.plot] || 0) + 1 })
-  const plotIndex: Record<string, number> = { A: 0, B: 0, C: 0 }
+  const plotIndex: Record<string, number> = { '1': 0, '1JC': 0, 'D': 0 }
   for (const seed of PINS) {
     const plot = PLOTS.find(p => p.key === seed.plot)!
     const i = plotIndex[seed.plot]++
@@ -496,7 +495,7 @@ async function main() {
   console.log(`Created ${PINS.length} feedback pins across three plots`)
 
   // --- organised campaign: near-identical template objections on Plot B ----
-  const plotB = PLOTS.find(p => p.key === 'B')!
+  const plotB = PLOTS.find(p => p.key === '1JC')!
   for (let ci = 0; ci < CAMPAIGN_PERSONAL.length; ci++) {
     const [lat, lng] = pointIn(plotB, ci, CAMPAIGN_PERSONAL.length)
     const createdAt = ago(9 - ci) // a recent surge
@@ -519,7 +518,7 @@ async function main() {
     })
     corpus.push({ id: row.id, content: comment, type: 'pin', latitude: lat, longitude: lng, createdAt, sentiment: 'negative', themes: [1], material: materialFor([1]), source: 'pin', campaign: true })
   }
-  console.log(`Created ${CAMPAIGN_PERSONAL.length} campaign responses (Plot B parking template)`)
+  console.log(`Created ${CAMPAIGN_PERSONAL.length} campaign responses (Plot 1J&C parking template)`)
 
   // --- consultation survey ------------------------------------------------
   const surveyFields: Field[] = [
@@ -688,9 +687,9 @@ async function main() {
       const neg = inPlot.filter(r => r.sentiment === 'negative').length
       const dominant: 'positive' | 'negative' | 'neutral' | 'mixed' = pos > 0 && neg > 0 ? 'mixed' : pos >= neg ? 'positive' : 'negative'
       const headlineMap: Record<string, string> = {
-        A: `Feedback on Plot A concentrates on heritage and the restoration of the mills, and is broadly supportive.`,
-        B: `Plot B draws the strongest objections in the whole programme — height, density and parking dominate the responses here.`,
-        C: `Plot C attracts the most positive feedback, centred on the new park, school and community facilities.`,
+        '1': `Feedback on Plot 1 is broadly supportive — the gateway design next to Millennium Mills, the dock-edge retail, and connectivity, with some concern about height and the lack of affordable homes.`,
+        '1JC': `Plot 1J&C draws the strongest objections in Phase 1 — the 676-home density, height over Silo D Park and parking/DLR capacity dominate the responses here.`,
+        'D': `Silo D attracts the most positive feedback, centred on restoring the listed building and creating Silo D Park for community use.`,
       }
       return {
         latitude: p.centroid[0], longitude: p.centroid[1], areaLabel: p.name,
@@ -719,7 +718,7 @@ async function main() {
       templatedCount: campaignRows.length,
       uniqueCount: total - campaignRows.length,
       campaigns: campaignRows.length >= 3 ? [{
-        label: 'Parking & DLR capacity objection (Plot B)',
+        label: 'Parking & DLR capacity objection (Plot 1J&C)',
         count: campaignRows.length,
         stance: 'oppose' as const,
         templateSummary: '',
@@ -733,32 +732,32 @@ async function main() {
 
     const headlineStats = {
       stats: [
-        { text: `${total} pieces of feedback analysed across all three plots`, type: 'insight' as const },
-        { text: `Plot C (park, school, community) is the most supported part of the programme`, type: 'support' as const },
-        { text: `Height, density and parking on Plot B draw the strongest objections`, type: 'concern' as const },
-        { text: `Heritage restoration on Plot A has broad public backing`, type: 'support' as const },
-        { text: `Cumulative traffic and school-place capacity is a recurring cross-programme concern`, type: 'concern' as const },
+        { text: `${total} pieces of feedback analysed across Plot 1, Plot 1J&C and Silo D`, type: 'insight' as const },
+        { text: `Silo D (restoration + Silo D Park) is the most supported part of Phase 1`, type: 'support' as const },
+        { text: `Height, density and parking on Plot 1J&C draw the strongest objections`, type: 'concern' as const },
+        { text: `The Plot 1 gateway next to Millennium Mills has broad public backing`, type: 'support' as const },
+        { text: `Cumulative transport and healthcare capacity is a recurring cross-programme concern`, type: 'concern' as const },
       ],
     }
 
     const summary = {
-      executive: `Across the Silvertown programme, ${total} responses show a community that broadly welcomes the ambition but wants it delivered at the right scale and in the right order. Support is strongest for the heritage-led restoration of the Millennium Mills on Plot A and for the park, primary school and community facilities proposed on Plot C. Opposition concentrates sharply on Plot B, where the height and density of the waterfront towers and the level of parking provision generate the most objections. Running through all three plots is a concern about cumulative impact — traffic, DLR capacity and school and GP places — which residents feel should be addressed programme-wide rather than plot by plot.`,
+      executive: `Across Phase 1 of the Silvertown Masterplan — Plot 1, Plot 1J&C and Silo D — ${total} responses show a community that broadly welcomes the ambition but wants it delivered at the right scale and in the right order. Support is strongest for the Plot 1 gateway next to the Grade II listed Millennium Mills and for the restoration of the historic Silo D with the new Silo D Park. Opposition concentrates sharply on Plot 1J&C, where the density of the 676-home scheme, the height of the tallest blocks over Silo D Park, and parking and DLR capacity generate the most objections. Running through all three plots is a concern about cumulative impact — transport, DLR capacity and healthcare — which residents feel should be addressed across Phase 1 rather than plot by plot.`,
       keyFindings: [
-        'Plot C (Thameside Green) attracts the most positive feedback, driven by the new park, primary school and community pavilion.',
-        'Plot B (Dock Wharf) is the flashpoint: 26-storey heights, density and a low parking ratio dominate objections here.',
-        'Plot A (Millennium Mills) enjoys broad support for heritage restoration and affordable workspace, with some worry about affordability holding over time.',
-        'Affordable housing levels (25% on Plot B) are widely felt to be too low for public dock land.',
-        'Cumulative infrastructure — transport, healthcare and school places — is the strongest cross-programme theme.',
+        'Silo D attracts the most positive feedback, driven by restoring the listed building and creating Silo D Park for community use.',
+        'Plot 1J&C is the flashpoint: 676-home density, height over Silo D Park and a low parking ratio dominate objections here.',
+        'Plot 1 enjoys broad support as a gateway building next to Millennium Mills, though its all-private tenure and height draw some concern.',
+        'Affordable housing levels on Plot 1J&C are widely felt to be too low for consented dock land, and Plot 1 has none.',
+        'Cumulative infrastructure — transport, DLR capacity and healthcare — is the strongest cross-programme theme.',
       ],
       recommendations: [
-        'Publish a programme-wide transport, school-places and healthcare capacity plan spanning all three plots.',
-        'Revisit the massing and daylight impact of the tallest blocks on Plot B and consider stepping heights down towards existing homes.',
-        'Commit in writing to delivering the Plot C park and school early in the phasing.',
-        'Set out the affordable housing tenure split and consider increasing the affordable proportion.',
-        'Agree a construction logistics and liaison plan with local traders and around the proposed school.',
+        'Publish a Phase 1-wide transport and healthcare capacity plan spanning Plot 1, Plot 1J&C and Silo D.',
+        'Revisit the massing and daylight impact of the tallest blocks on Plot 1J&C, particularly over Silo D Park.',
+        'Confirm the Silo D planning strategy and commit in writing to delivering Silo D Park early in the phasing.',
+        'Set out the affordable housing tenure split on Plot 1J&C and revisit the absence of affordable homes on Plot 1.',
+        'Agree a construction logistics and liaison plan with local traders across the Phase 1 plots.',
       ],
-      concernAreas: ['Building height and density on Plot B', 'Parking and DLR capacity', 'Delivery phasing of the park and school', 'Affordable housing levels', 'Construction impact and hours'],
-      supportAreas: ['Heritage restoration of the mills (Plot A)', 'New public park and green space (Plot C)', 'Primary school and community facilities (Plot C)', 'Affordable maker workspace (Plot A)', 'Public access to the dock edge'],
+      concernAreas: ['Height and density on Plot 1J&C', 'Parking and DLR capacity', 'Delivery phasing of Silo D Park', 'Affordable housing levels', 'Construction impact and hours'],
+      supportAreas: ['Restoration of the listed Silo D', 'Silo D Park and public green space', 'The Plot 1 gateway next to Millennium Mills', 'Dock-edge retail and public access', 'Ground-floor activity on Spillers Street'],
     }
 
     return {

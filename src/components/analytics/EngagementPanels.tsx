@@ -1,18 +1,18 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
-import { Layers, Users, TrendingUp, MapPin, FileText, Inbox, BellRing, Building2 } from 'lucide-react'
-import { PlotComparisonCards, STANCE_COLORS, type Plot } from '@/components/analytics/PlotComparison'
+import { Users, TrendingUp, MapPin, FileText, Inbox, BellRing, Building2 } from 'lucide-react'
+import { STANCE_COLORS } from './PlotComparison'
 
-// ---- types (mirror /api/projects/[id]/programme) -------------------------
+// Participation metrics + audience segmentation, computed from live data by the
+// programme endpoint. Rendered inside the AI Analytics tab.
+
 type TimelineWeek = { week: string; pins: number; forms: number; enquiries: number; registrations: number }
 type Totals = { pins: number; survey: number; enquiries: number; registrations: number; stakeholders: number; contributions: number }
 type AudienceSeg = { label: string; count: number; support: number; neutral: number; object: number }
 type ProgrammeData = {
-  projectName: string
-  plots: Plot[]
   participation: { totals: Totals; timeline: TimelineWeek[] }
-  audience: { segments: AudienceSeg[]; organisations: number; stakeholdersByStance: Record<string, number>; stakeholdersByType: Record<string, number>; stakeholderTotal: number }
+  audience: { segments: AudienceSeg[]; organisations: number; stakeholdersByStance: Record<string, number>; stakeholderTotal: number }
 }
 
 const CHANNEL = [
@@ -34,52 +34,26 @@ function StatTile({ icon: Icon, label, value, tint }: { icon: any; label: string
   )
 }
 
-export function ProgrammeTab({ projectId }: { projectId: string }) {
-  const { data, isLoading, error } = useQuery<ProgrammeData>({
+export function EngagementPanels({ projectId }: { projectId: string }) {
+  const { data } = useQuery<ProgrammeData>({
     queryKey: ['programme', projectId],
     queryFn: async () => {
       const res = await fetch(`/api/projects/${projectId}/programme`)
-      if (!res.ok) throw new Error('Failed to load programme data')
+      if (!res.ok) throw new Error('Failed to load engagement data')
       return res.json()
     },
   })
 
-  if (isLoading) {
-    return (
-      <div className="space-y-4">
-        <div className="skeleton h-8 w-64" />
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">{[1, 2, 3].map(i => <div key={i} className="skeleton h-40 w-full rounded-xl" />)}</div>
-      </div>
-    )
-  }
-  if (error || !data) {
-    return <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-red-700">Could not load programme data.</div>
-  }
-
-  const { plots, participation, audience } = data
+  if (!data) return null
+  const { participation, audience } = data
   const maxWeek = Math.max(1, ...participation.timeline.map(w => w.pins + w.forms + w.enquiries + w.registrations))
 
   return (
     <div className="space-y-8">
-      {/* header */}
-      <div>
-        <div className="flex items-center gap-2 text-teal-700">
-          <Layers size={18} aria-hidden="true" />
-          <span className="text-xs font-semibold uppercase tracking-wider">Programme overview</span>
-        </div>
-        <h2 className="mt-1 text-2xl font-semibold text-slate-900">Engagement across all {plots.length} plots</h2>
-        <p className="mt-1 text-slate-500">
-          {participation.totals.contributions.toLocaleString()} contributions and {participation.totals.registrations.toLocaleString()} registered followers across the whole {data.projectName.replace(/ Demo$/, '')} programme — monitored together, not plot by plot.
-        </p>
-      </div>
-
-      {/* per-plot cards */}
-      <PlotComparisonCards plots={plots} />
-
       {/* participation metrics */}
       <section>
         <div className="mb-3 flex items-center gap-2">
-          <TrendingUp size={18} className="text-teal-700" aria-hidden="true" />
+          <TrendingUp size={18} className="text-brand-600" aria-hidden="true" />
           <h3 className="text-lg font-semibold text-slate-900">Participation metrics</h3>
         </div>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
@@ -129,7 +103,7 @@ export function ProgrammeTab({ projectId }: { projectId: string }) {
       {/* audience segmentation */}
       <section>
         <div className="mb-3 flex items-center gap-2">
-          <Users size={18} className="text-teal-700" aria-hidden="true" />
+          <Users size={18} className="text-brand-600" aria-hidden="true" />
           <h3 className="text-lg font-semibold text-slate-900">Audience segmentation</h3>
         </div>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">

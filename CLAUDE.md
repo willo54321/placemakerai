@@ -166,6 +166,12 @@ Requires `embedEnabled: true` on the project.
 - Pin comments limited to 2000 characters
 - Geographic clustering uses 3 decimal places (~100m precision)
 - Dynamic imports for heavy components (FeedbackTab, EmbedSettingsTab)
+- **No filler subtitle/annotation text.** Never add descriptive sub-headings that
+  restate what a section/component shows or add marketing gloss (e.g. "The same
+  feedback, sliced by zone — see where support and objection concentrate", "Where
+  to focus engagement — each stakeholder plotted by…"). Let the heading and the
+  data speak for themselves. Only add helper text when it conveys genuinely
+  necessary, non-obvious information (e.g. a units caveat or a required action).
 - **Embed-first:** the client's own website is the CMS. Do not build a page builder, homepage
   builder, or general content management surface — content that needs to be authored in Placemaker
   belongs in structured, themeable fields on the project, not a freeform canvas.

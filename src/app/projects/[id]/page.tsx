@@ -2,12 +2,11 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { useSession } from 'next-auth/react'
-import { ArrowLeft, Users, MapPin, Settings, LayoutDashboard, BarChart3, Globe, Eye, FileText, HelpCircle, Inbox, Layers } from 'lucide-react'
+import { ArrowLeft, Users, MapPin, Settings, LayoutDashboard, BarChart3, Globe, Eye, FileText, HelpCircle, Inbox } from 'lucide-react'
 import Link from 'next/link'
 import { useState, Suspense } from 'react'
 import dynamic from 'next/dynamic'
 import { OverviewTab } from './overview'
-import { ProgrammeTab } from './programme'
 import { SettingsTab } from './settings'
 import { AnalyticsTab } from './analytics'
 import { EnquiriesTab } from './enquiries'
@@ -21,10 +20,6 @@ const TOUR_COPY: Record<Tab, { title: string; body: string }> = {
   overview: {
     title: 'Overview & activity',
     body: 'Your at-a-glance summary. The activity feed shows every new piece of feedback the moment residents submit it — with links straight to each item.',
-  },
-  programme: {
-    title: 'Programme overview',
-    body: 'For multi-site programmes: engagement rolled up across every plot at once — per-plot participation and stance, participation metrics over time, and who is taking part.',
   },
   feedback: {
     title: 'Map feedback',
@@ -97,7 +92,7 @@ const FormsTabWrapper = dynamic(() => import('./forms-wrapper').then(mod => ({ d
   )
 })
 
-type Tab = 'overview' | 'programme' | 'feedback' | 'forms' | 'enquiries' | 'stakeholders' | 'website' | 'analytics' | 'settings' | 'howto'
+type Tab = 'overview' | 'feedback' | 'forms' | 'enquiries' | 'stakeholders' | 'website' | 'analytics' | 'settings' | 'howto'
 
 // Deep-link target passed alongside a tab switch (e.g. from the activity
 // feed): jump straight to a specific pin or form response.
@@ -113,7 +108,7 @@ type TabGroup = {
 }
 
 const tabGroups: TabGroup[] = [
-  { id: 'top', label: '', tabs: ['overview', 'programme'] },
+  { id: 'top', label: '', tabs: ['overview'] },
   { id: 'collect', label: 'Collect', tabs: ['feedback', 'forms', 'enquiries', 'analytics'] },
   { id: 'engage', label: 'Engage', tabs: ['stakeholders'] },
   { id: 'publish', label: 'Publish', tabs: ['website'] },
@@ -242,13 +237,6 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
       id: 'overview' as Tab,
       label: 'Overview',
       icon: LayoutDashboard,
-      count: 0,
-      adminOnly: false,
-    },
-    {
-      id: 'programme' as Tab,
-      label: 'Programme',
-      icon: Layers,
       count: 0,
       adminOnly: false,
     },
@@ -490,11 +478,6 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
           {activeTab === 'overview' && (
             <div className="p-6">
               <OverviewTab project={project} onNavigate={navigateTo} />
-            </div>
-          )}
-          {activeTab === 'programme' && (
-            <div className="p-6">
-              <ProgrammeTab projectId={params.id} />
             </div>
           )}
           {activeTab === 'feedback' && (

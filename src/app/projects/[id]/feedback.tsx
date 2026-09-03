@@ -186,8 +186,7 @@ export function FeedbackTab({
         )}
         {activeSubTab === 'preview' && (
           <div className="h-full p-4 flex flex-col">
-            <div className="mb-2 flex items-center justify-between">
-              <p className="text-sm text-slate-500">Live public view — exactly what visitors see on your website.</p>
+            <div className="mb-2 flex items-center justify-end">
               <a
                 href={embedUrl}
                 target="_blank"

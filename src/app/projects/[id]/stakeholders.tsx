@@ -103,9 +103,6 @@ function StakeholderMatrix({
             <Target size={18} className="text-green-600" aria-hidden="true" />
             Power / interest matrix
           </h3>
-          <p className="text-sm text-slate-500 mt-0.5">
-            Where to focus engagement — each stakeholder plotted by influence and interest.
-          </p>
         </div>
         <span className="text-xs text-slate-400">{mapped.length} of {stakeholders.length} mapped</span>
       </div>

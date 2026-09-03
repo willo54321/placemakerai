@@ -25,6 +25,7 @@ import {
 } from '@/components/analytics'
 import { AutoInsights } from '@/components/analytics/AutoInsights'
 import { FeedbackBreakdown } from '@/components/analytics/PlotComparison'
+import { EngagementPanels } from '@/components/analytics/EngagementPanels'
 
 /**
  * Summary text with validated citation chips. The server replaces the model's
@@ -497,7 +498,7 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
         </div>
       </div>
 
-      {/* Flexible feedback breakdown — by plot, source, or map shape */}
+      {/* Feedback breakdown — by zone or by source */}
       <FeedbackBreakdown projectId={projectId} />
 
       {/* KPI Stats Row - Most Important Metrics at Top */}
@@ -825,6 +826,9 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
         )}
       </div>
 
+
+      {/* Participation metrics + audience segmentation */}
+      <EngagementPanels projectId={projectId} />
 
       {/* Geographic sentiment heatmap: red = opposition, green = support */}
       {analysis.geographic && analysis.geographic.clusters.length > 0 && (

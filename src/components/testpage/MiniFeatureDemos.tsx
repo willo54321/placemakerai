@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { ThumbsUp, X, Eye, Upload, Image as ImageIcon, Layers, ChevronLeft, ChevronDown, ChevronUp, CheckCircle, Lock, ShieldCheck, Users, Phone, Mail, FileText } from 'lucide-react'
+import { ThumbsUp, X, Eye, Upload, Image as ImageIcon, Layers, ChevronLeft, ChevronDown, ChevronUp, CheckCircle, Lock, ShieldCheck, Users, Phone, Mail, FileText, Inbox, Send, ArrowDownLeft, ArrowUpRight, CheckCheck, Sparkles, MapPin } from 'lucide-react'
 
 /**
  * Three miniature looping product demos for the modal's "More to discover"
@@ -1072,6 +1072,136 @@ export function MiniAuditTrailDemo() {
           <FileText size={10} className="text-[#16A34A] shrink-0" />
           <span className="text-[8px] text-slate-500 leading-snug">Ready for the Statement of Community Involvement</span>
         </div>
+      </div>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* 06 — Shared inbox                                                   */
+/* ------------------------------------------------------------------ */
+
+const INBOX_ROWS = [
+  { name: 'Sarah Thompson', subject: 'Parking on Elm Rise', status: 'New', color: '#B45309', bg: '#FFFBEB', unread: true },
+  { name: 'David Chen', subject: 'Business relocation support', status: 'Open', color: '#15803D', bg: '#F0FDF4', unread: false },
+  { name: 'Local History Society', subject: 'Heritage of the old mill', status: 'Closed', color: '#64748B', bg: '#F1F5F9', unread: false },
+]
+
+export function MiniSharedInboxDemo() {
+  // 1 rows appear · 2 top enquiry marked read
+  const phase = useLoop([{ at: 500, phase: 1 }, { at: 3000, phase: 2 }], 8000, 2)
+  return (
+    <div className="relative w-full h-full flex items-center justify-center px-5 select-none" aria-label="Demo: the shared enquiry inbox, filterable by status with unread tracking">
+      <div className="w-full max-w-[250px] bg-white rounded-xl border border-slate-200 shadow-md overflow-hidden">
+        <div className="flex items-center gap-1 px-2.5 py-1.5 border-b border-slate-100">
+          <Inbox size={11} className="text-slate-500" />
+          <span className="text-[9.5px] font-semibold text-slate-700">Enquiries</span>
+          <span className="ml-auto flex gap-1">
+            {['All', 'New', 'Open'].map((f, i) => (
+              <span key={f} className={`text-[7.5px] font-medium rounded px-1 py-px ${i === 0 ? 'bg-green-50 text-green-700' : 'text-slate-400'}`}>{f}</span>
+            ))}
+          </span>
+        </div>
+        {INBOX_ROWS.map((r, i) => {
+          const unread = r.unread && phase < 2
+          return (
+            <div key={i} className="flex items-center gap-1.5 px-2.5 py-1.5 border-b border-slate-50" style={{ opacity: phase >= 1 ? 1 : 0, transform: phase >= 1 ? 'translateY(0)' : 'translateY(6px)', transition: `opacity 0.4s ${EASE} ${i * 110}ms, transform 0.4s ${EASE} ${i * 110}ms` }}>
+              <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: unread ? '#16A34A' : 'transparent', transition: `background-color 0.5s ${EASE}` }} />
+              <span className="flex-1 min-w-0">
+                <span className={`block text-[9px] truncate ${unread ? 'font-semibold text-slate-900' : 'font-medium text-slate-600'}`}>{r.name}</span>
+                <span className="block text-[8px] text-slate-400 truncate">{r.subject}</span>
+              </span>
+              <span className="text-[7.5px] font-semibold rounded-full px-1.5 py-0.5 shrink-0" style={{ color: r.color, backgroundColor: r.bg }}>{r.status}</span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* 06 — Reply by email                                                 */
+/* ------------------------------------------------------------------ */
+
+export function MiniReplyEmailDemo() {
+  // 1 reply appears in composer · 2 sent → emailed + delivered
+  const phase = useLoop([{ at: 800, phase: 1 }, { at: 3200, phase: 2 }], 8200, 2)
+  const sent = phase >= 2
+  return (
+    <div className="relative w-full h-full flex items-center justify-center px-5 select-none" aria-label="Demo: replying to an enquiry, emailed to the enquirer">
+      <div className="w-full max-w-[240px] bg-white rounded-xl border border-slate-200 shadow-md p-2.5">
+        <div className="flex items-center gap-1 mb-1.5 text-[8px] text-slate-400">
+          <Mail size={9} /> To: sarah.t@email.com
+        </div>
+        <div className="rounded-lg border border-slate-200 p-2 min-h-[46px]">
+          <p className="text-[9px] text-slate-700 leading-relaxed" style={{ opacity: phase >= 1 ? 1 : 0, transition: `opacity 0.5s ${EASE}` }}>
+            Thanks Sarah — parking is being reviewed with the highways team, and the plans are on the project page.
+          </p>
+        </div>
+        <div className="mt-2 flex items-center justify-between">
+          <span className="text-[8px] font-medium inline-flex items-center gap-1" style={{ color: sent ? '#15803D' : 'transparent', transition: `color 0.4s ${EASE}` }}>
+            <CheckCheck size={10} /> Emailed · delivered
+          </span>
+          <span className="inline-flex items-center gap-1 text-[9px] font-medium text-white rounded-md px-2 py-1" style={{ backgroundColor: sent ? '#94A3B8' : '#16A34A', transition: `background-color 0.4s ${EASE}` }}>
+            <Send size={9} /> {sent ? 'Sent' : 'Send'}
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* 06 — Full thread history                                            */
+/* ------------------------------------------------------------------ */
+
+export function MiniThreadHistoryDemo() {
+  // 1 inbound original · 2 outbound reply (delivered)
+  const phase = useLoop([{ at: 600, phase: 1 }, { at: 2200, phase: 2 }], 8000, 2)
+  return (
+    <div className="relative w-full h-full flex items-center justify-center px-5 select-none" aria-label="Demo: the full enquiry thread — original message and reply, with delivery status">
+      <div className="w-full max-w-[240px] space-y-2">
+        <div className="flex justify-start" style={{ opacity: phase >= 1 ? 1 : 0, transform: phase >= 1 ? 'translateY(0)' : 'translateY(8px)', transition: `opacity 0.45s ${EASE}, transform 0.45s ${EASE}` }}>
+          <div className="max-w-[86%] rounded-2xl bg-slate-100 text-slate-800 px-3 py-2">
+            <div className="flex items-center gap-1 text-[8px] text-slate-500 mb-0.5"><ArrowDownLeft size={9} /> <span className="font-medium">Sarah Thompson</span><span className="opacity-70">· enquiry</span></div>
+            <p className="text-[9px] leading-relaxed">We’re worried about parking on Elm Rise. Is there a survey?</p>
+          </div>
+        </div>
+        <div className="flex justify-end" style={{ opacity: phase >= 2 ? 1 : 0, transform: phase >= 2 ? 'translateY(0)' : 'translateY(8px)', transition: `opacity 0.45s ${EASE}, transform 0.45s ${EASE}` }}>
+          <div className="max-w-[86%] rounded-2xl bg-[#16A34A] text-white px-3 py-2">
+            <div className="flex items-center gap-1 text-[8px] text-green-50 mb-0.5"><ArrowUpRight size={9} /> <span className="font-medium">You</span></div>
+            <p className="text-[9px] leading-relaxed">Thanks Sarah — parking is being reviewed and the plans are online.</p>
+            <div className="flex items-center gap-1 justify-end mt-0.5 text-[8px] text-green-100"><span>delivered</span><CheckCheck size={10} /></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* 06 — Feeds AI analysis                                              */
+/* ------------------------------------------------------------------ */
+
+export function MiniFeedsAiDemo() {
+  // 1 enquiry shown · 2 classified (sentiment + theme) alongside channels
+  const phase = useLoop([{ at: 700, phase: 1 }, { at: 2300, phase: 2 }], 8000, 2)
+  return (
+    <div className="relative w-full h-full flex flex-col items-center justify-center gap-2 px-5 select-none" aria-label="Demo: enquiry text analysed for sentiment and themes alongside map comments and forms">
+      <div className="w-full max-w-[240px] bg-white rounded-xl border border-slate-100 shadow-md p-2.5" style={{ opacity: phase >= 1 ? 1 : 0, transform: phase >= 1 ? 'translateY(0)' : 'translateY(6px)', transition: `opacity 0.45s ${EASE}, transform 0.45s ${EASE}` }}>
+        <div className="flex items-center gap-1 text-[8px] text-slate-400 mb-1"><Mail size={9} /> Enquiry · Sarah Thompson</div>
+        <p className="text-[9px] text-slate-700 leading-snug mb-1.5">Worried about parking on Elm Rise once the new homes are occupied.</p>
+        <div className="flex gap-1" style={{ opacity: phase >= 2 ? 1 : 0, transform: phase >= 2 ? 'scale(1)' : 'scale(0.9)', transition: `opacity 0.4s ${EASE}, transform 0.4s ${EASE}` }}>
+          <span className="inline-flex items-center gap-1 text-[8px] font-semibold rounded-full px-1.5 py-0.5" style={{ color: '#DC2626', backgroundColor: '#FEF2F2' }}><CheckCircle size={8} /> Object</span>
+          <span className="inline-flex items-center text-[8px] font-semibold rounded-full px-1.5 py-0.5" style={{ color: '#16A34A', backgroundColor: '#F0FDF4' }}>Traffic &amp; parking</span>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 text-[7.5px] text-slate-400" style={{ opacity: phase >= 2 ? 1 : 0, transition: `opacity 0.5s ${EASE}` }}>
+        <Sparkles size={9} className="text-[#16A34A]" />
+        <span>One analysis with</span>
+        <span className="inline-flex items-center gap-0.5"><MapPin size={8} /> map</span>
+        <span className="inline-flex items-center gap-0.5"><FileText size={8} /> forms</span>
       </div>
     </div>
   )

@@ -20,6 +20,10 @@ import {
   MiniStanceDemo,
   MiniEngagementLogDemo,
   MiniAuditTrailDemo,
+  MiniSharedInboxDemo,
+  MiniReplyEmailDemo,
+  MiniThreadHistoryDemo,
+  MiniFeedsAiDemo,
 } from './MiniFeatureDemos';
 
 const MINI_DEMOS: Record<string, () => JSX.Element> = {
@@ -36,6 +40,10 @@ const MINI_DEMOS: Record<string, () => JSX.Element> = {
   'Stance tracking': MiniStanceDemo,
   'Engagement log': MiniEngagementLogDemo,
   'Consultation audit trail': MiniAuditTrailDemo,
+  'Shared inbox': MiniSharedInboxDemo,
+  'Reply by email': MiniReplyEmailDemo,
+  'Full thread history': MiniThreadHistoryDemo,
+  'Feeds AI analysis': MiniFeedsAiDemo,
 };
 import FeedbackFlowDemo from './FeedbackFlowDemo';
 import FormBuilderDemo from './FormBuilderDemo';
@@ -146,12 +154,24 @@ const services = [
     subtitle: 'Reply to the public from one shared desk',
     description: 'Public enquiries submitted from your site land in a shared inbox. Read the full conversation, reply by email in a click, and track each enquiry from new to closed — and every message still feeds the same AI analysis as your map and forms.',
     secondaryDescription: '',
-    features: [
-      { name: 'Shared inbox', detail: 'Every public enquiry in one desk, filterable by new, open and closed, with unread tracking.' },
-      { name: 'Reply by email', detail: 'Answer from the platform; the reply is emailed to the enquirer and their response comes back to your inbox.' },
-      { name: 'Full thread history', detail: 'The original enquiry and every reply logged together, with a delivery status on each message.' },
-      { name: 'Feeds AI analysis', detail: 'Enquiry text is analysed for sentiment and themes alongside map comments and form responses.' },
-    ],
+    modal: {
+      headline: 'Every public enquiry, answered from one place',
+      intro:
+        'A branded enquiry form embeds on your site and every submission lands in a shared inbox. Read the full thread, reply by email in a click, and move each enquiry from new to closed — while the text still feeds the same AI analysis as your map and forms.',
+      bullets: [
+        'Every public enquiry in one desk — filterable by new, open and closed, with unread tracking',
+        'Reply by email straight from the platform; the enquirer’s response comes back to your inbox',
+        'The original enquiry and every reply logged together, with a delivery status on each message',
+        'Enquiry text analysed for sentiment and themes alongside map comments and form responses',
+      ],
+      footnote: 'Public enquiries are a data channel and a conversation — not a separate silo.',
+      featureCards: [
+        { name: 'Shared inbox', detail: 'Every public enquiry in one desk, filterable by new, open and closed, with unread tracking.' },
+        { name: 'Reply by email', detail: 'Answer from the platform; the reply is emailed to the enquirer and their response comes back to your inbox.' },
+        { name: 'Full thread history', detail: 'The original enquiry and every reply logged together, with a delivery status on each message.' },
+        { name: 'Feeds AI analysis', detail: 'Enquiry text is analysed for sentiment and themes alongside map comments and form responses.' },
+      ],
+    },
   },
   {
     number: '04',
@@ -365,6 +385,8 @@ export default function Services() {
                       <FormBuilderDemo />
                     ) : open.number === '05' ? (
                       <StakeholderCrmDemo />
+                    ) : open.number === '06' ? (
+                      <EnquiryInboxDemo />
                     ) : (
                       <AnalysisDemo />
                     )}

@@ -16,6 +16,10 @@ import {
   MiniSentimentDemo,
   MiniThemesDemo,
   MiniMaterialDemo,
+  MiniMatrixDemo,
+  MiniStanceDemo,
+  MiniEngagementLogDemo,
+  MiniAuditTrailDemo,
 } from './MiniFeatureDemos';
 
 const MINI_DEMOS: Record<string, () => JSX.Element> = {
@@ -28,6 +32,10 @@ const MINI_DEMOS: Record<string, () => JSX.Element> = {
   'Sentiment Analysis': MiniSentimentDemo,
   'Theme Extraction': MiniThemesDemo,
   'Material Considerations': MiniMaterialDemo,
+  'Power / interest matrix': MiniMatrixDemo,
+  'Stance tracking': MiniStanceDemo,
+  'Engagement log': MiniEngagementLogDemo,
+  'Consultation audit trail': MiniAuditTrailDemo,
 };
 import FeedbackFlowDemo from './FeedbackFlowDemo';
 import FormBuilderDemo from './FormBuilderDemo';
@@ -113,12 +121,24 @@ const services = [
     subtitle: 'Track every contact, meeting and position',
     description: 'Keep a live register of the people and organisations you engage — councillors, residents’ groups, businesses and statutory bodies. Map each by influence and interest, record their stance, and log every meeting, call and email so your consultation has a defensible audit trail.',
     secondaryDescription: '',
-    features: [
-      { name: 'Power / interest matrix', detail: 'Plot every stakeholder by influence and interest to see who to manage closely, keep satisfied, or simply keep informed.' },
-      { name: 'Stance tracking', detail: 'Mark each contact supporter, opposed, neutral or undecided — and watch positions shift as engagement progresses.' },
-      { name: 'Engagement log', detail: 'Record every meeting, call, email and letter against the contact, building a time-stamped audit trail.' },
-      { name: 'Consultation audit trail', detail: 'Show exactly who you engaged, when, and what they said — ready for the statement of community involvement.' },
-    ],
+    modal: {
+      headline: 'Every stakeholder, mapped and logged',
+      intro:
+        'Keep a live register of the people and organisations you engage. Map each by influence and interest, track where they stand, and log every meeting, call and email — so your consultation has a defensible audit trail.',
+      bullets: [
+        'Plot every contact on a power / interest matrix — manage closely, keep satisfied, or simply keep informed',
+        'Mark each stakeholder supporter, opposed, neutral or undecided, and watch positions shift as you engage',
+        'Log every meeting, call, email and letter against the contact, each one time-stamped',
+        'Produce a who-engaged-when-and-how record, ready for the statement of community involvement',
+      ],
+      footnote: 'A consultation audit trail, not a sales pipeline.',
+      featureCards: [
+        { name: 'Power / interest matrix', detail: 'Plot every stakeholder by influence and interest to see who to manage closely, keep satisfied, or simply keep informed.' },
+        { name: 'Stance tracking', detail: 'Mark each contact supporter, opposed, neutral or undecided — and watch positions shift as engagement progresses.' },
+        { name: 'Engagement log', detail: 'Record every meeting, call, email and letter against the contact, building a time-stamped audit trail.' },
+        { name: 'Consultation audit trail', detail: 'Show exactly who you engaged, when, and how — ready for the statement of community involvement.' },
+      ],
+    },
   },
   {
     number: '06',
@@ -343,6 +363,8 @@ export default function Services() {
                       <ModerationDemo />
                     ) : open.number === '02' ? (
                       <FormBuilderDemo />
+                    ) : open.number === '05' ? (
+                      <StakeholderCrmDemo />
                     ) : (
                       <AnalysisDemo />
                     )}

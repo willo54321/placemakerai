@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { ThumbsUp, X, Eye, Upload, Image as ImageIcon, Layers, ChevronLeft, ChevronDown, ChevronUp, CheckCircle, Lock, ShieldCheck } from 'lucide-react'
+import { ThumbsUp, X, Eye, Upload, Image as ImageIcon, Layers, ChevronLeft, ChevronDown, ChevronUp, CheckCircle, Lock, ShieldCheck, Users, Phone, Mail, FileText } from 'lucide-react'
 
 /**
  * Three miniature looping product demos for the modal's "More to discover"
@@ -910,6 +910,169 @@ export function MiniSecureDemo() {
       >
         <ShieldCheck size={9} className="text-[#16A34A]" /> Stored securely — visible only to your project team
       </p>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* 05 — Power / interest matrix                                        */
+/* ------------------------------------------------------------------ */
+
+const MATRIX_DOTS = [
+  { interest: 5, influence: 4, color: '#DC2626' },
+  { interest: 4, influence: 5, color: '#64748B' },
+  { interest: 3, influence: 5, color: '#D97706' },
+  { interest: 4, influence: 3, color: '#16A34A' },
+  { interest: 5, influence: 2, color: '#16A34A' },
+  { interest: 2, influence: 3, color: '#64748B' },
+]
+
+const MATRIX_QUADS = [
+  { label: 'Keep satisfied', pos: 'top-0 left-0', bg: 'rgba(251,191,36,0.10)' },
+  { label: 'Manage closely', pos: 'top-0 right-0', bg: 'rgba(22,163,74,0.12)' },
+  { label: 'Monitor', pos: 'bottom-0 left-0', bg: 'rgba(148,163,184,0.10)' },
+  { label: 'Keep informed', pos: 'bottom-0 right-0', bg: 'rgba(37,99,235,0.10)' },
+]
+
+export function MiniMatrixDemo() {
+  // 1 grid · 2 dots plot in
+  const phase = useLoop([{ at: 500, phase: 1 }, { at: 1400, phase: 2 }], 8000, 2)
+  return (
+    <div className="relative w-full h-full flex items-center justify-center px-5 select-none" aria-label="Demo: stakeholders plotted on a power and interest matrix">
+      <div className="flex items-stretch gap-1.5">
+        <span className="text-[7px] font-medium text-slate-400 [writing-mode:vertical-rl] rotate-180 self-center">Influence →</span>
+        <div className="flex flex-col">
+          <div className="relative w-[150px] aspect-square rounded-lg border border-slate-200 overflow-hidden bg-white">
+            {MATRIX_QUADS.map(q => (
+              <div key={q.label} className={`absolute w-1/2 h-1/2 ${q.pos} p-1`} style={{ background: q.bg, opacity: phase >= 1 ? 1 : 0, transition: `opacity 0.5s ${EASE}` }}>
+                <span className="text-[6px] font-semibold text-slate-500 uppercase tracking-wide leading-none">{q.label}</span>
+              </div>
+            ))}
+            <div className="absolute inset-y-0 left-1/2 w-px bg-slate-200" />
+            <div className="absolute inset-x-0 top-1/2 h-px bg-slate-200" />
+            {MATRIX_DOTS.map((d, i) => {
+              const x = ((d.interest - 0.5) / 5) * 100
+              const y = (1 - (d.influence - 0.5) / 5) * 100
+              const shown = phase >= 2
+              return (
+                <span key={i} className="absolute h-2.5 w-2.5 rounded-full border-2 border-white shadow-sm" style={{ left: `${x}%`, top: `${y}%`, background: d.color, transform: `translate(-50%, -50%) scale(${shown ? 1 : 0})`, opacity: shown ? 1 : 0, transition: `transform 0.5s ${EASE} ${i * 100}ms, opacity 0.4s ${EASE} ${i * 100}ms` }} />
+              )
+            })}
+          </div>
+          <span className="text-[7px] font-medium text-slate-400 text-center mt-1">Interest →</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* 05 — Stance tracking                                                */
+/* ------------------------------------------------------------------ */
+
+export function MiniStanceDemo() {
+  // 1 rows shown · 2 the undecided contact shifts to supporter
+  const phase = useLoop([{ at: 900, phase: 1 }, { at: 2800, phase: 2 }], 8200, 2)
+  const rows = [
+    { name: 'Residents’ Association', stance: 'Opposed', color: '#DC2626', bg: '#FEF2F2' },
+    { name: 'Heritage Society', shift: true },
+    { name: 'Cllr Smith', stance: 'Neutral', color: '#64748B', bg: '#F1F5F9' },
+  ]
+  return (
+    <div className="relative w-full h-full flex flex-col items-center justify-center gap-1.5 px-5 select-none" aria-label="Demo: each stakeholder marked with a stance that updates as engagement progresses">
+      <div className="w-full max-w-[240px] space-y-1.5">
+        {rows.map((r, i) => {
+          const shifted = phase >= 2
+          const stance = r.shift ? (shifted ? 'Supporter' : 'Undecided') : r.stance!
+          const color = r.shift ? (shifted ? '#16A34A' : '#D97706') : r.color!
+          const bg = r.shift ? (shifted ? '#F0FDF4' : '#FFFBEB') : r.bg!
+          return (
+            <div key={i} className="flex items-center gap-2 bg-white rounded-lg border border-slate-100 shadow-sm px-2.5 py-1.5" style={{ opacity: phase >= 1 ? 1 : 0, transform: phase >= 1 ? 'translateY(0)' : 'translateY(6px)', transition: `opacity 0.4s ${EASE} ${i * 90}ms, transform 0.4s ${EASE} ${i * 90}ms` }}>
+              <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: color, transition: `background-color 0.5s ${EASE}` }} />
+              <span className="flex-1 min-w-0 text-[9.5px] font-medium text-slate-700 truncate">{r.name}</span>
+              <span className="text-[8px] font-semibold rounded-full px-1.5 py-0.5 shrink-0" style={{ color, backgroundColor: bg, transition: `all 0.5s ${EASE}` }}>{stance}</span>
+            </div>
+          )
+        })}
+      </div>
+      <p className="text-[8px] text-slate-400" style={{ opacity: phase >= 2 ? 1 : 0, transition: `opacity 0.5s ${EASE}` }}>Positions update as engagement progresses</p>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* 05 — Engagement log                                                 */
+/* ------------------------------------------------------------------ */
+
+const MINI_LOG = [
+  { icon: Users, color: '#16A34A', bg: '#F0FDF4', who: 'Residents’ Association', label: 'Meeting', when: '2d' },
+  { icon: Mail, color: '#2563EB', bg: '#EFF6FF', who: 'Heritage Society', label: 'Email', when: '4d' },
+  { icon: Phone, color: '#7C3AED', bg: '#F5F3FF', who: 'Cllr Smith', label: 'Call', when: '1w' },
+]
+
+export function MiniEngagementLogDemo() {
+  // entries stream in
+  const phase = useLoop([{ at: 500, phase: 1 }], 8000, 1)
+  return (
+    <div className="relative w-full h-full flex items-center justify-center px-5 select-none" aria-label="Demo: meetings, calls and emails logged against each stakeholder">
+      <div className="w-full max-w-[240px] relative pl-1">
+        <div className="absolute left-[13px] top-1 bottom-1 w-px bg-slate-100" />
+        <div className="space-y-2">
+          {MINI_LOG.map((e, i) => {
+            const Icon = e.icon
+            const shown = phase >= 1
+            return (
+              <div key={i} className="relative flex items-start gap-2.5" style={{ opacity: shown ? 1 : 0, transform: shown ? 'translateY(0)' : 'translateY(8px)', transition: `opacity 0.45s ${EASE} ${i * 180}ms, transform 0.45s ${EASE} ${i * 180}ms` }}>
+                <span className="relative z-10 w-[26px] h-[26px] rounded-full flex items-center justify-center shrink-0 border-2 border-white" style={{ backgroundColor: e.bg }}>
+                  <Icon size={12} style={{ color: e.color }} />
+                </span>
+                <div className="min-w-0 flex-1 pt-0.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[9.5px] font-semibold text-slate-900 truncate">{e.who}</span>
+                    <span className="text-[7.5px] font-medium rounded px-1 py-px shrink-0" style={{ color: e.color, backgroundColor: e.bg }}>{e.label}</span>
+                    <span className="text-[8px] text-slate-400 ml-auto shrink-0">{e.when}</span>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* 05 — Consultation audit trail                                       */
+/* ------------------------------------------------------------------ */
+
+const AUDIT_ROWS = [
+  { who: 'Residents’ Association', when: '2 Sep 2026', what: 'Meeting' },
+  { who: 'Heritage Society', when: '31 Aug 2026', what: 'Email' },
+  { who: 'Cllr Smith', when: '26 Aug 2026', what: 'Call' },
+]
+
+export function MiniAuditTrailDemo() {
+  // rows fill in · then the "ready" stamp
+  const phase = useLoop([{ at: 500, phase: 1 }, { at: 2200, phase: 2 }], 8200, 2)
+  return (
+    <div className="relative w-full h-full flex items-center justify-center px-5 select-none" aria-label="Demo: a consultation audit trail of who was engaged, when, and how — ready for reporting">
+      <div className="w-full max-w-[240px] bg-white rounded-xl border border-slate-100 shadow-md overflow-hidden">
+        <div className="grid grid-cols-[1fr_auto_auto] gap-2 px-2.5 py-1.5 bg-slate-50 border-b border-slate-100 text-[7.5px] font-semibold text-slate-400 uppercase tracking-wide">
+          <span>Who</span><span>When</span><span>How</span>
+        </div>
+        {AUDIT_ROWS.map((r, i) => (
+          <div key={i} className="grid grid-cols-[1fr_auto_auto] gap-2 px-2.5 py-1.5 border-b border-slate-50 items-center" style={{ opacity: phase >= 1 ? 1 : 0, transform: phase >= 1 ? 'translateX(0)' : 'translateX(8px)', transition: `opacity 0.4s ${EASE} ${i * 140}ms, transform 0.4s ${EASE} ${i * 140}ms` }}>
+            <span className="text-[8.5px] font-medium text-slate-700 truncate">{r.who}</span>
+            <span className="text-[8px] text-slate-400 tabular-nums whitespace-nowrap">{r.when}</span>
+            <span className="text-[8px] text-slate-500">{r.what}</span>
+          </div>
+        ))}
+        <div className="px-2.5 py-2 flex items-center gap-1.5" style={{ opacity: phase >= 2 ? 1 : 0, transform: phase >= 2 ? 'translateY(0)' : 'translateY(4px)', transition: `opacity 0.5s ${EASE}, transform 0.5s ${EASE}` }}>
+          <FileText size={10} className="text-[#16A34A] shrink-0" />
+          <span className="text-[8px] text-slate-500 leading-snug">Ready for the Statement of Community Involvement</span>
+        </div>
+      </div>
     </div>
   )
 }

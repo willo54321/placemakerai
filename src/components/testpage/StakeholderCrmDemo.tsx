@@ -28,7 +28,7 @@ type Kind = keyof typeof KIND
 const ENTRIES: { kind: Kind; who: string; summary: string; when: string }[] = [
   { kind: 'meeting', who: 'Residents’ Association', summary: 'Walked through the three plots and the consultation timeline', when: '2d' },
   { kind: 'email', who: 'Heritage Society', summary: 'Sent heritage statement; awaiting comments on Silo D', when: '4d' },
-  { kind: 'call', who: 'Cllr Hussain', summary: 'Briefed on Phase 1 infrastructure and school places', when: '1w' },
+  { kind: 'call', who: 'Cllr Smith', summary: 'Briefed on Phase 1 infrastructure and school places', when: '1w' },
   { kind: 'meeting', who: 'Royal Docks Team', summary: 'Design review of the dock-edge public realm', when: '2w' },
   { kind: 'letter', who: 'Local Traders Forum', summary: 'Confirmed the traders’ liaison group for construction', when: '3w' },
 ]

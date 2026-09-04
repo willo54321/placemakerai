@@ -18,7 +18,9 @@ site stays the client's site, on their domain, in their brand.
 See `MARKETING.md` for the competitor teardown (Go Vocal, Commonplace), positioning, messaging and
 the marketing-site build plan.
 
-**Scope note (2026-08-28):** The product was deliberately descoped to the three core features above. Stakeholder CRM, guided tours, construction issues mode, email campaigns, mailing lists/subscribers, panoramas, and the enquiry inbox/messaging workflow were all removed (recoverable from git history if ever needed). Public enquiry *submission* remains as a data-collection channel feeding AI analysis — there is no inbox UI or reply workflow.
+**Scope note (2026-08-28):** The product was deliberately descoped to the three core features above. Guided tours, construction issues mode, email campaigns, mailing lists/subscribers and panoramas were removed (recoverable from git history if ever needed).
+
+**Re-added since (2026-09):** a lean **Stakeholder tracker/CRM** (register + power/interest matrix + engagement log; `/projects/[id]` Stakeholders tab, `api/projects/[id]/stakeholders/**`) and an **Enquiry inbox with outbound replies** (thread view + reply-by-email via Resend, `api/projects/[id]/enquiries/[enquiryId]/messages`). Public enquiry *submission* still also feeds AI analysis. Inbound two-way email threading and client-domain sending remain unbuilt. Both features are marketed on the homepage (`Services.tsx` items 05/06 with `StakeholderCrmDemo`/`EnquiryInboxDemo`).
 
 ## Tech Stack
 

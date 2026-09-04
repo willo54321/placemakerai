@@ -31,6 +31,8 @@ const MINI_DEMOS: Record<string, () => JSX.Element> = {
 };
 import FeedbackFlowDemo from './FeedbackFlowDemo';
 import FormBuilderDemo from './FormBuilderDemo';
+import StakeholderCrmDemo from './StakeholderCrmDemo';
+import EnquiryInboxDemo from './EnquiryInboxDemo';
 
 const services = [
   {
@@ -104,6 +106,32 @@ const services = [
         { name: 'Material Considerations', detail: 'Feedback is separated into material and non-material planning considerations, ready for officer reports and committee.' },
       ],
     },
+  },
+  {
+    number: '05',
+    title: 'Stakeholder CRM',
+    subtitle: 'Track every contact, meeting and position',
+    description: 'Keep a live register of the people and organisations you engage — councillors, residents’ groups, businesses and statutory bodies. Map each by influence and interest, record their stance, and log every meeting, call and email so your consultation has a defensible audit trail.',
+    secondaryDescription: '',
+    features: [
+      { name: 'Power / interest matrix', detail: 'Plot every stakeholder by influence and interest to see who to manage closely, keep satisfied, or simply keep informed.' },
+      { name: 'Stance tracking', detail: 'Mark each contact supporter, opposed, neutral or undecided — and watch positions shift as engagement progresses.' },
+      { name: 'Engagement log', detail: 'Record every meeting, call, email and letter against the contact, building a time-stamped audit trail.' },
+      { name: 'Consultation audit trail', detail: 'Show exactly who you engaged, when, and what they said — ready for the statement of community involvement.' },
+    ],
+  },
+  {
+    number: '06',
+    title: 'Enquiry Inbox',
+    subtitle: 'Reply to the public from one shared desk',
+    description: 'Public enquiries submitted from your site land in a shared inbox. Read the full conversation, reply by email in a click, and track each enquiry from new to closed — and every message still feeds the same AI analysis as your map and forms.',
+    secondaryDescription: '',
+    features: [
+      { name: 'Shared inbox', detail: 'Every public enquiry in one desk, filterable by new, open and closed, with unread tracking.' },
+      { name: 'Reply by email', detail: 'Answer from the platform; the reply is emailed to the enquirer and their response comes back to your inbox.' },
+      { name: 'Full thread history', detail: 'The original enquiry and every reply logged together, with a delivery status on each message.' },
+      { name: 'Feeds AI analysis', detail: 'Enquiry text is analysed for sentiment and themes alongside map comments and form responses.' },
+    ],
   },
   {
     number: '04',
@@ -217,6 +245,14 @@ export default function Services() {
                     <FormBuilderDemo />
                   ) : service.number === '04' ? (
                     <FeedbackFlowDemo />
+                  ) : service.number === '05' ? (
+                    <div className="w-full rounded-lg overflow-hidden border border-white/10">
+                      <StakeholderCrmDemo />
+                    </div>
+                  ) : service.number === '06' ? (
+                    <div className="w-full rounded-lg overflow-hidden border border-white/10">
+                      <EnquiryInboxDemo />
+                    </div>
                   ) : (
                     <div className="w-full rounded-lg overflow-hidden border border-white/10">
                       <AnalysisDemo />

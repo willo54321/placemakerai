@@ -122,7 +122,7 @@ const services = [
   },
   {
     number: '06',
-    title: 'Enquiry Inbox',
+    title: 'Enquiry Management System',
     subtitle: 'Reply to the public from one shared desk',
     description: 'Public enquiries submitted from your site land in a shared inbox. Read the full conversation, reply by email in a click, and track each enquiry from new to closed — and every message still feeds the same AI analysis as your map and forms.',
     secondaryDescription: '',

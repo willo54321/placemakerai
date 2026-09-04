@@ -1,13 +1,13 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Users } from 'lucide-react'
+import { ClipboardList, Users, Phone, Mail, FileText, CalendarDays } from 'lucide-react'
 
 /**
- * The stakeholder CRM demo: a scripted, looping re-enactment of the stakeholder
- * tracker — contacts plot onto the power/interest matrix by influence and
- * interest, coloured by stance, while the engagement log counts up. Mirrors the
- * real matrix's quadrants and stance palette.
+ * The stakeholder engagement-log demo: a scripted, looping re-enactment of the
+ * consultation audit trail — meetings, calls, emails and letters logged against
+ * each stakeholder stream in newest-first, with a running total. Mirrors the
+ * real engagement log's entry types and palette.
  *
  * Same conventions as the other demos: Stripe easing, loops while mounted,
  * reduced motion renders the finished frame.
@@ -15,25 +15,22 @@ import { Users } from 'lucide-react'
 
 const EASE = 'cubic-bezier(0.19, 1, 0.22, 1)'
 
-const STANCE = { supporter: '#16A34A', opposed: '#DC2626', neutral: '#64748B', undecided: '#D97706' } as const
+const KIND = {
+  meeting: { icon: Users, color: '#16A34A', bg: '#F0FDF4', label: 'Meeting' },
+  email: { icon: Mail, color: '#2563EB', bg: '#EFF6FF', label: 'Email' },
+  call: { icon: Phone, color: '#7C3AED', bg: '#F5F3FF', label: 'Call' },
+  letter: { icon: FileText, color: '#D97706', bg: '#FFFBEB', label: 'Letter' },
+  event: { icon: CalendarDays, color: '#0E7C86', bg: '#ECFEFF', label: 'Event' },
+} as const
 
-type St = keyof typeof STANCE
-type Person = { name: string; influence: number; interest: number; stance: St }
+type Kind = keyof typeof KIND
 
-const PEOPLE: Person[] = [
-  { name: 'Cllr Hussain', influence: 5, interest: 4, stance: 'neutral' },
-  { name: 'Residents’ Assoc.', influence: 4, interest: 5, stance: 'opposed' },
-  { name: 'GLA / Docks team', influence: 5, interest: 3, stance: 'supporter' },
-  { name: 'Heritage Society', influence: 3, interest: 5, stance: 'undecided' },
-  { name: 'Local Traders', influence: 3, interest: 4, stance: 'supporter' },
-  { name: 'Cyclists Group', influence: 2, interest: 4, stance: 'neutral' },
-]
-
-const QUADRANTS = [
-  { label: 'Keep satisfied', pos: 'top-0 left-0', bg: 'rgba(251,191,36,0.10)' },
-  { label: 'Manage closely', pos: 'top-0 right-0', bg: 'rgba(22,163,74,0.12)' },
-  { label: 'Monitor', pos: 'bottom-0 left-0', bg: 'rgba(148,163,184,0.10)' },
-  { label: 'Keep informed', pos: 'bottom-0 right-0', bg: 'rgba(37,99,235,0.10)' },
+const ENTRIES: { kind: Kind; who: string; summary: string; when: string }[] = [
+  { kind: 'meeting', who: 'Residents’ Association', summary: 'Walked through the three plots and the consultation timeline', when: '2d' },
+  { kind: 'email', who: 'Heritage Society', summary: 'Sent heritage statement; awaiting comments on Silo D', when: '4d' },
+  { kind: 'call', who: 'Cllr Hussain', summary: 'Briefed on Phase 1 infrastructure and school places', when: '1w' },
+  { kind: 'meeting', who: 'Royal Docks Team', summary: 'Design review of the dock-edge public realm', when: '2w' },
+  { kind: 'letter', who: 'Local Traders Forum', summary: 'Confirmed the traders’ liaison group for construction', when: '3w' },
 ]
 
 function useCountUp(target: number, active: boolean, ms = 900) {
@@ -53,12 +50,12 @@ function useCountUp(target: number, active: boolean, ms = 900) {
 }
 
 export default function StakeholderCrmDemo() {
-  // 1 matrix grid · 2 stakeholders plot in · 3 register + engagements count
+  // 1 header · 2 entries stream in
   const [phase, setPhase] = useState(0)
   const timers = useRef<ReturnType<typeof setTimeout>[]>([])
 
   useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { setPhase(3); return }
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { setPhase(2); return }
     let cancelled = false
     const at = (ms: number, fn: () => void) => { timers.current.push(setTimeout(fn, ms)) }
     const run = () => {
@@ -66,107 +63,72 @@ export default function StakeholderCrmDemo() {
       timers.current.forEach(clearTimeout)
       timers.current = []
       setPhase(1)
-      at(700, () => setPhase(2))
-      at(2600, () => setPhase(3))
+      at(500, () => setPhase(2))
       at(9000, run)
     }
     run()
     return () => { cancelled = true; timers.current.forEach(clearTimeout) }
   }, [])
 
-  const engagements = useCountUp(34, phase >= 3)
+  const logged = useCountUp(34, phase >= 2)
 
   return (
-    <div className="relative w-full aspect-[4/3] bg-white select-none overflow-hidden" aria-label="Demo: stakeholders plotted on a power and interest matrix, coloured by stance">
+    <div className="relative w-full aspect-[4/3] bg-white select-none overflow-hidden" aria-label="Demo: a stakeholder engagement log — meetings, calls, emails and letters logged as an audit trail">
       <div className="absolute inset-0 p-4 sm:p-5 flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between mb-3">
           <p className="text-[11px] font-semibold text-slate-900 flex items-center gap-1.5">
             <span className="w-5 h-5 rounded-md bg-[#16A34A] flex items-center justify-center">
-              <Users size={10} className="text-white" />
+              <ClipboardList size={10} className="text-white" />
             </span>
-            Stakeholders
+            Engagement log
           </p>
           <span className="text-[9px] font-medium text-slate-500" style={{ fontVariantNumeric: 'tabular-nums' }}>
-            {PEOPLE.length} tracked
+            {logged} logged
           </span>
         </div>
 
-        <div className="flex-1 min-h-0 flex gap-3">
-          {/* Power / interest matrix */}
-          <div className="flex items-stretch gap-1.5">
-            <span className="text-[7px] font-medium text-slate-400 [writing-mode:vertical-rl] rotate-180 self-center">Influence →</span>
-            <div className="flex flex-col">
-              <div className="relative aspect-square h-full max-h-full w-[150px] rounded-lg border border-slate-200 overflow-hidden">
-                {QUADRANTS.map(q => (
-                  <div
-                    key={q.label}
-                    className={`absolute w-1/2 h-1/2 ${q.pos} p-1`}
-                    style={{ background: q.bg, opacity: phase >= 1 ? 1 : 0, transition: `opacity 0.5s ${EASE}` }}
-                  >
-                    <span className="text-[6px] font-semibold text-slate-500 uppercase tracking-wide leading-none">{q.label}</span>
-                  </div>
-                ))}
-                <div className="absolute inset-y-0 left-1/2 w-px bg-slate-200" />
-                <div className="absolute inset-x-0 top-1/2 h-px bg-slate-200" />
-                {PEOPLE.map((p, i) => {
-                  const x = ((p.interest - 0.5) / 5) * 100
-                  const y = (1 - (p.influence - 0.5) / 5) * 100
-                  const shown = phase >= 2
-                  return (
-                    <span
-                      key={p.name}
-                      className="absolute h-2.5 w-2.5 rounded-full border-2 border-white shadow-sm"
-                      style={{
-                        left: `${x}%`,
-                        top: `${y}%`,
-                        background: STANCE[p.stance],
-                        transform: `translate(-50%, -50%) scale(${shown ? 1 : 0})`,
-                        opacity: shown ? 1 : 0,
-                        transition: `transform 0.5s ${EASE} ${i * 110}ms, opacity 0.4s ${EASE} ${i * 110}ms`,
-                      }}
-                    />
-                  )
-                })}
-              </div>
-              <span className="text-[7px] font-medium text-slate-400 text-center mt-1">Interest →</span>
-            </div>
-          </div>
-
-          {/* Register + engagement log */}
-          <div className="flex-1 min-w-0 flex flex-col">
-            <div
-              className="rounded-lg border border-slate-100 bg-slate-50/60 px-2.5 py-2 mb-2"
-              style={{ opacity: phase >= 3 ? 1 : 0, transform: phase >= 3 ? 'translateY(0)' : 'translateY(6px)', transition: `opacity 0.5s ${EASE}, transform 0.5s ${EASE}` }}
-            >
-              <p className="text-[8px] font-medium text-slate-400 uppercase tracking-wide">Engagements logged</p>
-              <p className="text-[17px] font-bold text-slate-900 leading-tight" style={{ fontVariantNumeric: 'tabular-nums' }}>{engagements}</p>
-            </div>
-            <div className="space-y-1 overflow-hidden">
-              {PEOPLE.slice(0, 4).map((p, i) => (
+        {/* Timeline */}
+        <div className="flex-1 min-h-0 relative pl-1">
+          {/* rail */}
+          <div className="absolute left-[13px] top-1 bottom-1 w-px bg-slate-100" />
+          <div className="space-y-2.5">
+            {ENTRIES.map((e, i) => {
+              const meta = KIND[e.kind]
+              const Icon = meta.icon
+              const shown = phase >= 2
+              return (
                 <div
-                  key={p.name}
-                  className="flex items-center gap-1.5 rounded-md border border-slate-100 px-1.5 py-1"
+                  key={i}
+                  className="relative flex items-start gap-2.5"
                   style={{
-                    opacity: phase >= 2 ? 1 : 0,
-                    transform: phase >= 2 ? 'translateX(0)' : 'translateX(8px)',
-                    transition: `opacity 0.4s ${EASE} ${i * 110}ms, transform 0.4s ${EASE} ${i * 110}ms`,
+                    opacity: shown ? 1 : 0,
+                    transform: shown ? 'translateY(0)' : 'translateY(8px)',
+                    transition: `opacity 0.45s ${EASE} ${i * 150}ms, transform 0.45s ${EASE} ${i * 150}ms`,
                   }}
                 >
-                  <span className="h-2 w-2 rounded-full shrink-0" style={{ background: STANCE[p.stance] }} />
-                  <span className="text-[8.5px] font-medium text-slate-700 truncate flex-1">{p.name}</span>
-                  <span className="text-[7px] capitalize text-slate-400">{p.stance}</span>
+                  <span
+                    className="relative z-10 w-[26px] h-[26px] rounded-full flex items-center justify-center shrink-0 border-2 border-white"
+                    style={{ backgroundColor: meta.bg }}
+                  >
+                    <Icon size={12} style={{ color: meta.color }} />
+                  </span>
+                  <div className="min-w-0 flex-1 pt-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-semibold text-slate-900 truncate">{e.who}</span>
+                      <span
+                        className="text-[7.5px] font-medium rounded px-1 py-px shrink-0"
+                        style={{ color: meta.color, backgroundColor: meta.bg }}
+                      >
+                        {meta.label}
+                      </span>
+                      <span className="text-[8px] text-slate-400 ml-auto shrink-0">{e.when}</span>
+                    </div>
+                    <p className="text-[9px] text-slate-500 leading-snug mt-0.5 line-clamp-1">{e.summary}</p>
+                  </div>
                 </div>
-              ))}
-            </div>
-            {/* legend */}
-            <div className="mt-auto flex flex-wrap gap-x-2 gap-y-0.5 pt-1.5">
-              {(['supporter', 'neutral', 'opposed', 'undecided'] as St[]).map(s => (
-                <span key={s} className="inline-flex items-center gap-1 text-[7px] text-slate-500 capitalize">
-                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: STANCE[s] }} /> {s}
-                </span>
-              ))}
-            </div>
+              )
+            })}
           </div>
         </div>
       </div>

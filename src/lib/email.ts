@@ -91,6 +91,61 @@ export async function sendSetPasswordEmail({
 }
 
 /**
+ * Send a staff reply to a public enquirer. Sent from the platform's verified
+ * domain for deliverability; Reply-To is set to the responding admin so the
+ * enquirer's reply lands straight in that person's inbox. Returns the delivery
+ * outcome so the caller can record it on the EnquiryMessage.
+ */
+export async function sendEnquiryReply({
+  to,
+  toName,
+  subject,
+  body,
+  replyTo,
+  projectName,
+}: {
+  to: string
+  toName?: string | null
+  subject: string
+  body: string
+  replyTo?: string | null
+  projectName?: string | null
+}): Promise<{ status: 'sent' | 'skipped' | 'failed'; id?: string | null }> {
+  const client = getResend()
+  if (!client) {
+    console.log('RESEND_API_KEY not configured, skipping enquiry reply')
+    return { status: 'skipped' }
+  }
+
+  try {
+    const { data, error } = await client.emails.send({
+      from: getFromAddress(),
+      to: [to],
+      replyTo: replyTo || undefined,
+      subject,
+      text: body,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <p style="color: #475569;">Hi ${escapeHtml(toName || 'there')},</p>
+          <p style="color: #1e293b; white-space: pre-wrap; line-height: 1.6;">${escapeHtml(body)}</p>
+          <p style="color: #94a3b8; font-size: 13px; margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
+            This is a reply to your enquiry${projectName ? ` about ${escapeHtml(projectName)}` : ''}. You can reply to this email to continue the conversation.
+          </p>
+        </div>
+      `,
+    })
+    if (error) {
+      console.error('Failed to send enquiry reply:', error)
+      return { status: 'failed' }
+    }
+    return { status: 'sent', id: data?.id }
+  } catch (err) {
+    console.error('Enquiry reply send error:', err)
+    return { status: 'failed' }
+  }
+}
+
+/**
  * Notify the team that a Start a Project enquiry landed. Reply-To is the
  * submitter, so replying to the notification answers the lead directly.
  * Skips silently when RESEND_API_KEY or CONTACT_NOTIFY_EMAIL is unset —

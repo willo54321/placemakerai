@@ -7,7 +7,7 @@ import { Spinner } from '@/components/Spinner'
 import { toast } from 'sonner'
 import {
   Inbox, Mail, Building2, Phone, ArrowDownLeft, ArrowUpRight,
-  CheckCheck, Clock, AlertCircle, CircleDot,
+  CheckCheck, Clock, AlertCircle, CircleDot, Send,
 } from 'lucide-react'
 
 type EnquiryStatus = 'new' | 'open' | 'closed'
@@ -293,10 +293,36 @@ function ThreadView({
   isAdmin: boolean
   onStatusChange: (status: EnquiryStatus) => void
 }) {
+  const queryClient = useQueryClient()
+  const [reply, setReply] = useState('')
+
   const { data, isLoading, error } = useQuery<ThreadResponse>({
     queryKey: ['enquiry', projectId, enquiryId],
     queryFn: () => fetchJson(`/api/projects/${projectId}/enquiries/${enquiryId}`),
   })
+
+  const sendReply = useMutation({
+    mutationFn: (body: string) =>
+      fetchJson(`/api/projects/${projectId}/enquiries/${enquiryId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body }),
+      }),
+    onSuccess: (res: { delivery?: 'sent' | 'skipped' | 'failed' }) => {
+      setReply('')
+      queryClient.invalidateQueries({ queryKey: ['enquiry', projectId, enquiryId] })
+      queryClient.invalidateQueries({ queryKey: ['enquiries', projectId] })
+      if (res?.delivery === 'sent') toast.success('Reply sent')
+      else if (res?.delivery === 'skipped') toast.success('Reply saved (email sending not configured)')
+      else toast.error('Reply saved, but the email failed to send')
+    },
+    onError: (e: Error) => toast.error(e.message || 'Could not send reply'),
+  })
+
+  const submitReply = () => {
+    const body = reply.trim()
+    if (body && !sendReply.isPending) sendReply.mutate(body)
+  }
 
   if (isLoading) {
     return <div className="flex items-center justify-center py-24"><Spinner size="lg" /></div>
@@ -376,10 +402,34 @@ function ThreadView({
         })}
       </div>
 
-      {/* Reply composer lands in a later phase (outbound email). */}
-      <div className="p-3 border-t border-slate-100 bg-slate-50 text-center text-xs text-slate-400">
-        Replying by email is coming soon. For now, use the contact details above.
-      </div>
+      {/* Reply composer */}
+      {isAdmin ? (
+        <div className="p-3 border-t border-slate-100 bg-white">
+          <textarea
+            value={reply}
+            onChange={e => setReply(e.target.value)}
+            onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); submitReply() } }}
+            rows={3}
+            placeholder={`Reply to ${enquiry.submitterName}…`}
+            className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-green-500 focus:border-green-500"
+          />
+          <div className="mt-2 flex items-center justify-between gap-3">
+            <span className="text-xs text-slate-400 truncate">Emails {enquiry.submitterEmail}; their reply comes to your inbox.</span>
+            <button
+              onClick={submitReply}
+              disabled={!reply.trim() || sendReply.isPending}
+              className="btn-primary text-sm disabled:opacity-50 flex-shrink-0"
+            >
+              {sendReply.isPending ? <Spinner size="sm" /> : <Send size={15} aria-hidden="true" />}
+              {sendReply.isPending ? 'Sending…' : 'Send reply'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="p-3 border-t border-slate-100 bg-slate-50 text-center text-xs text-slate-400">
+          View-only access — use the contact details above to reply.
+        </div>
+      )}
     </div>
   )
 }

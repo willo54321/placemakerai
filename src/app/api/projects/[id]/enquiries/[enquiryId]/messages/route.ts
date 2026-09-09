@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
+import crypto from 'crypto'
 import { prisma } from '@/lib/db'
 import { authorizeProject } from '@/lib/api-auth'
 import { requireAuth } from '@/lib/permissions'
 import { sendEnquiryReply } from '@/lib/email'
+import { getProjectReplyAddress, inboundEmailEnabled } from '@/lib/email-identity'
 import { logAudit } from '@/lib/audit'
 
 // POST - Send a staff reply to an enquiry. Creates an outbound EnquiryMessage,
@@ -16,9 +18,9 @@ export async function POST(
   if (denied) return denied
   const user = await requireAuth()
 
-  const enquiry = await prisma.enquiry.findFirst({
+  let enquiry = await prisma.enquiry.findFirst({
     where: { id: params.enquiryId, projectId: params.id },
-    include: { project: { select: { name: true } } },
+    include: { project: { select: { name: true, emailLocalPart: true } } },
   })
   if (!enquiry) {
     return NextResponse.json({ error: 'Enquiry not found' }, { status: 404 })
@@ -35,13 +37,30 @@ export async function POST(
 
   const subject = /^re:/i.test(enquiry.subject) ? enquiry.subject : `Re: ${enquiry.subject}`
 
+  // With inbound email configured, replies route back into this thread via a
+  // tagged Reply-To (threadToken minted on first use); otherwise they go to
+  // the responding admin's own inbox.
+  if (inboundEmailEnabled() && enquiry.project?.emailLocalPart && !enquiry.threadToken) {
+    enquiry = {
+      ...enquiry,
+      ...(await prisma.enquiry.update({
+        where: { id: enquiry.id },
+        data: { threadToken: crypto.randomBytes(8).toString('hex') },
+      })),
+    }
+  }
+  const threadReplyAddress =
+    enquiry.threadToken && enquiry.project
+      ? getProjectReplyAddress(enquiry.project, `e-${enquiry.threadToken}`)
+      : null
+
   const result = await sendEnquiryReply({
     to: enquiry.submitterEmail,
     toName: enquiry.submitterName,
     subject,
     body: text,
-    replyTo: user.email ?? null,
-    projectName: enquiry.project?.name,
+    replyTo: threadReplyAddress ?? user.email ?? null,
+    project: enquiry.project,
   })
 
   const deliveryStatus =

@@ -20,7 +20,17 @@ the marketing-site build plan.
 
 **Scope note (2026-08-28):** The product was deliberately descoped to the three core features above. Guided tours, construction issues mode, email campaigns, mailing lists/subscribers and panoramas were removed (recoverable from git history if ever needed).
 
-**Re-added since (2026-09):** a lean **Stakeholder tracker/CRM** (register + power/interest matrix + engagement log; `/projects/[id]` Stakeholders tab, `api/projects/[id]/stakeholders/**`) and an **Enquiry inbox with outbound replies** (thread view + reply-by-email via Resend, `api/projects/[id]/enquiries/[enquiryId]/messages`). Public enquiry *submission* still also feeds AI analysis. Inbound two-way email threading and client-domain sending remain unbuilt. Both features are marketed on the homepage (`Services.tsx` items 05/06 with `StakeholderCrmDemo`/`EnquiryInboxDemo`).
+**Re-added since (2026-09):** a lean **Stakeholder tracker/CRM** (register + power/interest matrix + engagement log; `/projects/[id]` Stakeholders tab, `api/projects/[id]/stakeholders/**`) and an **Enquiry inbox with outbound replies** (thread view + reply-by-email via Resend, `api/projects/[id]/enquiries/[enquiryId]/messages`). Public enquiry *submission* still also feeds AI analysis. Client-domain sending remains unbuilt. Both features are marketed on the homepage (`Services.tsx` items 05/06 with `StakeholderCrmDemo`/`EnquiryInboxDemo`).
+
+**Inbound email threading (2026-09-09):** replies to platform emails land in the enquiries inbox
+via Resend receiving — `POST /api/inbound/resend` handles the `email.received` webhook (svix
+signature verified in `src/lib/webhook-verify.ts`, full message fetched via
+`resend.emails.receiving.get`). Outbound Reply-To uses tagged project addresses
+(`<localPart>+e-<threadToken>@` threads into an enquiry, `+c-<campaignId>@` marks a campaign
+reply; bare `<localPart>@` creates a new enquiry) — only when `RESEND_WEBHOOK_SECRET` is set,
+otherwise Reply-To stays the sending admin. Email-origin enquiries get `channel: 'email'`;
+webhook retries dedup on `externalId`; auto-replies are skipped; project admins get a
+notification email. Requires MX on placemakerai.io pointing at Resend (DNS is on Vercel).
 
 **Re-added 2026-09-09 — Mailing list + campaigns** (explicit user decision to rebuild the descoped
 feature): consented subscriber capture (`mailingConsent` on enquiry/external-feedback submissions,
@@ -29,6 +39,13 @@ CSV export + compose-and-send campaigns), campaign sending via Resend from the p
 (batches of 100, `{{name}}`/`{{project}}` personalisation, per-recipient unsubscribe token with
 List-Unsubscribe/RFC 8058 one-click headers, confirm-page at `/unsubscribe`). Sent campaigns are
 immutable send records; drafts are editable. Client-domain sending is still future work.
+
+**Per-project sending addresses (2026-09-09):** each project sends campaigns and enquiry replies
+from its own address on the platform domain — `Project.emailLocalPart` (unique, derived from the
+project name at creation, editable in Settings) builds
+`"<Project Name> <localpart@EMAIL_FROM-domain>"` via `getFromAddress(project)` in `src/lib/email.ts`
+(helpers in `src/lib/email-identity.ts`). Falls back to the plain `EMAIL_FROM` platform address when
+unset. Account emails (invite/reset) always use the platform address.
 
 ## Tech Stack
 
@@ -149,6 +166,7 @@ DATABASE_URL=          # PostgreSQL connection
 NEXTAUTH_SECRET=       # JWT signing secret
 NEXTAUTH_URL=          # Base URL (e.g., https://placemakerai.io)
 RESEND_API_KEY=        # Email delivery (invite/reset emails)
+RESEND_WEBHOOK_SECRET= # Svix signing secret for the inbound email.received webhook (enables inbound threading)
 ANTHROPIC_API_KEY=     # AI analysis (Claude)
 ```
 

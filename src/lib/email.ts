@@ -1,10 +1,11 @@
 import { Resend } from 'resend'
 import { escapeHtml, escapeHtmlWithBreaks } from '@/lib/escape-html'
+import { getSenderDomain } from '@/lib/email-identity'
 
 // Lazy initialization to avoid build errors when env var not set
 let resend: Resend | null = null
 
-function getResend() {
+export function getResend() {
   if (!process.env.RESEND_API_KEY) {
     return null
   }
@@ -14,8 +15,25 @@ function getResend() {
   return resend
 }
 
-function getFromAddress(): string {
-  return process.env.EMAIL_FROM || 'Placemaker.ai <onboarding@resend.dev>'
+export interface ProjectSender {
+  name: string
+  emailLocalPart?: string | null
+}
+
+/**
+ * From address for an email. Project-scoped mail (campaigns, enquiry replies)
+ * sends as "<project name> <localPart@domain>" on the EMAIL_FROM domain when
+ * the project has an emailLocalPart; everything else — and any project without
+ * one, or when EMAIL_FROM has no usable domain — uses the platform address.
+ */
+function getFromAddress(project?: ProjectSender | null): string {
+  const platformFrom = process.env.EMAIL_FROM || 'Placemaker.ai <onboarding@resend.dev>'
+  if (!project?.emailLocalPart) return platformFrom
+  const domain = getSenderDomain()
+  if (!domain) return platformFrom
+  const displayName = project.name.replace(/["<>]/g, '').trim()
+  const address = `${project.emailLocalPart}@${domain}`
+  return displayName ? `${displayName} <${address}>` : address
 }
 
 /**
@@ -91,10 +109,11 @@ export async function sendSetPasswordEmail({
 }
 
 /**
- * Send a staff reply to a public enquirer. Sent from the platform's verified
- * domain for deliverability; Reply-To is set to the responding admin so the
- * enquirer's reply lands straight in that person's inbox. Returns the delivery
- * outcome so the caller can record it on the EnquiryMessage.
+ * Send a staff reply to a public enquirer. Sent from the project's address on
+ * the platform's verified domain (falling back to the platform address);
+ * Reply-To is set to the responding admin so the enquirer's reply lands
+ * straight in that person's inbox. Returns the delivery outcome so the caller
+ * can record it on the EnquiryMessage.
  */
 export async function sendEnquiryReply({
   to,
@@ -102,14 +121,14 @@ export async function sendEnquiryReply({
   subject,
   body,
   replyTo,
-  projectName,
+  project,
 }: {
   to: string
   toName?: string | null
   subject: string
   body: string
   replyTo?: string | null
-  projectName?: string | null
+  project?: ProjectSender | null
 }): Promise<{ status: 'sent' | 'skipped' | 'failed'; id?: string | null }> {
   const client = getResend()
   if (!client) {
@@ -119,7 +138,7 @@ export async function sendEnquiryReply({
 
   try {
     const { data, error } = await client.emails.send({
-      from: getFromAddress(),
+      from: getFromAddress(project),
       to: [to],
       replyTo: replyTo || undefined,
       subject,
@@ -129,7 +148,7 @@ export async function sendEnquiryReply({
           <p style="color: #475569;">Hi ${escapeHtml(toName || 'there')},</p>
           <p style="color: #1e293b; white-space: pre-wrap; line-height: 1.6;">${escapeHtml(body)}</p>
           <p style="color: #94a3b8; font-size: 13px; margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
-            This is a reply to your enquiry${projectName ? ` about ${escapeHtml(projectName)}` : ''}. You can reply to this email to continue the conversation.
+            This is a reply to your enquiry${project?.name ? ` about ${escapeHtml(project.name)}` : ''}. You can reply to this email to continue the conversation.
           </p>
         </div>
       `,
@@ -199,6 +218,67 @@ export async function sendContactNotification({
 }
 
 /**
+ * Tell project admins an inbound email landed in the enquiries inbox — the
+ * inbox is the source of truth, this is just the nudge. Sent from the platform
+ * address with no Reply-To so replies to the notification go nowhere (replying
+ * belongs in the inbox, where it threads and is recorded).
+ */
+export async function sendInboundEmailNotification({
+  to,
+  projectId,
+  projectName,
+  kind,
+  fromName,
+  fromEmail,
+  subject,
+  snippet,
+  baseUrl,
+}: {
+  to: string[]
+  projectId: string
+  projectName: string
+  kind: 'reply' | 'new'
+  fromName?: string | null
+  fromEmail: string
+  subject: string
+  snippet: string
+  baseUrl: string
+}) {
+  const client = getResend()
+  if (!client || to.length === 0) return null
+
+  const heading = kind === 'reply' ? 'New reply to an enquiry' : 'New enquiry by email'
+  const sender = fromName ? `${fromName} <${fromEmail}>` : fromEmail
+
+  try {
+    const { error } = await client.emails.send({
+      from: getFromAddress(),
+      to,
+      subject: `${heading}: ${subject} — ${projectName}`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #1e293b;">${heading}</h2>
+          <p style="color: #475569;"><strong>${escapeHtml(sender)}</strong> — ${escapeHtml(projectName)}</p>
+          <p style="color: #475569; white-space: pre-wrap; border-left: 3px solid #16a34a; padding-left: 12px;">${escapeHtml(snippet)}</p>
+          <a href="${baseUrl}/projects/${projectId}" style="display: inline-block; background: #16a34a; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 500; margin: 12px 0;">
+            Open the Enquiries inbox
+          </a>
+          <p style="color: #94a3b8; font-size: 13px;">Reply from the inbox so the conversation stays on the enquiry record.</p>
+        </div>
+      `,
+    })
+    if (error) {
+      console.error('Failed to send inbound notification:', error)
+      return null
+    }
+    return true
+  } catch (err) {
+    console.error('Inbound notification send error:', err)
+    return null
+  }
+}
+
+/**
  * Substitute {{name}} / {{project}} / {{subject}} placeholders in
  * admin-authored campaign subject lines and bodies.
  */
@@ -223,22 +303,23 @@ export interface CampaignRecipient {
  * addresses are never exposed to each other and {{name}} personalises
  * correctly; batched 100 per Resend batch call. Every message carries the
  * recipient's unsubscribe link in the footer and in List-Unsubscribe headers
- * (with one-click POST per RFC 8058). Sent from the platform address —
- * per-client sending domains are future work. Reply-To goes to the sending
- * admin so responses land in a human inbox.
+ * (with one-click POST per RFC 8058). Sent from the project's address on the
+ * platform domain (falling back to the platform address) — per-client sending
+ * domains are future work. Reply-To goes to the sending admin so responses
+ * land in a human inbox.
  */
 export async function sendCampaignEmail({
   to,
   subject,
   body,
-  projectName,
+  project,
   replyTo,
   baseUrl,
 }: {
   to: CampaignRecipient[]
   subject: string
   body: string
-  projectName: string
+  project: ProjectSender
   replyTo?: string | null
   baseUrl: string
 }): Promise<{ sent: number; failed: number }> {
@@ -257,7 +338,7 @@ export async function sendCampaignEmail({
   const buildHtml = (recipient: CampaignRecipient) => {
     const personalized = personalizeTemplate(body, {
       name: recipient.name,
-      project: projectName,
+      project: project.name,
       subject,
     })
     return `
@@ -267,7 +348,7 @@ export async function sendCampaignEmail({
         <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 30px 0;">
 
         <p style="color: #94a3b8; font-size: 12px;">
-          You received this email because you're subscribed to updates from ${escapeHtml(projectName)}.
+          You received this email because you're subscribed to updates from ${escapeHtml(project.name)}.
           <a href="${pageUrl(recipient.unsubscribeToken)}" style="color: #94a3b8;">Unsubscribe</a>
         </p>
       </div>
@@ -281,10 +362,10 @@ export async function sendCampaignEmail({
   for (let i = 0; i < to.length; i += BATCH_SIZE) {
     const chunk = to.slice(i, i + BATCH_SIZE)
     const messages = chunk.map(recipient => ({
-      from: getFromAddress(),
+      from: getFromAddress(project),
       to: [recipient.email],
       replyTo: replyTo || undefined,
-      subject: personalizeTemplate(subject, { name: recipient.name, project: projectName }),
+      subject: personalizeTemplate(subject, { name: recipient.name, project: project.name }),
       html: buildHtml(recipient),
       headers: {
         'List-Unsubscribe': `<${oneClickUrl(recipient.unsubscribeToken)}>`,

@@ -39,10 +39,7 @@ export async function GET(
       status: enquiry.status,
       read: enquiry.read,
       assigneeId: enquiry.assigneeId,
-      // The only channel today is the embed enquiry form. Inbound email lands
-      // in Phase 2 and will set this per-message; surfaced now so the inbox
-      // filter has a stable shape to build against.
-      channel: 'form' as const,
+      channel: enquiry.channel as 'form' | 'email',
       replyCount: enquiry._count.messages,
       lastActivityAt: latest?.createdAt ?? enquiry.createdAt,
       createdAt: enquiry.createdAt,

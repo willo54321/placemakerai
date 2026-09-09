@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { getAuth } from '@/lib/auth'
 import { getAccessibleProjects, requireAuth, requireSuperAdmin } from '@/lib/permissions'
+import { deriveEmailLocalPart } from '@/lib/email-identity'
 
 export async function GET() {
   try {
@@ -141,12 +142,30 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
+
+    // Every project gets a sending address on the platform domain, derived
+    // from its name ("Magna Park Corby" -> magnaparkcorby@...); suffixed with
+    // a number if another project already claimed the same local part.
+    const base = deriveEmailLocalPart(String(body.name ?? ''))?.slice(0, 60) ?? null
+    let emailLocalPart = base
+    if (base) {
+      const clashes = await prisma.project.findMany({
+        where: { emailLocalPart: { startsWith: base } },
+        select: { emailLocalPart: true },
+      })
+      const taken = new Set(clashes.map((c) => c.emailLocalPart))
+      for (let n = 2; emailLocalPart && taken.has(emailLocalPart); n++) {
+        emailLocalPart = `${base}${n}`
+      }
+    }
+
     const project = await prisma.project.create({
       data: {
         name: body.name,
         description: body.description || null,
         latitude: body.latitude || null,
         longitude: body.longitude || null,
+        emailLocalPart,
       },
     })
     return NextResponse.json(project)

@@ -16,12 +16,14 @@ interface Project {
   longitude: number | null
   mapZoom: number | null
   embedEnabled: boolean
+  emailLocalPart?: string | null
   createdAt: string
   updatedAt: string
   _count?: {
     mapMarkers: number
     feedbackForms: number
   }
+  _emailDomain?: string | null
 }
 
 interface SettingsTabProps {
@@ -37,23 +39,28 @@ export function SettingsTab({ projectId, project }: SettingsTabProps) {
   const [name, setName] = useState(project.name)
   const [description, setDescription] = useState(project.description || '')
   const [status, setStatus] = useState(project.status || 'LIVE')
+  const [emailLocalPart, setEmailLocalPart] = useState(project.emailLocalPart || '')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
 
   const updateProject = useMutation({
-    mutationFn: (data: { name: string; description: string; status: string }) =>
+    mutationFn: (data: { name: string; description: string; status: string; emailLocalPart: string | null }) =>
       fetch(`/api/projects/${projectId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
-      }).then(r => r.json()),
+      }).then(async r => {
+        const json = await r.json().catch(() => ({}))
+        if (!r.ok) throw new Error(json.error || 'Failed to save settings')
+        return json
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
       queryClient.invalidateQueries({ queryKey: ['projects'] })
       toast.success('Settings saved successfully')
     },
-    onError: () => {
-      toast.error('Failed to save settings')
+    onError: (e: Error) => {
+      toast.error(e.message || 'Failed to save settings')
     },
   })
 
@@ -77,6 +84,7 @@ export function SettingsTab({ projectId, project }: SettingsTabProps) {
       name: name.trim(),
       description: description.trim(),
       status,
+      emailLocalPart: emailLocalPart || null,
     })
   }
 
@@ -88,7 +96,10 @@ export function SettingsTab({ projectId, project }: SettingsTabProps) {
 
   const hasChanges = name !== project.name ||
     description !== (project.description || '') ||
-    status !== (project.status || 'LIVE')
+    status !== (project.status || 'LIVE') ||
+    emailLocalPart !== (project.emailLocalPart || '')
+
+  const emailDomain = project._emailDomain
 
   return (
     <div className="space-y-8">
@@ -146,6 +157,40 @@ export function SettingsTab({ projectId, project }: SettingsTabProps) {
             <p className="text-xs text-slate-500 mt-1">
               Shown as the status pill on the projects list. Doesn&apos;t affect whether the embed is live —
               control that in Website settings.
+            </p>
+          </div>
+
+          <div>
+            <label htmlFor="project-email-local-part" className="label">
+              Sending Address
+            </label>
+            <div className="flex items-center">
+              <input
+                id="project-email-local-part"
+                type="text"
+                value={emailLocalPart}
+                onChange={(e) =>
+                  setEmailLocalPart(
+                    e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 64)
+                  )
+                }
+                className="input w-full rounded-r-none"
+                placeholder="projectname"
+                disabled={!canEdit}
+              />
+              <span className="input w-auto shrink-0 rounded-l-none border-l-0 bg-slate-50 text-slate-500 select-none">
+                @{emailDomain || '…'}
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              {emailLocalPart && emailDomain ? (
+                <>Mailing-list emails and enquiry replies send from{' '}
+                  <span className="font-medium text-slate-700">
+                    {name.trim() || project.name} &lt;{emailLocalPart}@{emailDomain}&gt;
+                  </span>. Replies go to the sending admin&apos;s email.</>
+              ) : (
+                <>Leave blank to send mailing-list emails and enquiry replies from the platform address.</>
+              )}
             </p>
           </div>
 

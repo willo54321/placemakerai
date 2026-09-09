@@ -3,6 +3,7 @@ import { authorizeProject } from '@/lib/api-auth'
 import { getCurrentUser } from '@/lib/permissions'
 import { logAudit } from '@/lib/audit'
 import { sendCampaignEmail } from '@/lib/email'
+import { getProjectReplyAddress } from '@/lib/email-identity'
 import { NextResponse } from 'next/server'
 
 /**
@@ -23,7 +24,7 @@ export async function POST(
     }),
     prisma.project.findUnique({
       where: { id: params.id },
-      select: { name: true },
+      select: { name: true, emailLocalPart: true },
     }),
     getCurrentUser(),
   ])
@@ -49,12 +50,14 @@ export async function POST(
 
   const baseUrl = (process.env.NEXTAUTH_URL || 'https://platform.placemakerai.io').replace(/\/$/, '')
 
+  // With inbound email configured, replies become new enquiries attributed to
+  // this campaign; otherwise they go to the sending admin's own inbox.
   const { sent, failed } = await sendCampaignEmail({
     to: recipients,
     subject: campaign.subject,
     body: campaign.body,
-    projectName: project.name,
-    replyTo: user?.email || null,
+    project,
+    replyTo: getProjectReplyAddress(project, `c-${campaign.id}`) ?? user?.email ?? null,
     baseUrl,
   })
 

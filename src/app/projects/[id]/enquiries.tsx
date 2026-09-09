@@ -22,7 +22,7 @@ interface EnquiryRow {
   status: EnquiryStatus
   read: boolean
   assigneeId: string | null
-  channel: 'form'
+  channel: 'form' | 'email'
   replyCount: number
   lastActivityAt: string
   createdAt: string
@@ -254,6 +254,9 @@ export function EnquiriesTab({ projectId, isAdmin }: { projectId: string; isAdmi
                       <span>{formatWhen(row.lastActivityAt)}</span>
                       {row.replyCount > 0 && (
                         <span className="inline-flex items-center gap-0.5">· {row.replyCount} repl{row.replyCount === 1 ? 'y' : 'ies'}</span>
+                      )}
+                      {row.channel === 'email' && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-medium">Email</span>
                       )}
                     </div>
                   </button>

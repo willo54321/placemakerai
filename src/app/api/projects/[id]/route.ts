@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { getAuth } from '@/lib/auth'
 import { canAccessProject } from '@/lib/permissions'
 import { logAudit } from '@/lib/audit'
+import { getSenderDomain, isValidEmailLocalPart } from '@/lib/email-identity'
 
 export async function GET(
   request: Request,
@@ -65,6 +66,9 @@ export async function GET(
       ...project,
       _userRole: access.role,
       _isAdmin: access.isAdmin,
+      // Domain the project's sending address lives on (null when EMAIL_FROM
+      // has no usable domain); lets Settings preview the full address.
+      _emailDomain: getSenderDomain(),
     })
   } catch (error) {
     console.error('Failed to fetch project:', error)
@@ -109,11 +113,35 @@ export async function PATCH(
     if (body.embedHideStreetLabels !== undefined) updateData.embedHideStreetLabels = body.embedHideStreetLabels
     if (body.embedReferenceOnly !== undefined) updateData.embedReferenceOnly = body.embedReferenceOnly
     if (body.embedDefaultSatellite !== undefined) updateData.embedDefaultSatellite = body.embedDefaultSatellite
+    if ('emailLocalPart' in body) {
+      const raw = body.emailLocalPart
+      if (raw === null || raw === '') {
+        updateData.emailLocalPart = null
+      } else if (typeof raw === 'string' && isValidEmailLocalPart(raw)) {
+        updateData.emailLocalPart = raw
+      } else {
+        return NextResponse.json(
+          { error: 'Sending address may only contain lowercase letters, numbers and hyphens' },
+          { status: 400 }
+        )
+      }
+    }
 
-    const project = await prisma.project.update({
-      where: { id: params.id },
-      data: updateData,
-    })
+    let project
+    try {
+      project = await prisma.project.update({
+        where: { id: params.id },
+        data: updateData,
+      })
+    } catch (err) {
+      if ((err as { code?: string }).code === 'P2002') {
+        return NextResponse.json(
+          { error: 'That sending address is already used by another project' },
+          { status: 409 }
+        )
+      }
+      throw err
+    }
 
     await logAudit({
       projectId: params.id,

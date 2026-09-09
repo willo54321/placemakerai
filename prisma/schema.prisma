@@ -93,6 +93,12 @@ model Enquiry {
   assigneeId      String?
   read            Boolean   @default(false)
   threadToken     String?   @unique
+  // How the enquiry arrived: 'form' (embed enquiry form) | 'email' (inbound
+  // mail to the project's sending address). externalId is the Resend inbound
+  // email id for email-origin enquiries — unique so webhook retries can't
+  // create duplicates.
+  channel         String    @default("form")
+  externalId      String?   @unique
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   project         Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -117,6 +123,9 @@ model EnquiryMessage {
   // are always 'delivered'; outbound advances as the provider reports back.
   deliveryStatus String   @default("stored")
   attachments    Json?    // [{ name, url, size, mime }]
+  // Resend inbound email id for inbound messages — unique so webhook retries
+  // can't append the same reply twice.
+  externalId     String?  @unique
   createdAt      DateTime @default(now())
   enquiry        Enquiry  @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
 
@@ -363,6 +372,10 @@ model Project {
   embedHideStreetLabels Boolean          @default(false) // Hide street labels on map
   embedReferenceOnly    Boolean          @default(false) // Reference mode - no interactions, view only
   embedDefaultSatellite Boolean          @default(false) // Default to satellite view instead of roadmap
+  // Local part of the project's sending address (<localPart>@<EMAIL_FROM domain>),
+  // e.g. "magnaparkcorby". Derived from the name at creation, editable in Settings.
+  // Null falls back to the platform EMAIL_FROM address.
+  emailLocalPart        String?          @unique
   enquiries             Enquiry[]
   feedbackForms         FeedbackForm[]
   geoLayers             GeoLayer[]

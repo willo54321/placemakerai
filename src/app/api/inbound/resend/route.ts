@@ -64,11 +64,25 @@ async function notifyProjectAdmins(args: {
   subject: string
   snippet: string
 }) {
-  const access = await prisma.projectAccess.findMany({
-    where: { projectId: args.projectId, role: 'ADMIN' },
-    select: { user: { select: { email: true } } },
-  })
-  const to = access.map(a => a.user.email).filter((e): e is string => Boolean(e))
+  // Super admins have implicit access to every project, so they're alerted
+  // alongside the project's own admins.
+  const [access, superAdmins] = await Promise.all([
+    prisma.projectAccess.findMany({
+      where: { projectId: args.projectId, role: 'ADMIN' },
+      select: { user: { select: { email: true } } },
+    }),
+    prisma.user.findMany({
+      where: { systemRole: 'SUPER_ADMIN' },
+      select: { email: true },
+    }),
+  ])
+  const to = Array.from(
+    new Set(
+      [...access.map(a => a.user.email), ...superAdmins.map(u => u.email)].filter(
+        (e): e is string => Boolean(e)
+      )
+    )
+  )
   if (to.length === 0 && process.env.CONTACT_NOTIFY_EMAIL) {
     to.push(process.env.CONTACT_NOTIFY_EMAIL)
   }

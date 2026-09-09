@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { rateLimitResponse } from '@/lib/rate-limit'
+import { recordMailingConsent } from '@/lib/subscribers'
 
 // CORS headers for cross-origin form submissions
 const corsHeaders = {
@@ -79,6 +80,19 @@ export async function POST(
       gdprConsentDate: new Date(),
     },
   })
+
+  // Opt-in to the project mailing list. Strict === true: webhook integrations
+  // often send checkbox values as strings, and "false" must not count as
+  // consent.
+  if (body.mailingConsent === true) {
+    await recordMailingConsent({
+      projectId: params.id,
+      email: body.submitterEmail,
+      name: body.submitterName,
+      source: 'enquiry',
+      sourceId: enquiry.id,
+    })
+  }
 
   return NextResponse.json({
     success: true,

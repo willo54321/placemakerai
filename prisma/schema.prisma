@@ -173,6 +173,56 @@ model StakeholderEngagement {
   @@index([stakeholderId])
 }
 
+// A consented mailing-list contact for a project. Rows are created from the
+// public subscribe embed, enquiry/feedback submissions that tick mailing
+// consent, or manual entry — `source` records which. Unsubscribing flips
+// `subscribed` rather than deleting, so consent history survives (the GDPR
+// record of when consent was given and withdrawn).
+model Subscriber {
+  id               String    @id @default(cuid())
+  projectId        String
+  email            String
+  name             String?
+  // manual | enquiry | feedback_form | subscribe_embed
+  source           String    @default("manual")
+  sourceId         String?
+  subscribed       Boolean   @default(true)
+  unsubscribedAt   DateTime?
+  // Capability token for the public unsubscribe link; never expose the row id.
+  unsubscribeToken String    @unique @default(cuid())
+  gdprConsent      Boolean   @default(false)
+  gdprConsentDate  DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  project          Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, email])
+  @@index([email])
+}
+
+// An email campaign to a project's mailing list. Drafts are editable; once
+// sent the row becomes the immutable send record (what was said, by whom, to
+// how many). Sent from the platform domain — per-client sending domains are
+// future work.
+model Campaign {
+  id             String    @id @default(cuid())
+  projectId      String
+  subject        String
+  body           String
+  // draft | sent | failed. Sends run synchronously, so no 'sending' state.
+  status         String    @default("draft")
+  sentAt         DateTime?
+  // Denormalised sender email so the record survives user deletion.
+  sentBy         String?
+  recipientCount Int       @default(0)
+  failedCount    Int       @default(0)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  project        Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, createdAt])
+}
+
 model FeedbackForm {
   id        String             @id @default(cuid())
   projectId String
@@ -323,6 +373,8 @@ model Project {
   analysisResults       AnalysisResult[]
   userAccess            ProjectAccess[]
   stakeholders          Stakeholder[]
+  subscribers           Subscriber[]
+  campaigns             Campaign[]
 }
 
 model PublicPin {

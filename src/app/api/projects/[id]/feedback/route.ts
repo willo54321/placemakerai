@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 import { rateLimitResponse } from '@/lib/rate-limit'
+import { recordMailingConsent } from '@/lib/subscribers'
 
 // Cap auto-detected form fields to prevent unbounded schema growth
 const MAX_AUTO_FIELDS = 50
@@ -177,6 +178,28 @@ export async function POST(
       gdprConsentDate: new Date(),
     },
   })
+
+  // Opt-in to the project mailing list. Strict === true so string checkbox
+  // values from webhook integrations ("false", "0") never count as consent.
+  // The email/name fields are auto-detected the same way the form fields are.
+  const mailingConsent = body.mailingConsent === true || (body.data && body.data.mailingConsent === true)
+  if (mailingConsent) {
+    const findField = (pattern: RegExp) => {
+      const key = Object.keys(formData).find(k => pattern.test(k))
+      const value = key ? formData[key] : null
+      return typeof value === 'string' ? value : null
+    }
+    const email = findField(/email/i)
+    if (email) {
+      await recordMailingConsent({
+        projectId,
+        email,
+        name: findField(/name/i),
+        source: 'feedback_form',
+        sourceId: response.id,
+      })
+    }
+  }
 
   return NextResponse.json(
     {

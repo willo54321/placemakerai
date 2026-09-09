@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { useSession } from 'next-auth/react'
-import { ArrowLeft, Users, MapPin, Settings, LayoutDashboard, BarChart3, Globe, Eye, FileText, HelpCircle, Inbox } from 'lucide-react'
+import { ArrowLeft, Users, MapPin, Settings, LayoutDashboard, BarChart3, Globe, Eye, FileText, HelpCircle, Inbox, Mail } from 'lucide-react'
 import Link from 'next/link'
 import { useState, Suspense } from 'react'
 import dynamic from 'next/dynamic'
@@ -11,6 +11,7 @@ import { SettingsTab } from './settings'
 import { AnalyticsTab } from './analytics'
 import { EnquiriesTab } from './enquiries'
 import { StakeholdersTab } from './stakeholders'
+import { MailingListTab } from './mailing'
 import { HowToTab, type GuideStep } from './how-to'
 import UserMenu from '@/components/UserMenu'
 import { ProductTour, type TourStep } from '@/components/ProductTour'
@@ -44,6 +45,10 @@ const TOUR_COPY: Record<Tab, { title: string; body: string }> = {
   stakeholders: {
     title: 'Stakeholders',
     body: 'Your register of named contacts and organisations. Log every meeting, call and email to build the consultation audit trail — who you engaged, when, and what they said.',
+  },
+  mailing: {
+    title: 'Mailing list',
+    body: 'Everyone who opted in to project updates — from the signup form, enquiries and feedback forms. Compose and send update emails, with unsubscribe handled for you.',
   },
   settings: {
     title: 'Settings',
@@ -92,7 +97,7 @@ const FormsTabWrapper = dynamic(() => import('./forms-wrapper').then(mod => ({ d
   )
 })
 
-type Tab = 'overview' | 'feedback' | 'forms' | 'enquiries' | 'stakeholders' | 'website' | 'analytics' | 'settings' | 'howto'
+type Tab = 'overview' | 'feedback' | 'forms' | 'enquiries' | 'stakeholders' | 'mailing' | 'website' | 'analytics' | 'settings' | 'howto'
 
 // Deep-link target passed alongside a tab switch (e.g. from the activity
 // feed): jump straight to a specific pin or form response.
@@ -110,7 +115,7 @@ type TabGroup = {
 const tabGroups: TabGroup[] = [
   { id: 'top', label: '', tabs: ['overview'] },
   { id: 'collect', label: 'Collect', tabs: ['feedback', 'forms', 'enquiries', 'analytics'] },
-  { id: 'engage', label: 'Engage', tabs: ['stakeholders'] },
+  { id: 'engage', label: 'Engage', tabs: ['stakeholders', 'mailing'] },
   { id: 'publish', label: 'Publish', tabs: ['website'] },
   { id: 'configure', label: 'Configure', tabs: ['settings'] },
   { id: 'help', label: 'Help', tabs: ['howto'] },
@@ -265,6 +270,13 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
       id: 'stakeholders' as Tab,
       label: 'Stakeholders',
       icon: Users,
+      count: 0,
+      adminOnly: false,
+    },
+    {
+      id: 'mailing' as Tab,
+      label: 'Mailing List',
+      icon: Mail,
       count: 0,
       adminOnly: false,
     },
@@ -511,6 +523,11 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
           {activeTab === 'stakeholders' && (
             <div className="p-6">
               <StakeholdersTab projectId={params.id} isAdmin={Boolean(isAdmin)} />
+            </div>
+          )}
+          {activeTab === 'mailing' && (
+            <div className="p-6">
+              <MailingListTab projectId={params.id} isAdmin={Boolean(isAdmin)} />
             </div>
           )}
           {activeTab === 'analytics' && (

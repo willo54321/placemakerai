@@ -22,6 +22,14 @@ the marketing-site build plan.
 
 **Re-added since (2026-09):** a lean **Stakeholder tracker/CRM** (register + power/interest matrix + engagement log; `/projects/[id]` Stakeholders tab, `api/projects/[id]/stakeholders/**`) and an **Enquiry inbox with outbound replies** (thread view + reply-by-email via Resend, `api/projects/[id]/enquiries/[enquiryId]/messages`). Public enquiry *submission* still also feeds AI analysis. Inbound two-way email threading and client-domain sending remain unbuilt. Both features are marketed on the homepage (`Services.tsx` items 05/06 with `StakeholderCrmDemo`/`EnquiryInboxDemo`).
 
+**Re-added 2026-09-09 — Mailing list + campaigns** (explicit user decision to rebuild the descoped
+feature): consented subscriber capture (`mailingConsent` on enquiry/external-feedback submissions,
+public `POST /api/embed/{id}/subscribe`, manual add), a Mailing List tab (subscribers register +
+CSV export + compose-and-send campaigns), campaign sending via Resend from the platform domain
+(batches of 100, `{{name}}`/`{{project}}` personalisation, per-recipient unsubscribe token with
+List-Unsubscribe/RFC 8058 one-click headers, confirm-page at `/unsubscribe`). Sent campaigns are
+immutable send records; drafts are editable. Client-domain sending is still future work.
+
 ## Tech Stack
 
 - **Framework:** Next.js 14.1 (App Router)
@@ -78,7 +86,9 @@ npm run db:studio    # Open Prisma Studio
 | PublicPin | Map feedback (pins, lines, polygons) |
 | FeedbackForm | Custom forms with JSON field config |
 | FeedbackResponse | Form submissions (data as JSON) |
-| Enquiry | Public enquiry submissions (analyzed by AI; no reply workflow) |
+| Enquiry | Public enquiry submissions (analyzed by AI; thread + outbound replies) |
+| Subscriber | Mailing-list contact per project (consent record + unsubscribe token) |
+| Campaign | Mailing-list email (draft → immutable sent record) |
 | GeoLayer | GeoJSON boundaries |
 | ImageOverlay | Custom map image overlays |
 | MapMarker | Admin-authored map markers |

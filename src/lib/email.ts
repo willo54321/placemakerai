@@ -1,5 +1,5 @@
 import { Resend } from 'resend'
-import { escapeHtml } from '@/lib/escape-html'
+import { escapeHtml, escapeHtmlWithBreaks } from '@/lib/escape-html'
 
 // Lazy initialization to avoid build errors when env var not set
 let resend: Resend | null = null
@@ -196,6 +196,120 @@ export async function sendContactNotification({
     console.error('Contact notification send error:', err)
     return null
   }
+}
+
+/**
+ * Substitute {{name}} / {{project}} / {{subject}} placeholders in
+ * admin-authored campaign subject lines and bodies.
+ */
+export function personalizeTemplate(
+  template: string,
+  vars: { name?: string | null; subject?: string; project?: string }
+): string {
+  return template
+    .replace(/\{\{name\}\}/gi, vars.name || 'there')
+    .replace(/\{\{subject\}\}/gi, vars.subject ?? '')
+    .replace(/\{\{project\}\}/gi, vars.project ?? '')
+}
+
+export interface CampaignRecipient {
+  email: string
+  name?: string | null
+  unsubscribeToken: string
+}
+
+/**
+ * Send a campaign to a project's mailing list. One message per recipient so
+ * addresses are never exposed to each other and {{name}} personalises
+ * correctly; batched 100 per Resend batch call. Every message carries the
+ * recipient's unsubscribe link in the footer and in List-Unsubscribe headers
+ * (with one-click POST per RFC 8058). Sent from the platform address —
+ * per-client sending domains are future work. Reply-To goes to the sending
+ * admin so responses land in a human inbox.
+ */
+export async function sendCampaignEmail({
+  to,
+  subject,
+  body,
+  projectName,
+  replyTo,
+  baseUrl,
+}: {
+  to: CampaignRecipient[]
+  subject: string
+  body: string
+  projectName: string
+  replyTo?: string | null
+  baseUrl: string
+}): Promise<{ sent: number; failed: number }> {
+  const client = getResend()
+  if (!client) {
+    console.log('RESEND_API_KEY not configured, skipping campaign send')
+    return { sent: 0, failed: to.length }
+  }
+
+  // Footer link goes to the confirm page (safe against link scanners); the
+  // List-Unsubscribe header must be a POST-capable URL for RFC 8058 one-click,
+  // so it targets the API route directly.
+  const pageUrl = (token: string) => `${baseUrl}/unsubscribe?token=${token}`
+  const oneClickUrl = (token: string) => `${baseUrl}/api/unsubscribe?token=${token}`
+
+  const buildHtml = (recipient: CampaignRecipient) => {
+    const personalized = personalizeTemplate(body, {
+      name: recipient.name,
+      project: projectName,
+      subject,
+    })
+    return `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="white-space: pre-wrap; color: #1e293b; line-height: 1.6;">${escapeHtmlWithBreaks(personalized)}</div>
+
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 30px 0;">
+
+        <p style="color: #94a3b8; font-size: 12px;">
+          You received this email because you're subscribed to updates from ${escapeHtml(projectName)}.
+          <a href="${pageUrl(recipient.unsubscribeToken)}" style="color: #94a3b8;">Unsubscribe</a>
+        </p>
+      </div>
+    `
+  }
+
+  let sent = 0
+  let failed = 0
+
+  const BATCH_SIZE = 100
+  for (let i = 0; i < to.length; i += BATCH_SIZE) {
+    const chunk = to.slice(i, i + BATCH_SIZE)
+    const messages = chunk.map(recipient => ({
+      from: getFromAddress(),
+      to: [recipient.email],
+      replyTo: replyTo || undefined,
+      subject: personalizeTemplate(subject, { name: recipient.name, project: projectName }),
+      html: buildHtml(recipient),
+      headers: {
+        'List-Unsubscribe': `<${oneClickUrl(recipient.unsubscribeToken)}>`,
+        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+      },
+    }))
+
+    try {
+      const { data, error } = await client.batch.send(messages)
+      if (error) {
+        console.error('Failed to send campaign batch:', error)
+        failed += chunk.length
+      } else {
+        // batch.send returns one result entry per accepted message.
+        const succeeded = Array.isArray(data?.data) ? data.data.length : chunk.length
+        sent += succeeded
+        failed += chunk.length - succeeded
+      }
+    } catch (err) {
+      console.error('Campaign batch send error:', err)
+      failed += chunk.length
+    }
+  }
+
+  return { sent, failed }
 }
 
 /**

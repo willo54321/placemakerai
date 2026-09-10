@@ -7,7 +7,7 @@ import { Spinner } from '@/components/Spinner'
 import { toast } from 'sonner'
 import {
   Users, Plus, Building2, Mail, Phone, Trash2, X, Pencil,
-  MessageSquare, CalendarDays, ArrowRight, Inbox, Target,
+  MessageSquare, CalendarDays, ArrowRight, Inbox, Target, Landmark,
 } from 'lucide-react'
 
 // ---- domain vocab -----------------------------------------------------------
@@ -204,6 +204,25 @@ export function StakeholdersTab({ projectId, isAdmin }: { projectId: string; isA
     onError: (e: Error) => toast.error(e.message || 'Could not add stakeholder'),
   })
 
+  const importReps = useMutation({
+    mutationFn: () =>
+      fetchJson<{ imported: number; skipped: number; mp: string | null; councillors: number; district: string | null }>(
+        `/api/projects/${projectId}/stakeholders/import-representatives`,
+        { method: 'POST' }
+      ),
+    onSuccess: (summary) => {
+      queryClient.invalidateQueries({ queryKey: listKey })
+      if (summary.imported === 0) {
+        toast.info('Representatives already in the register — nothing new to add')
+      } else {
+        toast.success(
+          `Imported ${summary.imported} representative${summary.imported === 1 ? '' : 's'}${summary.mp ? ` including ${summary.mp} MP` : ''}${summary.district ? ` (${summary.district})` : ''}`
+        )
+      }
+    },
+    onError: (e: Error) => toast.error(e.message || 'Import failed'),
+  })
+
   if (isLoading) {
     return <div className="flex items-center justify-center py-24"><Spinner size="lg" /></div>
   }
@@ -224,10 +243,20 @@ export function StakeholdersTab({ projectId, isAdmin }: { projectId: string; isA
           </p>
         </div>
         {isAdmin && (
-          <button onClick={() => { setAdding(true); setSelectedId(null) }} className="btn-primary">
-            <Plus size={18} aria-hidden="true" />
-            Add stakeholder
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => importReps.mutate()}
+              disabled={importReps.isPending}
+              className="btn-secondary"
+            >
+              {importReps.isPending ? <Spinner size="sm" /> : <Landmark size={18} aria-hidden="true" />}
+              Import MP &amp; councillors
+            </button>
+            <button onClick={() => { setAdding(true); setSelectedId(null) }} className="btn-primary">
+              <Plus size={18} aria-hidden="true" />
+              Add stakeholder
+            </button>
+          </div>
         )}
       </div>
 

@@ -3,6 +3,11 @@ import { NextResponse } from 'next/server'
 import { getAuth } from '@/lib/auth'
 import { getAccessibleProjects, requireAuth, requireSuperAdmin } from '@/lib/permissions'
 import { deriveEmailLocalPart } from '@/lib/email-identity'
+import { importRepresentativesForProject } from '@/lib/import-representatives'
+
+// Project creation triggers external representative lookups when coordinates
+// are provided; allow headroom beyond the default function timeout.
+export const maxDuration = 30
 
 export async function GET() {
   try {
@@ -168,6 +173,21 @@ export async function POST(request: Request) {
         emailLocalPart,
       },
     })
+
+    // Best-effort: seed the stakeholder register with the location's MP and
+    // councillors. Capped so slow public APIs can't hang project creation —
+    // the Stakeholders tab has an import button to retry.
+    if (project.latitude != null && project.longitude != null) {
+      try {
+        await Promise.race([
+          importRepresentativesForProject(project.id),
+          new Promise(resolve => setTimeout(resolve, 12000)),
+        ])
+      } catch (err) {
+        console.error('Representative import at creation failed:', err)
+      }
+    }
+
     return NextResponse.json(project)
   } catch (error) {
     console.error('Failed to create project:', error)

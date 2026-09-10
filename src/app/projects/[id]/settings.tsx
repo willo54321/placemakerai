@@ -255,7 +255,6 @@ export function SettingsTab({ projectId, project }: SettingsTabProps) {
       <section className="card p-6">
         <h3 className="text-lg font-semibold text-slate-900 mb-1">Data Export</h3>
         <p className="text-sm text-slate-500 mb-4">
-          Download everything this project holds — for reporting, audits, or subject access requests.
           Exports are recorded in the audit log.
         </p>
         <div className="flex flex-wrap gap-3">

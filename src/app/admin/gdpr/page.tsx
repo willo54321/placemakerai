@@ -142,9 +142,6 @@ export default function GdprPage() {
           </Link>
           <div>
             <h1 className="text-xl font-semibold text-slate-900">GDPR Requests</h1>
-            <p className="text-sm text-slate-500">
-              Find, export, or erase everything held for an email address
-            </p>
           </div>
         </div>
       </header>

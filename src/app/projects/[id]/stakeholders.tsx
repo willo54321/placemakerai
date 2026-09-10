@@ -282,9 +282,6 @@ export function StakeholdersTab({ projectId, isAdmin }: { projectId: string; isA
         <div className="card p-10 text-center">
           <Users size={32} className="mx-auto text-slate-300 mb-3" aria-hidden="true" />
           <p className="text-slate-600 font-medium">No stakeholders yet</p>
-          <p className="text-sm text-slate-400 mt-1">
-            Add the people and organisations you’re engaging with to build a record of every interaction.
-          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(300px,420px)_1fr] gap-4">

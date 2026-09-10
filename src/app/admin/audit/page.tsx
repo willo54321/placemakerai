@@ -79,9 +79,6 @@ export default function AdminAuditPage() {
           <ScrollText className="text-brand-600" size={24} />
           Audit log & usage
         </h1>
-        <p className="text-slate-500 mt-1">
-          Every recorded admin action, newest first, and AI analysis usage per project.
-        </p>
       </div>
 
       {isLoading && (

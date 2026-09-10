@@ -175,11 +175,9 @@ export function EnquiriesTab({ projectId, isAdmin }: { projectId: string; isAdmi
             <Inbox size={20} className="text-green-600" aria-hidden="true" />
             Enquiries
           </h2>
-          <p className="text-sm text-slate-500 mt-0.5">
-            Public enquiries submitted through your embed. {unreadCount > 0 && (
-              <span className="font-medium text-slate-700">{unreadCount} unread.</span>
-            )}
-          </p>
+          {unreadCount > 0 && (
+            <p className="text-sm font-medium text-slate-700 mt-0.5">{unreadCount} unread</p>
+          )}
         </div>
       </div>
 

@@ -92,7 +92,8 @@ export async function GET(
           longitude: s.longitude,
           zoom: s.zoom,
           highlight: s.highlight,
-          showOverlays: s.showOverlays
+          showOverlays: s.showOverlays,
+          icon: s.icon
         }))
       })),
     zones: project.geoLayers.map(l => {

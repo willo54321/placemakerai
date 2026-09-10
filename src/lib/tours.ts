@@ -1,5 +1,7 @@
 // Shared validation for tour-stop payloads (admin create + update routes).
 
+import { isTourStopIcon } from './tour-icons'
+
 export interface StopPayload {
   title?: string
   description?: string
@@ -10,11 +12,12 @@ export interface StopPayload {
   zoom?: number
   highlight?: unknown
   showOverlays?: unknown
+  icon?: string | null
 }
 
 const STOP_FIELDS = [
   'title', 'description', 'imageUrl', 'videoUrl',
-  'latitude', 'longitude', 'zoom', 'highlight', 'showOverlays',
+  'latitude', 'longitude', 'zoom', 'highlight', 'showOverlays', 'icon',
 ]
 
 function isValidHighlight(value: unknown): boolean {
@@ -102,6 +105,17 @@ export function parseStopPayload(body: Record<string, unknown>, partial: boolean
       errors.push('highlight must be null or a GeoJSON Polygon')
     } else {
       data.highlight = body.highlight ?? null
+    }
+  }
+
+  if (body.icon !== undefined) {
+    // 'number' is the UI's default choice and stored as null
+    if (body.icon === null || body.icon === 'number' || body.icon === '') {
+      data.icon = null
+    } else if (!isTourStopIcon(body.icon)) {
+      errors.push('icon is not one of the supported marker icons')
+    } else {
+      data.icon = body.icon
     }
   }
 

@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, useCallback, useMemo, forwardRef, useImper
 import { GoogleMap, useJsApiLoader, MarkerF, PolygonF, PolylineF, DrawingManagerF, OverlayView } from '@react-google-maps/api'
 import { X } from 'lucide-react'
 import { RotatableOverlay, calculateRotationAngle, snapAngle } from './RotatableOverlay'
+import { startFlyTo, type FlyToTarget } from '@/lib/fly-to'
+import { TOUR_STOP_ICON_PATHS } from '@/lib/tour-icons'
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''
 // 'visualization' powers the sentiment heatmap; loader options must be
@@ -78,6 +80,10 @@ interface InteractiveMapProps {
   isDrawingMode?: boolean
   activeDrawingTool?: 'polygon' | 'line' | null
   activeDrawingColor?: string
+  // Animated camera move (tour editor/preview). Changing this object's
+  // identity starts a cinematic flight; the `center`/`zoom` props are left
+  // alone because prop-driven changes snap instantly.
+  flyTo?: FlyToTarget | null
   onMapClick?: (lat: number, lng: number) => void
   onMarkerClick?: (markerId: string) => void
   onDrawingCreated?: (geometry: GeoJSON.Geometry, type: 'polygon' | 'line') => void
@@ -147,6 +153,37 @@ function createNumberedMarkerIcon(color: string, number: string | number, isHove
   }
 }
 
+// Pin marker with a themed glyph in the head (tour stop icons)
+function createIconMarkerIcon(color: string, iconType: string, isHovered: boolean = false): google.maps.Icon {
+  const shadowBlur = isHovered ? '3' : '2'
+  const shadowOpacity = isHovered ? '0.3' : '0.2'
+  const size = isHovered ? 40 : 36
+  const height = isHovered ? 50 : 45
+  const iconPath = TOUR_STOP_ICON_PATHS[iconType] || TOUR_STOP_ICON_PATHS.info
+
+  const svg = `
+    <svg width="${size}" height="${height}" viewBox="0 0 36 45" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="shadow" x="-30%" y="-20%" width="160%" height="150%">
+          <feDropShadow dx="0" dy="2" stdDeviation="${shadowBlur}" flood-color="#000000" flood-opacity="${shadowOpacity}"/>
+        </filter>
+      </defs>
+      <g filter="url(#shadow)">
+        <path d="M18 2C9.7 2 3 8.7 3 17c0 11 15 25 15 25s15-14 15-25c0-8.3-6.7-15-15-15z" fill="${color}"/>
+        <circle cx="18" cy="16" r="10" fill="white"/>
+        <g transform="translate(9, 7) scale(0.5)">
+          <path d="${iconPath}" fill="${color}"/>
+        </g>
+      </g>
+    </svg>
+  `
+  return {
+    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
+    scaledSize: new google.maps.Size(size, height),
+    anchor: new google.maps.Point(size / 2, height)
+  }
+}
+
 // Cache marker icons so we don't allocate a brand-new google.maps.Icon object
 // (which triggers marker.setIcon churn) on every render / every hover. Keyed by
 // the parameters that actually affect the produced icon.
@@ -155,20 +192,34 @@ const markerIconCache = new globalThis.Map<string, google.maps.Icon>()
 function getMarkerIcon(
   color: string,
   label: string,
-  isHovered: boolean
+  isHovered: boolean,
+  type?: string
 ): google.maps.Icon {
-  const kind: 'number' | 'plain' = label && /^\d+$/.test(label) ? 'number' : 'plain'
+  let kind: 'icon' | 'number' | 'plain'
+  if (type && type !== 'number' && TOUR_STOP_ICON_PATHS[type]) {
+    kind = 'icon'
+  } else if (label && /^\d+$/.test(label)) {
+    kind = 'number'
+  } else {
+    kind = 'plain'
+  }
 
   // Only the values that vary the SVG output participate in the cache key.
   const keyLabel = kind === 'number' ? label : ''
-  const cacheKey = `${kind}|${color}|${keyLabel}|${isHovered ? 1 : 0}`
+  const keyType = kind === 'icon' ? type : ''
+  const cacheKey = `${kind}|${color}|${keyType}|${keyLabel}|${isHovered ? 1 : 0}`
 
   const cached = markerIconCache.get(cacheKey)
   if (cached) return cached
 
-  const icon = kind === 'number'
-    ? createNumberedMarkerIcon(color, label, isHovered)
-    : createMarkerIcon(color, isHovered)
+  let icon: google.maps.Icon
+  if (kind === 'icon') {
+    icon = createIconMarkerIcon(color, type as string, isHovered)
+  } else if (kind === 'number') {
+    icon = createNumberedMarkerIcon(color, label, isHovered)
+  } else {
+    icon = createMarkerIcon(color, isHovered)
+  }
 
   markerIconCache.set(cacheKey, icon)
   return icon
@@ -214,6 +265,7 @@ const InteractiveMap = forwardRef<InteractiveMapRef, InteractiveMapProps>(({
   onDrawingCreated,
   onDrawingClick,
   onBoundsChange,
+  flyTo = null,
   onOverlayClick,
   onOverlayBoundsChange,
   onOverlayRotationChange,
@@ -302,6 +354,12 @@ const InteractiveMap = forwardRef<InteractiveMapRef, InteractiveMapProps>(({
 
     return () => google.maps.event.removeListener(listener)
   }, [map, onBoundsChange])
+
+  // Cinematic camera flight, keyed on the flyTo object's identity
+  useEffect(() => {
+    if (!map || !flyTo) return
+    return startFlyTo(map, flyTo)
+  }, [map, flyTo])
 
   // Keep the latest onOverlayClick in a ref so we can diff overlays without the
   // effect re-running (and tearing down every overlay) whenever the handler
@@ -557,6 +615,9 @@ const InteractiveMap = forwardRef<InteractiveMapRef, InteractiveMapProps>(({
       gestureHandling: 'greedy',
       maxZoom: 17,
       minZoom: 10,
+      // Renders in-between zoom levels so the tour fly-to animation glides
+      // instead of stepping through whole raster zoom levels.
+      isFractionalZoomEnabled: true,
     }
   }, [isLoaded])
 
@@ -789,7 +850,7 @@ const InteractiveMap = forwardRef<InteractiveMapRef, InteractiveMapProps>(({
           <MarkerF
             key={marker.id}
             position={{ lat: marker.latitude!, lng: marker.longitude! }}
-            icon={getMarkerIcon(marker.color, marker.label, hoveredMarker === marker.id)}
+            icon={getMarkerIcon(marker.color, marker.label, hoveredMarker === marker.id, marker.type)}
             onClick={() => onMarkerClick ? onMarkerClick(marker.id) : setSelectedMarker(marker.id)}
             onMouseOver={() => setHoveredMarker(marker.id)}
             onMouseOut={() => setHoveredMarker(null)}

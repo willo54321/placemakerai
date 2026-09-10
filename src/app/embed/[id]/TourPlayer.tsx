@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { X, ChevronLeft, ChevronRight, Play, ThumbsUp, ThumbsDown, MessageCircle, CheckCircle, AlertCircle } from 'lucide-react'
+import { TOUR_STOP_ICON_PATHS } from '@/lib/tour-icons'
 
 export interface TourStopHighlight {
   type: 'Polygon'
@@ -20,6 +21,7 @@ export interface TourStopData {
   zoom: number
   highlight: TourStopHighlight | null
   showOverlays: string[] | null
+  icon: string | null
 }
 
 export interface TourData {
@@ -53,6 +55,21 @@ const RESPONSE_CATEGORIES = [
   { id: 'comment', label: 'Comment', icon: MessageCircle },
   { id: 'negative', label: 'Negative', icon: ThumbsDown },
 ]
+
+// Circular stop badge: the stop's themed icon when set, otherwise its number
+function StopBadge({ icon, number, className }: { icon: string | null; number: number; className: string }) {
+  return (
+    <span className={`${className} shrink-0 rounded-full flex items-center justify-center`}>
+      {icon && TOUR_STOP_ICON_PATHS[icon] ? (
+        <svg viewBox="6 4 24 24" className="w-[65%] h-[65%]" aria-hidden="true">
+          <path d={TOUR_STOP_ICON_PATHS[icon]} fill="currentColor" />
+        </svg>
+      ) : (
+        number
+      )}
+    </span>
+  )
+}
 
 // Convert a YouTube/Vimeo link to an embeddable player URL (null = not embeddable)
 function getVideoEmbedUrl(url: string): string | null {
@@ -228,9 +245,11 @@ export function TourPlayer({
                   onClick={() => onStopIndexChange(idx)}
                   className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
                 >
-                  <span className="w-6 h-6 shrink-0 rounded-full flex items-center justify-center text-xs font-semibold bg-brand-50 text-brand-600">
-                    {idx + 1}
-                  </span>
+                  <StopBadge
+                    icon={s.icon}
+                    number={idx + 1}
+                    className="w-6 h-6 text-xs font-semibold bg-brand-50 text-brand-600"
+                  />
                   <span className="truncate">{s.title}</span>
                 </button>
               ))}
@@ -276,9 +295,11 @@ export function TourPlayer({
         )}
         <div className="p-5">
           <div className="flex items-center gap-3">
-            <span className="w-7 h-7 shrink-0 rounded-full flex items-center justify-center text-sm font-bold bg-brand-600 text-white">
-              {stopIndex + 1}
-            </span>
+            <StopBadge
+              icon={stop.icon}
+              number={stopIndex + 1}
+              className="w-7 h-7 text-sm font-bold bg-brand-600 text-white"
+            />
             <span className="text-xs text-gray-400">
               Stop {stopIndex + 1} of {tour.stops.length}
             </span>

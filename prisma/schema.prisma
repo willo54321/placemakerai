@@ -448,6 +448,7 @@ model TourStop {
   zoom         Float       @default(16)
   highlight    Json? // GeoJSON Polygon spotlighted (map dimmed outside) at this stop
   showOverlays Json? // string[] of ImageOverlay ids visible at this stop; null = all
+  icon         String? // marker icon id from lib/tour-icons; null = numbered marker
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
   tour         Tour        @relation(fields: [tourId], references: [id], onDelete: Cascade)

@@ -12,6 +12,8 @@ import { fetchJson } from '@/lib/fetch-json'
 import { TourPlayer } from '@/app/embed/[id]/TourPlayer'
 import type { TourData, TourStopData, TourStopHighlight } from '@/app/embed/[id]/TourPlayer'
 import type { ImageOverlay as MapOverlay, MapMarker } from '@/components/InteractiveMap'
+import type { FlyToTarget } from '@/lib/fly-to'
+import { TOUR_STOP_ICONS, TOUR_STOP_ICON_PATHS } from '@/lib/tour-icons'
 
 const InteractiveMap = dynamic(() => import('@/components/InteractiveMap'), {
   ssr: false,
@@ -57,6 +59,7 @@ interface StopDraft {
   zoom: number
   highlight: TourStopHighlight | null
   showOverlays: string[] | null
+  icon: string | null
 }
 
 const EMPTY_DRAFT: StopDraft = {
@@ -69,6 +72,7 @@ const EMPTY_DRAFT: StopDraft = {
   zoom: 16,
   highlight: null,
   showOverlays: null,
+  icon: null,
 }
 
 const convertOverlays = (dbOverlays: DBImageOverlay[] | undefined, allowed: string[] | null): MapOverlay[] =>
@@ -111,6 +115,9 @@ export function ToursTab({ projectId, project }: { projectId: string; project: P
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [previewing, setPreviewing] = useState(false)
   const [previewStopIndex, setPreviewStopIndex] = useState(-1)
+  // Animated camera moves go through InteractiveMap's flyTo prop; setting
+  // mapCenter/mapZoom directly would snap instead
+  const [flyTarget, setFlyTarget] = useState<FlyToTarget | null>(null)
 
   const { data: tours = [], isLoading } = useQuery<Tour[]>({
     queryKey: ['tours', projectId],
@@ -119,16 +126,14 @@ export function ToursTab({ projectId, project }: { projectId: string; project: P
 
   const tour = tours.find(t => t.id === selectedTourId) || null
 
-  // Recentre the editor map when opening a tour
+  // Fly the editor map to the tour when opening it
   useEffect(() => {
     if (!selectedTourId) return
     const selected = tours.find(t => t.id === selectedTourId)
     if (selected && selected.stops.length > 0) {
-      setMapCenter([selected.stops[0].latitude, selected.stops[0].longitude])
-      setMapZoom(selected.stops[0].zoom)
+      setFlyTarget({ lat: selected.stops[0].latitude, lng: selected.stops[0].longitude, zoom: selected.stops[0].zoom })
     } else {
-      setMapCenter(defaultCenter)
-      setMapZoom(defaultZoom)
+      setFlyTarget({ lat: defaultCenter[0], lng: defaultCenter[1], zoom: defaultZoom })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTourId])
@@ -246,11 +251,11 @@ export function ToursTab({ projectId, project }: { projectId: string; project: P
       zoom: stop.zoom,
       highlight: stop.highlight,
       showOverlays: stop.showOverlays,
+      icon: stop.icon,
     })
     setPlacing(false)
     setDrawingSpotlight(false)
-    setMapCenter([stop.latitude, stop.longitude])
-    setMapZoom(stop.zoom)
+    setFlyTarget({ lat: stop.latitude, lng: stop.longitude, zoom: stop.zoom })
   }
 
   const handleMapClick = (lat: number, lng: number) => {
@@ -312,6 +317,7 @@ export function ToursTab({ projectId, project }: { projectId: string; project: P
         zoom: stopDraft.zoom,
         highlight: stopDraft.highlight,
         showOverlays: stopDraft.showOverlays,
+        icon: stopDraft.icon,
       },
     })
   }
@@ -348,6 +354,7 @@ export function ToursTab({ projectId, project }: { projectId: string; project: P
         longitude: isEditing ? stopDraft.longitude ?? stop.longitude : stop.longitude,
         color: isEditing ? '#F59E0B' : '#16A34A',
         notes: stop.title,
+        type: (isEditing ? stopDraft.icon : stop.icon) || undefined,
       })
     })
     if (editingStopId === 'new' && stopDraft.latitude !== null && stopDraft.longitude !== null) {
@@ -358,10 +365,11 @@ export function ToursTab({ projectId, project }: { projectId: string; project: P
         longitude: stopDraft.longitude,
         color: '#F59E0B',
         notes: null,
+        type: stopDraft.icon || undefined,
       })
     }
     return markers
-  }, [tour, previewing, editingStopId, stopDraft.latitude, stopDraft.longitude])
+  }, [tour, previewing, editingStopId, stopDraft.latitude, stopDraft.longitude, stopDraft.icon])
 
   const overlayFilter = previewing
     ? (previewStop ? previewStop.showOverlays : null)
@@ -643,11 +651,19 @@ export function ToursTab({ projectId, project }: { projectId: string; project: P
             activeDrawingTool={drawingSpotlight ? 'polygon' : null}
             activeDrawingColor="#F59E0B"
             onMapClick={handleMapClick}
+            onMarkerClick={markerId => {
+              // Jump between stops from the map, but never while a form is
+              // open (a stray click would silently discard unsaved edits)
+              if (formOpen || previewing || !tour) return
+              const stop = tour.stops.find(s => s.id === markerId)
+              if (stop) openEditStop(stop)
+            }}
             onDrawingCreated={handleDrawingCreated}
             onBoundsChange={(center: [number, number], zoom: number) => {
               setMapCenter(center)
               setMapZoom(zoom)
             }}
+            flyTo={flyTarget}
           />
         </div>
 
@@ -673,10 +689,7 @@ export function ToursTab({ projectId, project }: { projectId: string; project: P
             onStopIndexChange={idx => {
               setPreviewStopIndex(idx)
               const stop = tour.stops[idx]
-              if (stop) {
-                setMapCenter([stop.latitude, stop.longitude])
-                setMapZoom(stop.zoom)
-              }
+              if (stop) setFlyTarget({ lat: stop.latitude, lng: stop.longitude, zoom: stop.zoom })
             }}
             onClose={() => setPreviewing(false)}
             responsesByStop={new Map()}
@@ -725,7 +738,13 @@ export function ToursTab({ projectId, project }: { projectId: string; project: P
                       >
                         <GripVertical size={15} className="text-slate-300 group-hover:text-slate-400 cursor-grab shrink-0" />
                         <span className="w-6 h-6 shrink-0 bg-green-600 text-white rounded-full flex items-center justify-center text-xs font-semibold">
-                          {idx + 1}
+                          {stop.icon && TOUR_STOP_ICON_PATHS[stop.icon] ? (
+                            <svg viewBox="6 4 24 24" className="w-4 h-4" aria-hidden="true">
+                              <path d={TOUR_STOP_ICON_PATHS[stop.icon]} fill="currentColor" />
+                            </svg>
+                          ) : (
+                            idx + 1
+                          )}
                         </span>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-slate-900 truncate">{stop.title}</p>
@@ -885,6 +904,43 @@ export function ToursTab({ projectId, project }: { projectId: string; project: P
                           <X size={13} /> Remove
                         </button>
                       )}
+                    </div>
+                  </div>
+
+                  {/* Marker icon */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-slate-700">Marker icon</label>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {TOUR_STOP_ICONS.map(option => {
+                        const selected = (stopDraft.icon || 'number') === option.id
+                        const stopNumber = editingStopId === 'new'
+                          ? tour.stops.length + 1
+                          : Math.max(1, tour.stops.findIndex(s => s.id === editingStopId) + 1)
+                        return (
+                          <button
+                            key={option.id}
+                            type="button"
+                            onClick={() => setStopDraft(d => ({ ...d, icon: option.id === 'number' ? null : option.id }))}
+                            title={option.label}
+                            className={`flex flex-col items-center gap-0.5 py-1.5 rounded-lg border-2 transition-colors ${
+                              selected
+                                ? 'border-green-500 bg-green-50 text-green-700'
+                                : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                            }`}
+                          >
+                            <span className="w-6 h-6 flex items-center justify-center">
+                              {option.id === 'number' ? (
+                                <span className="text-sm font-bold">{stopNumber}</span>
+                              ) : (
+                                <svg viewBox="6 4 24 24" className="w-5 h-5" aria-hidden="true">
+                                  <path d={TOUR_STOP_ICON_PATHS[option.id]} fill="currentColor" />
+                                </svg>
+                              )}
+                            </span>
+                            <span className="text-[10px] leading-none">{option.label}</span>
+                          </button>
+                        )
+                      })}
                     </div>
                   </div>
 

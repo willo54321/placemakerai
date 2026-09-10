@@ -21,6 +21,11 @@ export async function GET(
       geoLayers: {
         where: { type: 'plot', visible: true },
         orderBy: { createdAt: 'asc' }
+      },
+      tours: {
+        where: { active: true },
+        include: { stops: { orderBy: { order: 'asc' } } },
+        orderBy: { createdAt: 'asc' }
       }
     }
   })
@@ -67,8 +72,29 @@ export async function GET(
       comment: p.comment,
       name: p.name,
       votes: p.votes,
-      createdAt: p.createdAt
+      createdAt: p.createdAt,
+      tourStopId: p.tourStopId
     })),
+    tours: project.tours
+      .filter(t => t.stops.length > 0)
+      .map(t => ({
+        id: t.id,
+        name: t.name,
+        description: t.description,
+        stops: t.stops.map(s => ({
+          id: s.id,
+          order: s.order,
+          title: s.title,
+          description: s.description,
+          imageUrl: s.imageUrl,
+          videoUrl: s.videoUrl,
+          latitude: s.latitude,
+          longitude: s.longitude,
+          zoom: s.zoom,
+          highlight: s.highlight,
+          showOverlays: s.showOverlays
+        }))
+      })),
     zones: project.geoLayers.map(l => {
       const feature = (l.geojson as any)?.type === 'FeatureCollection' ? (l.geojson as any).features?.[0] : (l.geojson as any)
       const props = feature?.properties || {}

@@ -32,6 +32,21 @@ otherwise Reply-To stays the sending admin. Email-origin enquiries get `channel:
 webhook retries dedup on `externalId`; auto-replies are skipped; project admins get a
 notification email. Requires MX on placemakerai.io pointing at Resend (DNS is on Vercel).
 
+**Re-added 2026-09-10 — Guided tours** (explicit user decision; redesigned rather than restored
+from the pre-descope version): admins author map tours — ordered stops, each with a title, story
+text, optional image (Vercel Blob upload) / YouTube-or-Vimeo video, a camera position captured
+WYSIWYG from the live editor map, an optional spotlight polygon (map dims outside it), and
+per-stop image-overlay visibility. Authored in the **Guided Tours** dashboard tab (`Publish`
+group, admin-only, map-first editor at `src/app/projects/[id]/tours.tsx`) with an in-editor
+preview that reuses the real public player. Public playback lives on the map embed ("Take the
+tour" button) and a dedicated iframe route `/embed/{projectId}/tour[?tour={tourId}]`; the player
+(`src/app/embed/[id]/TourPlayer.tsx`) is a left-docked panel (bottom sheet on mobile) with a
+cinematic fly-to between stops (driven via EmbedMap's `tourCamera` prop — deliberately not the
+`center` prop, which react-google-maps snaps instantly). **Per-stop responses are PublicPins**
+(`PublicPin.tourStopId`, SetNull on stop deletion) so they inherit moderation, appear on the
+feedback map, and feed AI analysis with no extra pipeline; approved ones render under each stop.
+Only `active: true` tours appear publicly (`/api/embed/{id}` returns `tours`).
+
 **Re-added 2026-09-09 — Mailing list + campaigns** (explicit user decision to rebuild the descoped
 feature): consented subscriber capture (`mailingConsent` on enquiry/external-feedback submissions,
 public `POST /api/embed/{id}/subscribe`, manual add), a Mailing List tab (subscribers register +
@@ -54,7 +69,8 @@ unset. Account emails (invite/reset) always use the platform address.
 - **Database:** PostgreSQL + Prisma ORM
 - **Auth:** NextAuth.js (JWT strategy)
 - **UI:** Tailwind CSS, Lucide icons
-- **Maps:** Leaflet, react-leaflet, Turf.js
+- **Maps:** Google Maps (`@react-google-maps/api`); Turf.js for server-side geometry. (Leaflet is
+  still in package.json but unused.)
 - **Data Fetching:** TanStack React Query
 - **Email:** Resend (account emails only: invite / password reset)
 - **AI:** Anthropic Claude (claude-opus-4-8 via @anthropic-ai/sdk)
@@ -104,6 +120,8 @@ npm run db:studio    # Open Prisma Studio
 | FeedbackForm | Custom forms with JSON field config |
 | FeedbackResponse | Form submissions (data as JSON) |
 | Enquiry | Public enquiry submissions (analyzed by AI; thread + outbound replies) |
+| Tour | Guided map tour (draft/active) per project |
+| TourStop | Ordered tour stop: story text, media, camera (lat/lng/zoom), spotlight polygon, overlay visibility |
 | Subscriber | Mailing-list contact per project (consent record + unsubscribe token) |
 | Campaign | Mailing-list email (draft → immutable sent record) |
 | GeoLayer | GeoJSON boundaries |
@@ -147,6 +165,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
 - Pin voting; admin approval workflow before pins appear publicly
 - GeoJSON boundary layers and image overlays on the map
 - Enquiry form embed: `/embed/{projectId}/enquiry` (submissions stored for AI analysis)
+- Guided tours: authored per project (Guided Tours tab), played on the map embed or the
+  dedicated `/embed/{projectId}/tour` iframe; per-stop responses are moderated PublicPins
 
 ### 2. Custom Feedback Forms
 - Drag-drop form builder with JSON field config

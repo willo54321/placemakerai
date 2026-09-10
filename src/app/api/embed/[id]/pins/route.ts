@@ -42,10 +42,30 @@ export async function POST(
   // Reject unknown fields so integrator typos (e.g. `type` instead of
   // `category`) fail loudly instead of being silently ignored. `email` and
   // `mailingConsent` are tolerated as no-ops for legacy embeds.
-  const KNOWN_FIELDS = ['shapeType', 'latitude', 'longitude', 'geometry', 'category', 'comment', 'name', 'gdprConsent', 'email', 'mailingConsent']
+  const KNOWN_FIELDS = ['shapeType', 'latitude', 'longitude', 'geometry', 'category', 'comment', 'name', 'gdprConsent', 'email', 'mailingConsent', 'tourStopId']
   const unknownFields = Object.keys(body).filter(k => !KNOWN_FIELDS.includes(k))
   if (unknownFields.length > 0) {
-    errors.push(`unknown field${unknownFields.length > 1 ? 's' : ''}: ${unknownFields.join(', ')} (accepted fields: shapeType, latitude, longitude, geometry, category, comment, name, gdprConsent)`)
+    errors.push(`unknown field${unknownFields.length > 1 ? 's' : ''}: ${unknownFields.join(', ')} (accepted fields: shapeType, latitude, longitude, geometry, category, comment, name, gdprConsent, tourStopId)`)
+  }
+
+  // Feedback left from a guided-tour stop panel carries the stop id so it can
+  // be shown under that stop. The stop must belong to an active tour of this
+  // project — otherwise submitters could attach feedback to arbitrary stops.
+  let tourStopId: string | null = null
+  if (body.tourStopId !== undefined && body.tourStopId !== null) {
+    if (typeof body.tourStopId !== 'string') {
+      errors.push('tourStopId must be a string')
+    } else {
+      const stop = await prisma.tourStop.findUnique({
+        where: { id: body.tourStopId },
+        select: { tour: { select: { projectId: true, active: true } } }
+      })
+      if (!stop || stop.tour.projectId !== params.id || !stop.tour.active) {
+        errors.push('tourStopId does not match an active tour stop of this project')
+      } else {
+        tourStopId = body.tourStopId
+      }
+    }
   }
 
   const lat = shapeType === 'pin' ? parseFloat(body.latitude) : null
@@ -101,6 +121,7 @@ export async function POST(
       // it served no purpose: no reply workflow, no notifications, no mailing list.
       gdprConsent: true,
       gdprConsentDate: new Date(),
+      tourStopId,
     }
   })
 

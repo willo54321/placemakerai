@@ -388,6 +388,7 @@ model Project {
   stakeholders          Stakeholder[]
   subscribers           Subscriber[]
   campaigns             Campaign[]
+  tours                 Tour[]
 }
 
 model PublicPin {
@@ -407,11 +408,52 @@ model PublicPin {
   shapeType       String    @default("pin")
   gdprConsent     Boolean   @default(false)
   gdprConsentDate DateTime?
+  // Set when the feedback was left from a guided-tour stop panel. SetNull so
+  // deleting a tour/stop never deletes public feedback.
+  tourStopId      String?
   project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tourStop        TourStop? @relation(fields: [tourStopId], references: [id], onDelete: SetNull)
   voteRecords     PinVote[]
 
   @@index([projectId, approved])
   @@index([projectId, createdAt])
+  @@index([tourStopId])
+}
+
+model Tour {
+  id          String     @id @default(cuid())
+  projectId   String
+  name        String
+  description String?
+  // Draft by default; only active tours appear on the public embed.
+  active      Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  stops       TourStop[]
+
+  @@index([projectId])
+}
+
+model TourStop {
+  id           String      @id @default(cuid())
+  tourId       String
+  order        Int
+  title        String
+  description  String
+  imageUrl     String?
+  videoUrl     String? // YouTube/Vimeo link embedded in the stop panel
+  latitude     Float
+  longitude    Float
+  zoom         Float       @default(16)
+  highlight    Json? // GeoJSON Polygon spotlighted (map dimmed outside) at this stop
+  showOverlays Json? // string[] of ImageOverlay ids visible at this stop; null = all
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  tour         Tour        @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  responses    PublicPin[]
+
+  @@index([tourId])
 }
 
 model PinVote {

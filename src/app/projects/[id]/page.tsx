@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { useSession } from 'next-auth/react'
-import { ArrowLeft, Users, MapPin, Settings, LayoutDashboard, BarChart3, Globe, Eye, FileText, HelpCircle, Inbox, Mail } from 'lucide-react'
+import { ArrowLeft, Users, MapPin, Settings, LayoutDashboard, BarChart3, Globe, Eye, FileText, HelpCircle, Inbox, Mail, Route } from 'lucide-react'
 import Link from 'next/link'
 import { useState, Suspense } from 'react'
 import dynamic from 'next/dynamic'
@@ -33,6 +33,10 @@ const TOUR_COPY: Record<Tab, { title: string; body: string }> = {
   website: {
     title: 'Your website embed',
     body: 'Grab the embed code to put the consultation map on any website, and customise its colours and behaviour.',
+  },
+  tours: {
+    title: 'Guided tours',
+    body: 'Walk visitors through the proposals stop by stop: each stop flies the map to a view, tells part of the story, and can collect responses.',
   },
   analytics: {
     title: 'AI analytics',
@@ -97,7 +101,19 @@ const FormsTabWrapper = dynamic(() => import('./forms-wrapper').then(mod => ({ d
   )
 })
 
-type Tab = 'overview' | 'feedback' | 'forms' | 'enquiries' | 'stakeholders' | 'mailing' | 'website' | 'analytics' | 'settings' | 'howto'
+const ToursTab = dynamic(() => import('./tours').then(mod => ({ default: mod.ToursTab })), {
+  ssr: false,
+  loading: () => (
+    <div className="h-full flex items-center justify-center">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-8 h-8 border-3 border-green-600 border-t-transparent rounded-full animate-spin" />
+        <span className="text-sm text-slate-500">Loading tours...</span>
+      </div>
+    </div>
+  )
+})
+
+type Tab = 'overview' | 'feedback' | 'forms' | 'enquiries' | 'stakeholders' | 'mailing' | 'website' | 'tours' | 'analytics' | 'settings' | 'howto'
 
 // Deep-link target passed alongside a tab switch (e.g. from the activity
 // feed): jump straight to a specific pin or form response.
@@ -116,7 +132,7 @@ const tabGroups: TabGroup[] = [
   { id: 'top', label: '', tabs: ['overview'] },
   { id: 'collect', label: 'Collect', tabs: ['feedback', 'forms', 'enquiries', 'analytics'] },
   { id: 'engage', label: 'Engage', tabs: ['stakeholders', 'mailing'] },
-  { id: 'publish', label: 'Publish', tabs: ['website'] },
+  { id: 'publish', label: 'Publish', tabs: ['website', 'tours'] },
   { id: 'configure', label: 'Configure', tabs: ['settings'] },
   { id: 'help', label: 'Help', tabs: ['howto'] },
 ]
@@ -284,6 +300,13 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
       id: 'website' as Tab,
       label: 'Website',
       icon: Globe,
+      count: 0,
+      adminOnly: true,
+    },
+    {
+      id: 'tours' as Tab,
+      label: 'Guided Tours',
+      icon: Route,
       count: 0,
       adminOnly: true,
     },
@@ -513,6 +536,11 @@ export default function ProjectPage({ params }: { params: { id: string } }) {
           {activeTab === 'website' && (
             <div className="p-6">
               <EmbedSettingsTab projectId={params.id} project={project} />
+            </div>
+          )}
+          {activeTab === 'tours' && (
+            <div className="p-6">
+              <ToursTab projectId={params.id} project={project} />
             </div>
           )}
           {activeTab === 'enquiries' && (

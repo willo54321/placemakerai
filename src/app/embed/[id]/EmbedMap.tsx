@@ -46,6 +46,18 @@ interface Zone {
   geometry: GeoJSONGeometry | null
 }
 
+interface HighlightGeometry {
+  type: 'Polygon'
+  coordinates: number[][][]
+}
+
+interface TourStopMarker {
+  id: string
+  latitude: number
+  longitude: number
+  title: string
+}
+
 interface EmbedMapProps {
   center: [number, number]
   zoom: number
@@ -61,7 +73,14 @@ interface EmbedMapProps {
   onVote: (pinId: string) => Promise<void>
   mapType: 'roadmap' | 'satellite'
   votedPins: Set<string>
-  animateToCenter?: boolean
+  // Guided tour: animated camera target, dimmed-outside spotlight, numbered
+  // stop markers. tourCamera drives the cinematic fly-to; `center`/`zoom`
+  // must stay constant while it is set (see the fly-to effect).
+  tourCamera?: { lat: number; lng: number; zoom: number } | null
+  highlight?: HighlightGeometry | null
+  tourStops?: TourStopMarker[]
+  activeTourStopIndex?: number | null
+  onTourStopClick?: (index: number) => void
   // Styling options
   hideStreetLabels?: boolean
   primaryColor?: string
@@ -209,7 +228,11 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
   onVote,
   mapType,
   votedPins,
-  animateToCenter = false,
+  tourCamera = null,
+  highlight = null,
+  tourStops = [],
+  activeTourStopIndex = null,
+  onTourStopClick,
   hideStreetLabels = false,
   primaryColor
 }, ref) {
@@ -313,92 +336,97 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
     }
   }, [map, mapType])
 
-  // Premium cinematic fly-to animation
+  // Premium cinematic fly-to animation. Kept OFF the `center`/`zoom` props on
+  // purpose: react-google-maps applies changed `center` props with an instant
+  // map.setCenter() in a child effect that runs *before* ours, which would snap
+  // to the target and reduce the animation to a no-op. Camera moves that should
+  // animate go through the `tourCamera` prop instead, while `center` stays
+  // constant.
   useEffect(() => {
-    if (map && animateToCenter) {
-      const currentCenter = map.getCenter()
-      const currentZoom = map.getZoom() || 15
+    if (!map || !tourCamera) return
 
-      if (!currentCenter) {
-        map.setCenter({ lat: center[0], lng: center[1] })
-        map.setZoom(zoom)
-        return
-      }
+    const currentCenter = map.getCenter()
+    const currentZoom = map.getZoom() || 15
 
-      const startLat = currentCenter.lat()
-      const startLng = currentCenter.lng()
-      const endLat = center[0]
-      const endLng = center[1]
-      const startZoom = currentZoom
-      const endZoom = zoom
+    if (!currentCenter) {
+      map.setCenter({ lat: tourCamera.lat, lng: tourCamera.lng })
+      map.setZoom(tourCamera.zoom)
+      return
+    }
 
-      // Calculate distance for duration scaling
-      const latDiff = Math.abs(endLat - startLat)
-      const lngDiff = Math.abs(endLng - startLng)
-      const distance = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff)
+    const startLat = currentCenter.lat()
+    const startLng = currentCenter.lng()
+    const endLat = tourCamera.lat
+    const endLng = tourCamera.lng
+    const startZoom = currentZoom
+    const endZoom = tourCamera.zoom
 
-      // Premium easing function - cubic bezier approximation for smooth feel
-      const easeInOutCubic = (t: number): number => {
-        return t < 0.5
-          ? 4 * t * t * t
-          : 1 - Math.pow(-2 * t + 2, 3) / 2
-      }
+    // Calculate distance for duration scaling
+    const latDiff = Math.abs(endLat - startLat)
+    const lngDiff = Math.abs(endLng - startLng)
+    const distance = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff)
 
-      // For longer distances, use a cinematic zoom-out-then-in effect
-      const useFlyover = distance > 0.01 // ~1km
-      const midZoom = useFlyover ? Math.min(startZoom, endZoom) - 2 : null
+    // Premium easing function - cubic bezier approximation for smooth feel
+    const easeInOutCubic = (t: number): number => {
+      return t < 0.5
+        ? 4 * t * t * t
+        : 1 - Math.pow(-2 * t + 2, 3) / 2
+    }
 
-      // Dynamic duration based on distance (1.2s to 2.5s)
-      const baseDuration = 1200
-      const maxDuration = 2500
-      const duration = Math.min(baseDuration + distance * 50000, maxDuration)
+    // For longer distances, use a cinematic zoom-out-then-in effect
+    const useFlyover = distance > 0.01 // ~1km
+    const midZoom = useFlyover ? Math.min(startZoom, endZoom) - 2 : null
 
-      let animationFrame: number
-      const startTime = performance.now()
+    // Dynamic duration based on distance (1.2s to 2.5s)
+    const baseDuration = 1200
+    const maxDuration = 2500
+    const duration = Math.min(baseDuration + distance * 50000, maxDuration)
 
-      const animate = (currentTime: number) => {
-        const elapsed = currentTime - startTime
-        const rawProgress = Math.min(elapsed / duration, 1)
-        const progress = easeInOutCubic(rawProgress)
+    let animationFrame: number
+    const startTime = performance.now()
 
-        // Interpolate position
-        const lat = startLat + (endLat - startLat) * progress
-        const lng = startLng + (endLng - startLng) * progress
-        map.setCenter({ lat, lng })
+    const animate = (currentTime: number) => {
+      const elapsed = currentTime - startTime
+      const rawProgress = Math.min(elapsed / duration, 1)
+      const progress = easeInOutCubic(rawProgress)
 
-        // For flyover effect: zoom out in first half, zoom in second half
-        if (useFlyover && midZoom !== null) {
-          let currentAnimZoom: number
-          if (progress < 0.5) {
-            // First half: ease out from start to mid
-            const zoomProgress = progress * 2
-            currentAnimZoom = startZoom + (midZoom - startZoom) * zoomProgress
-          } else {
-            // Second half: ease in from mid to end
-            const zoomProgress = (progress - 0.5) * 2
-            currentAnimZoom = midZoom + (endZoom - midZoom) * zoomProgress
-          }
-          map.setZoom(currentAnimZoom)
+      // Interpolate position
+      const lat = startLat + (endLat - startLat) * progress
+      const lng = startLng + (endLng - startLng) * progress
+      map.setCenter({ lat, lng })
+
+      // For flyover effect: zoom out in first half, zoom in second half
+      if (useFlyover && midZoom !== null) {
+        let currentAnimZoom: number
+        if (progress < 0.5) {
+          // First half: ease out from start to mid
+          const zoomProgress = progress * 2
+          currentAnimZoom = startZoom + (midZoom - startZoom) * zoomProgress
         } else {
-          // Simple zoom interpolation
-          const currentAnimZoom = startZoom + (endZoom - startZoom) * progress
-          map.setZoom(currentAnimZoom)
+          // Second half: ease in from mid to end
+          const zoomProgress = (progress - 0.5) * 2
+          currentAnimZoom = midZoom + (endZoom - midZoom) * zoomProgress
         }
-
-        if (rawProgress < 1) {
-          animationFrame = requestAnimationFrame(animate)
-        }
+        map.setZoom(currentAnimZoom)
+      } else {
+        // Simple zoom interpolation
+        const currentAnimZoom = startZoom + (endZoom - startZoom) * progress
+        map.setZoom(currentAnimZoom)
       }
 
-      animationFrame = requestAnimationFrame(animate)
-
-      return () => {
-        if (animationFrame) {
-          cancelAnimationFrame(animationFrame)
-        }
+      if (rawProgress < 1) {
+        animationFrame = requestAnimationFrame(animate)
       }
     }
-  }, [map, center, zoom, animateToCenter])
+
+    animationFrame = requestAnimationFrame(animate)
+
+    return () => {
+      if (animationFrame) {
+        cancelAnimationFrame(animationFrame)
+      }
+    }
+  }, [map, tourCamera])
 
   // Manage ground overlays - only update what changed, don't recreate all
   useEffect(() => {
@@ -651,6 +679,60 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
           options={drawingManagerOptions}
           onPolygonComplete={handlePolygonComplete}
         />
+
+        {/* Tour spotlight — dark overlay with a hole over the highlighted area */}
+        {highlight && highlight.coordinates && highlight.coordinates[0] && (
+          <PolygonF
+            paths={[
+              // Outer bounds covering the world (clockwise)
+              [
+                { lat: -85, lng: -180 },
+                { lat: 85, lng: -180 },
+                { lat: 85, lng: 180 },
+                { lat: -85, lng: 180 },
+              ],
+              // Inner hole - the spotlight area (counter-clockwise for hole)
+              highlight.coordinates[0].map(coord => ({
+                lat: coord[1],
+                lng: coord[0]
+              })).reverse()
+            ]}
+            options={{
+              fillColor: '#000000',
+              fillOpacity: 0.45,
+              strokeColor: primaryColor || '#F59E0B',
+              strokeWeight: 3,
+              strokeOpacity: 1,
+              clickable: false,
+              zIndex: 5
+            }}
+          />
+        )}
+
+        {/* Tour stop markers — numbered badges, clickable to jump to a stop */}
+        {tourStops.map((stop, index) => (
+          <OverlayView
+            key={`tour-stop-${stop.id}`}
+            position={{ lat: stop.latitude, lng: stop.longitude }}
+            mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+          >
+            <button
+              onClick={() => onTourStopClick?.(index)}
+              aria-label={`Tour stop ${index + 1}: ${stop.title}`}
+              style={{
+                transform: 'translate(-50%, -50%)',
+                backgroundColor: primaryColor || '#10B981',
+                width: activeTourStopIndex === index ? 36 : 28,
+                height: activeTourStopIndex === index ? 36 : 28,
+                fontSize: activeTourStopIndex === index ? 15 : 13,
+                zIndex: activeTourStopIndex === index ? 30 : 20,
+              }}
+              className="relative flex items-center justify-center rounded-full text-white font-bold border-2 border-white shadow-lg cursor-pointer transition-all duration-200"
+            >
+              {index + 1}
+            </button>
+          </OverlayView>
+        ))}
 
         {/* Plot zones — client-drawn boundaries, underneath feedback */}
         {zones.map(zone => {

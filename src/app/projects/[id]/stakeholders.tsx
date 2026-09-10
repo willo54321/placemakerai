@@ -206,7 +206,7 @@ export function StakeholdersTab({ projectId, isAdmin }: { projectId: string; isA
 
   const importReps = useMutation({
     mutationFn: () =>
-      fetchJson<{ imported: number; skipped: number; mp: string | null; councillors: number; district: string | null }>(
+      fetchJson<{ imported: number; skipped: number; mp: string | null; councillors: number; district: string | null; ward: string | null }>(
         `/api/projects/${projectId}/stakeholders/import-representatives`,
         { method: 'POST' }
       ),
@@ -216,7 +216,7 @@ export function StakeholdersTab({ projectId, isAdmin }: { projectId: string; isA
         toast.info('Representatives already in the register — nothing new to add')
       } else {
         toast.success(
-          `Imported ${summary.imported} representative${summary.imported === 1 ? '' : 's'}${summary.mp ? ` including ${summary.mp} MP` : ''}${summary.district ? ` (${summary.district})` : ''}`
+          `Imported ${summary.imported} representative${summary.imported === 1 ? '' : 's'}${summary.mp ? ` including ${summary.mp} MP` : ''}${summary.ward ? ` (${summary.ward} ward)` : ''}`
         )
       }
     },

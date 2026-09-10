@@ -114,11 +114,18 @@ async function findMp(constituency: string): Promise<Representative | null> {
   }
 }
 
+/** Ward names differ slightly between sources ("Lloyds & Corby Village" vs
+ * "Lloyds and Corby Village") — compare on a normalised form. */
+function normalizeWard(name: string): string {
+  return name.toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '')
+}
+
 async function findCouncillors(
-  district: string
+  district: string,
+  ward: string | null
 ): Promise<{ councillors: Representative[]; source: string | null }> {
   const baseUrl = MODERNGOV_COUNCILS[district]
-  if (!baseUrl) return { councillors: [], source: null }
+  if (!baseUrl || !ward) return { councillors: [], source: null }
   const source = `${baseUrl}/mgWebService.asmx/GetCouncillorsByWard`
 
   let xml: string
@@ -131,10 +138,13 @@ async function findCouncillors(
   }
   if (!xml.includes('<councillorsbyward>')) return { councillors: [], source: null }
 
+  // Only the site's own ward members — councillors are the local voice for
+  // the ward the project sits in, not the whole chamber.
   const organization = `${district} Council`
   const councillors: Representative[] = []
   for (const wardBlock of xml.split('<ward>').slice(1)) {
     const wardTitle = xmlField(wardBlock, 'wardtitle')
+    if (!wardTitle || normalizeWard(wardTitle) !== normalizeWard(ward)) continue
     for (const block of wardBlock.match(/<councillor>[\s\S]*?<\/councillor>/g) ?? []) {
       const rawName = xmlField(block, 'fullusername')
       if (!rawName) continue
@@ -161,7 +171,9 @@ export async function lookupRepresentatives(
 
   const [mp, council] = await Promise.all([
     geo.constituency ? findMp(geo.constituency) : Promise.resolve(null),
-    geo.district ? findCouncillors(geo.district) : Promise.resolve({ councillors: [], source: null }),
+    geo.district
+      ? findCouncillors(geo.district, geo.ward)
+      : Promise.resolve({ councillors: [], source: null }),
   ])
 
   return {

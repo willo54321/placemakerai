@@ -9,6 +9,7 @@ export interface ImportSummary {
   councillors: number
   constituency: string | null
   district: string | null
+  ward: string | null
 }
 
 /**
@@ -99,5 +100,6 @@ export async function importRepresentativesForProject(
     councillors: result.councillors.length,
     constituency: result.constituency,
     district: result.district,
+    ward: result.ward,
   }
 }

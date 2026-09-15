@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useJsApiLoader } from '@react-google-maps/api'
-import { MessageCircle, ThumbsUp, ThumbsDown, X, Send, MapPin, ChevronLeft, ChevronRight, Lightbulb, Pentagon, CheckCircle, AlertCircle } from 'lucide-react'
+import { MessageCircle, ThumbsUp, ThumbsDown, X, Send, MapPin, ChevronLeft, ChevronRight, Lightbulb, Pentagon, CheckCircle, AlertCircle, Layers } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { TourPlayer, StartTourButton } from './TourPlayer'
 import type { TourData, TourStopData, TourResponse } from './TourPlayer'
@@ -166,6 +166,10 @@ export function EmbedExperience({
   const [activeTourId, setActiveTourId] = useState<string | null>(null)
   const [tourStopIndex, setTourStopIndex] = useState(-1) // -1 = intro screen
   const [tourCamera, setTourCamera] = useState<{ center: [number, number]; zoom: number } | null>(null)
+
+  // Visitor-adjustable opacity for image overlays (null until seeded from the
+  // admin-configured value; visitor changes are client-side only, not persisted).
+  const [overlayOpacity, setOverlayOpacity] = useState<number | null>(null)
 
   // Collapse the sidebar by default on small screens (narrow iframes)
   useEffect(() => {
@@ -445,6 +449,25 @@ export function EmbedExperience({
     return project.overlays.filter(o => allowed.has(o.id))
   }, [project, activeStop])
 
+  // Seed the visitor opacity slider from the first overlay's admin-configured
+  // opacity once the project loads, then let the visitor override it.
+  useEffect(() => {
+    if (overlayOpacity === null && project?.overlays?.length) {
+      setOverlayOpacity(project.overlays[0].opacity ?? 0.7)
+    }
+  }, [project, overlayOpacity])
+  const effectiveOverlayOpacity = overlayOpacity ?? (project?.overlays?.[0]?.opacity ?? 0.7)
+
+  // Overlays handed to the map with the visitor-controlled opacity applied.
+  // During a guided tour the authored per-stop opacity is preserved.
+  const displayOverlays = useMemo(
+    () =>
+      tourOpen
+        ? visibleOverlays
+        : visibleOverlays.map(o => ({ ...o, opacity: effectiveOverlayOpacity })),
+    [visibleOverlays, effectiveOverlayOpacity, tourOpen]
+  )
+
   const tourActive = tourOpen || tourMode
 
   // Stable identity: the fly-to effect in EmbedMap keys on this object, so it
@@ -552,7 +575,7 @@ export function EmbedExperience({
           center={center}
           zoom={project.mapZoom || 15}
           tourCamera={embedTourCamera}
-          overlays={visibleOverlays}
+          overlays={displayOverlays}
           pins={tourActive ? [] : filteredPins}
           zones={project.zones || []}
           pendingPin={pendingShape?.type === 'pin' ? { lat: pendingShape.lat!, lng: pendingShape.lng! } : null}
@@ -722,6 +745,35 @@ export function EmbedExperience({
           >
             {mapType === 'satellite' ? 'Map' : 'Satellite'}
           </button>
+        )}
+
+        {/* Overlay opacity - Bottom Left (visitor-adjustable, sits above the tour button) */}
+        {!tourActive && visibleOverlays.length > 0 && (
+          <div className={`absolute left-4 z-10 ${tours.length > 0 ? 'bottom-20' : 'bottom-4'}`}>
+            <div
+              className="bg-white/95 backdrop-blur rounded-xl shadow-lg px-3 py-2 flex items-center gap-2.5 max-w-[calc(100vw-2rem)]"
+              title="Adjust overlay transparency"
+            >
+              <Layers size={16} className="shrink-0" style={{ color: primaryColor }} />
+              <span className="hidden sm:inline text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                Overlay
+              </span>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={effectiveOverlayOpacity}
+                onChange={(e) => setOverlayOpacity(parseFloat(e.target.value))}
+                aria-label="Overlay opacity"
+                className="w-28 sm:w-36 h-2 cursor-pointer"
+                style={{ accentColor: primaryColor }}
+              />
+              <span className="text-xs font-medium text-gray-600 tabular-nums w-8 text-right">
+                {Math.round(effectiveOverlayOpacity * 100)}%
+              </span>
+            </div>
+          </div>
         )}
 
         {/* Tour entry - Bottom Left */}

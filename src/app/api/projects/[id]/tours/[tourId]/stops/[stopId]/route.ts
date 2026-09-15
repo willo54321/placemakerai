@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db'
 import { authorizeProject } from '@/lib/api-auth'
+import { withApiHandler } from '@/lib/api-error'
 import { parseStopPayload } from '@/lib/tours'
 import { NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
@@ -14,10 +15,10 @@ async function findStop(projectId: string, tourId: string, stopId: string) {
 }
 
 // PATCH - Update a stop (partial: only provided fields change)
-export async function PATCH(
+export const PATCH = withApiHandler(async (
   request: Request,
   { params }: { params: { id: string; tourId: string; stopId: string } }
-) {
+) => {
   const denied = await authorizeProject(params.id, 'ADMIN')
   if (denied) return denied
 
@@ -38,13 +39,13 @@ export async function PATCH(
   })
 
   return NextResponse.json(stop)
-}
+})
 
 // DELETE - Remove a stop and close the numbering gap
-export async function DELETE(
+export const DELETE = withApiHandler(async (
   request: Request,
   { params }: { params: { id: string; tourId: string; stopId: string } }
-) {
+) => {
   const denied = await authorizeProject(params.id, 'ADMIN')
   if (denied) return denied
 
@@ -68,4 +69,4 @@ export async function DELETE(
   })
 
   return NextResponse.json({ success: true })
-}
+})

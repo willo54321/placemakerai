@@ -1,14 +1,15 @@
 import { prisma } from '@/lib/db'
 import { authorizeProject } from '@/lib/api-auth'
+import { withApiHandler } from '@/lib/api-error'
 import { parseStopPayload } from '@/lib/tours'
 import { NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 
 // POST - Add a stop to a tour (appended at the end)
-export async function POST(
+export const POST = withApiHandler(async (
   request: Request,
   { params }: { params: { id: string; tourId: string } }
-) {
+) => {
   const denied = await authorizeProject(params.id, 'ADMIN')
   if (denied) return denied
 
@@ -37,4 +38,4 @@ export async function POST(
   })
 
   return NextResponse.json(stop)
-}
+})

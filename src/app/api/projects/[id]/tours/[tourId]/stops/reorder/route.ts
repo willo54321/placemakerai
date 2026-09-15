@@ -1,12 +1,13 @@
 import { prisma } from '@/lib/db'
 import { authorizeProject } from '@/lib/api-auth'
+import { withApiHandler } from '@/lib/api-error'
 import { NextResponse } from 'next/server'
 
 // POST - Reorder stops. Body: { stops: [stopId, ...] } in the new order.
-export async function POST(
+export const POST = withApiHandler(async (
   request: Request,
   { params }: { params: { id: string; tourId: string } }
-) {
+) => {
   const denied = await authorizeProject(params.id, 'ADMIN')
   if (denied) return denied
 
@@ -44,4 +45,4 @@ export async function POST(
   })
 
   return NextResponse.json(stops)
-}
+})

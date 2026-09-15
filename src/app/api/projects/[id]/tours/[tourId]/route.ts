@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db'
 import { authorizeProject } from '@/lib/api-auth'
+import { withApiHandler } from '@/lib/api-error'
 import { NextResponse } from 'next/server'
 
 async function findTour(projectId: string, tourId: string) {
@@ -9,10 +10,10 @@ async function findTour(projectId: string, tourId: string) {
 }
 
 // GET - A single tour with its ordered stops
-export async function GET(
+export const GET = withApiHandler(async (
   request: Request,
   { params }: { params: { id: string; tourId: string } }
-) {
+) => {
   const denied = await authorizeProject(params.id, 'CLIENT')
   if (denied) return denied
 
@@ -26,13 +27,13 @@ export async function GET(
   }
 
   return NextResponse.json(tour)
-}
+})
 
 // PATCH - Update tour name/description/active
-export async function PATCH(
+export const PATCH = withApiHandler(async (
   request: Request,
   { params }: { params: { id: string; tourId: string } }
-) {
+) => {
   const denied = await authorizeProject(params.id, 'ADMIN')
   if (denied) return denied
 
@@ -66,13 +67,13 @@ export async function PATCH(
   })
 
   return NextResponse.json(tour)
-}
+})
 
 // DELETE - Delete a tour (stops cascade; their feedback pins survive via SetNull)
-export async function DELETE(
+export const DELETE = withApiHandler(async (
   request: Request,
   { params }: { params: { id: string; tourId: string } }
-) {
+) => {
   const denied = await authorizeProject(params.id, 'ADMIN')
   if (denied) return denied
 
@@ -84,4 +85,4 @@ export async function DELETE(
   await prisma.tour.delete({ where: { id: params.tourId } })
 
   return NextResponse.json({ success: true })
-}
+})

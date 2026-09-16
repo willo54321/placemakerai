@@ -36,11 +36,11 @@ describe('isValidEmailLocalPart', () => {
 
 describe('getSenderDomain', () => {
   it('extracts the domain from display-name and bare forms', () => {
-    expect(getSenderDomain('Placemaker.ai <hello@placemakerai.io>')).toBe('placemakerai.io')
+    expect(getSenderDomain('Placemaker <hello@placemakerai.io>')).toBe('placemakerai.io')
     expect(getSenderDomain('hello@placemakerai.io')).toBe('placemakerai.io')
   })
   it('refuses the shared onboarding domain and missing values', () => {
-    expect(getSenderDomain('Placemaker.ai <onboarding@resend.dev>')).toBeNull()
+    expect(getSenderDomain('Placemaker <onboarding@resend.dev>')).toBeNull()
     expect(getSenderDomain(undefined)).toBeNull()
   })
 })

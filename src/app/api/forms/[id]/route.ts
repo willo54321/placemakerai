@@ -4,10 +4,8 @@ import { NextResponse } from 'next/server'
 // Public form config for the /forms/[id] page and external embeds. Gated the
 // same way as submissions (form active + project embedding enabled) and
 // trimmed to the fields a visitor needs — never the raw row.
-export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const form = await prisma.feedbackForm.findUnique({
     where: { id: params.id },
     include: { Project: { select: { embedEnabled: true, name: true } } },

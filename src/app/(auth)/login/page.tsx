@@ -61,7 +61,7 @@ export default function LoginPage() {
           <div className="w-10 h-10 bg-brand-600 rounded-lg flex items-center justify-center">
             <MapPin className="w-6 h-6 text-white" />
           </div>
-          <h1 className="text-xl font-semibold text-slate-900">Placemaker.ai</h1>
+          <h1 className="text-xl font-semibold text-slate-900">Placemaker</h1>
         </div>
 
         {/* Welcome message */}

@@ -46,7 +46,7 @@ export default function Navigation() {
             <span
               className={`font-semibold text-[#0B2818] transition-all duration-300 ${isScrolled ? 'text-lg' : 'text-xl'}`}
             >
-              placemaker.ai
+              placemakerai.io
             </span>
           </a>
 

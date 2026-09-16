@@ -4,10 +4,8 @@ import { logAudit } from '@/lib/audit'
 import { NextResponse } from 'next/server'
 
 // GET all subscribers for a project
-export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const denied = await authorizeProject(params.id, 'CLIENT')
   if (denied) return denied
 
@@ -22,10 +20,8 @@ export async function GET(
 // the consent record belongs to the person, not the admin typing the address.
 // Manual rows still receive campaigns (subscribed=true) — the admin is
 // attesting to consent gathered offline (sign-up sheet, event, letter).
-export async function POST(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const denied = await authorizeProject(params.id, 'ADMIN')
   if (denied) return denied
 
@@ -85,10 +81,8 @@ export async function POST(
 
 // DELETE ?subscriberId= — hard delete (GDPR erasure). Opt-outs come through
 // the public unsubscribe link instead, which keeps the consent history row.
-export async function DELETE(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const denied = await authorizeProject(params.id, 'ADMIN')
   if (denied) return denied
 

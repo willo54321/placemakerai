@@ -64,13 +64,12 @@ unset. Account emails (invite/reset) always use the platform address.
 
 ## Tech Stack
 
-- **Framework:** Next.js 14.1 (App Router)
+- **Framework:** Next.js 16 (App Router), React 19
 - **Language:** TypeScript
 - **Database:** PostgreSQL + Prisma ORM
 - **Auth:** NextAuth.js (JWT strategy)
 - **UI:** Tailwind CSS, Lucide icons
-- **Maps:** Google Maps (`@react-google-maps/api`); Turf.js for server-side geometry. (Leaflet is
-  still in package.json but unused.)
+- **Maps:** Google Maps (`@react-google-maps/api`); Turf.js for server-side geometry.
 - **Data Fetching:** TanStack React Query
 - **Email:** Resend (account emails only: invite / password reset)
 - **AI:** Anthropic Claude (claude-opus-4-8 via @anthropic-ai/sdk)
@@ -79,10 +78,22 @@ unset. Account emails (invite/reset) always use the platform address.
 
 ```bash
 npm run dev          # Start dev server (port 3002)
+npm run db:dev       # Start the LOCAL dev Postgres (embedded, port 54322, data in .devdb/)
+npm run db:seed      # Seed local super-admin: dev@placemaker.local / devpassword
 npm run build        # Build for production
-npm run db:push      # Push Prisma schema to database
+npm run db:push      # Push Prisma schema to the LOCAL dev database (.env)
+npm run db:push:prod # Push schema to PRODUCTION (reads .env.prod) — user runs this, not Claude
+npm run db:backup:prod # pg_dump snapshot of prod into backups/ — run before every db:push:prod
 npm run db:studio    # Open Prisma Studio
+npm test             # Vitest unit tests
 ```
+
+**Environments (2026-09-10):** local dev uses an embedded Postgres (`npm run db:dev`;
+`DATABASE_URL` in `.env`/`.env.local` points at localhost:54322). The production database
+URL lives only in the gitignored `.env.prod`, used by `db:push:prod`. On Vercel,
+`DATABASE_URL` is scoped to Production only — preview/development deploys have no
+database access. CI (`.github/workflows/ci.yml`) runs lint, vitest, build and a
+non-blocking `npm audit` on every push/PR.
 
 ## Project Structure
 
@@ -188,6 +199,8 @@ NEXTAUTH_URL=          # Base URL (e.g., https://placemakerai.io)
 RESEND_API_KEY=        # Email delivery (invite/reset emails)
 RESEND_WEBHOOK_SECRET= # Svix signing secret for the inbound email.received webhook (enables inbound threading)
 ANTHROPIC_API_KEY=     # AI analysis (Claude)
+UPSTASH_REDIS_REST_URL=   # Optional: global rate limiting (Vercel Upstash integration)
+UPSTASH_REDIS_REST_TOKEN= # Optional: without these, rate limiting falls back to per-instance memory
 ```
 
 ## Common Tasks

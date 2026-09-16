@@ -4,8 +4,9 @@ import { NextResponse } from 'next/server'
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string; overlayId: string } }
+  props: { params: Promise<{ id: string; overlayId: string }> }
 ) {
+  const params = await props.params;
   const denied = await authorizeProject(params.id, 'ADMIN')
   if (denied) return denied
 
@@ -46,8 +47,9 @@ export async function PATCH(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string; overlayId: string } }
+  props: { params: Promise<{ id: string; overlayId: string }> }
 ) {
+  const params = await props.params;
   const denied = await authorizeProject(params.id, 'ADMIN')
   if (denied) return denied
 

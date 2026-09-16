@@ -7,7 +7,7 @@ import { issuePasswordToken, appBaseUrl, RESET_TOKEN_TTL_HOURS } from '@/lib/pas
 // Public endpoint: request a password-reset email.
 // Always responds with success so it cannot be used to enumerate accounts.
 export async function POST(request: Request) {
-  const limited = rateLimitResponse(request, 'forgot-password', 5, 15 * 60_000)
+  const limited = await rateLimitResponse(request, 'forgot-password', 5, 15 * 60_000)
   if (limited) return limited
 
   let email: unknown

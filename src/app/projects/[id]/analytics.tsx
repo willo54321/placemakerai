@@ -801,7 +801,7 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
             <div className="space-y-3">
               {selectedTheme.sampleQuotes.map((quote, i) => (
                 <blockquote key={i} className="text-slate-600 bg-white rounded-lg p-4 border-l-4 border-brand-300">
-                  <p className="italic">"{quote}"</p>
+                  <p className="italic">&ldquo;{quote}&rdquo;</p>
                 </blockquote>
               ))}
             </div>

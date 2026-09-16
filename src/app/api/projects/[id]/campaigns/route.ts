@@ -4,10 +4,8 @@ import { logAudit } from '@/lib/audit'
 import { NextResponse } from 'next/server'
 
 // GET all campaigns for a project (drafts + send history)
-export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const denied = await authorizeProject(params.id, 'CLIENT')
   if (denied) return denied
 
@@ -19,10 +17,8 @@ export async function GET(
 }
 
 // POST - create a draft campaign
-export async function POST(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const denied = await authorizeProject(params.id, 'ADMIN')
   if (denied) return denied
 

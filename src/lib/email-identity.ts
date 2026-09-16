@@ -28,7 +28,7 @@ export function deriveEmailLocalPart(name: string): string | null {
 
 /**
  * Domain of the platform's from address, e.g. "placemakerai.io" from
- * "Placemaker.ai <hello@placemakerai.io>". Returns null when EMAIL_FROM is
+ * "Placemaker <hello@placemakerai.io>". Returns null when EMAIL_FROM is
  * unset or on Resend's shared onboarding domain, where only the exact
  * onboarding address may send — project identities need a real domain.
  */

@@ -23,11 +23,9 @@ export async function OPTIONS() {
  * POST /api/embed/{projectId}/subscribe
  * Body: { email, name?, gdprConsent: true }
  */
-export async function POST(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
-  const limited = rateLimitResponse(request, 'embed-subscribe', 5, 60_000)
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const limited = await rateLimitResponse(request, 'embed-subscribe', 5, 60_000)
   if (limited) return limited
 
   const project = await prisma.project.findUnique({

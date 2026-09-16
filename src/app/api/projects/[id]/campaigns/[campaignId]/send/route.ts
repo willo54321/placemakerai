@@ -13,8 +13,9 @@ import { NextResponse } from 'next/server'
  */
 export async function POST(
   request: Request,
-  { params }: { params: { id: string; campaignId: string } }
+  props: { params: Promise<{ id: string; campaignId: string }> }
 ) {
+  const params = await props.params;
   const denied = await authorizeProject(params.id, 'ADMIN')
   if (denied) return denied
 

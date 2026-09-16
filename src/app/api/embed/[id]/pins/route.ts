@@ -5,11 +5,9 @@ import { rateLimitResponse } from '@/lib/rate-limit'
 const FEEDBACK_CATEGORIES = ['positive', 'negative', 'question', 'comment']
 
 // Public API - submit feedback (pin, line, or polygon)
-export async function POST(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
-  const limited = rateLimitResponse(request, 'embed-pins', 15, 60_000)
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const limited = await rateLimitResponse(request, 'embed-pins', 15, 60_000)
   if (limited) return limited
 
   // First check if project exists and has embedding enabled
@@ -133,7 +131,6 @@ export async function POST(
     geometry: pin.geometry,
     category: pin.category,
     comment: pin.comment,
-    name: pin.name,
     votes: pin.votes,
     createdAt: pin.createdAt
   })

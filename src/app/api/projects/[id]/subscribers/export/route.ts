@@ -8,10 +8,8 @@ import { logAudit } from '@/lib/audit'
  * for GDPR access requests. One row per subscriber including consent dates
  * and unsubscribe state, so the export is also the consent record.
  */
-export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const denied = await authorizeProject(params.id, 'ADMIN')
   if (denied) return denied
 
@@ -36,7 +34,7 @@ export async function GET(
 
   const escape = (value: unknown) => {
     const text = value == null ? '' : String(value)
-    return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
+    return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
   }
 
   const rows: string[] = [

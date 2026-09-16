@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type JSX } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ArrowRight, Check } from 'lucide-react';
 import MapPinDemo from './MapPinDemo';
@@ -55,12 +55,12 @@ const services = [
     number: '01',
     title: 'Interactive Maps',
     subtitle: 'Location linked feedback with visual context',
-    description: 'placemaker.ai enables communities to provide feedback directly linked to specific locations, creating a visual way to understand how concerns, ideas, and support relate to physical places within your project.',
+    description: 'placemakerai.io enables communities to provide feedback directly linked to specific locations, creating a visual way to understand how concerns, ideas, and support relate to physical places within your project.',
     secondaryDescription: '',
     modal: {
       headline: 'Feedback, pinned to the places it’s about',
       intro:
-        'The map is where residents already think about your project — in streets, junctions, footpaths and boundaries. placemaker.ai turns that spatial instinct into structured, analysable feedback.',
+        'The map is where residents already think about your project — in streets, junctions, footpaths and boundaries. placemakerai.io turns that spatial instinct into structured, analysable feedback.',
       bullets: [
         'Collect pins, drawn routes and outlined areas — each categorised, with distances and areas calculated automatically',
         'Moderate every submission before it goes public, then let residents upvote what they agree with',
@@ -79,12 +79,12 @@ const services = [
     number: '02',
     title: 'Custom Feedback Forms',
     subtitle: 'Build bespoke forms without writing code',
-    description: 'placemaker.ai lets you build bespoke consultation forms without writing code. Create unlimited forms, connect external websites via API, and collect responses with GDPR consent tracked automatically on every submission.',
+    description: 'placemakerai.io lets you build bespoke consultation forms without writing code. Create unlimited forms, connect external websites via API, and collect responses with GDPR consent tracked automatically on every submission.',
     secondaryDescription: '',
     modal: {
       headline: 'Build bespoke forms without writing code',
       intro:
-        'placemaker.ai lets you build bespoke consultation forms without writing code. Create unlimited forms, connect external websites via API, and collect responses with GDPR consent tracked automatically on every submission.',
+        'placemakerai.io lets you build bespoke consultation forms without writing code. Create unlimited forms, connect external websites via API, and collect responses with GDPR consent tracked automatically on every submission.',
       bullets: [
         'Eight field types — text, dropdowns, checkboxes and ratings — with drag-and-drop reordering and instant preview',
         'Connect any website with a single endpoint that auto-detects field names and builds the schema on the fly',
@@ -108,7 +108,7 @@ const services = [
     modal: {
       headline: 'From raw feedback to executive summaries',
       intro:
-        'Automated sentiment analysis, theme extraction, and material vs non-material consideration classification. placemaker.ai generates executive summaries from raw feedback, saving hours of manual review while ensuring nothing is missed.',
+        'Automated sentiment analysis, theme extraction, and material vs non-material consideration classification. placemakerai.io generates executive summaries from raw feedback, saving hours of manual review while ensuring nothing is missed.',
       bullets: [
         'Every response classified for stance — support, objection and mixed positions counted, not estimated',
         'Themes extracted and quantified across map comments, form responses and enquiries in one pass',

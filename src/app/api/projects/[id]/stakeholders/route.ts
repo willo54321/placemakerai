@@ -7,10 +7,8 @@ import { NextResponse } from 'next/server'
 // Returns each stakeholder with an engagement count and the date of the most
 // recent engagement, so the register table can show activity without loading
 // every timeline.
-export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const denied = await authorizeProject(params.id, 'CLIENT')
   if (denied) return denied
 
@@ -44,10 +42,8 @@ export async function GET(
   return NextResponse.json({ stakeholders: rows })
 }
 
-export async function POST(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const denied = await authorizeProject(params.id, 'ADMIN')
   if (denied) return denied
 

@@ -12,7 +12,7 @@ export default function HoldingPage() {
             <div className="w-12 h-12 bg-brand-600 rounded-xl flex items-center justify-center">
               <MapPin className="w-7 h-7 text-white" />
             </div>
-            <span className="text-2xl font-semibold text-white">Placemaker.ai</span>
+            <span className="text-2xl font-semibold text-white">Placemaker</span>
           </div>
 
           <h1 className="text-3xl sm:text-4xl font-semibold text-white mb-4">

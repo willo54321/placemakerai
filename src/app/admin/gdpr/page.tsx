@@ -59,7 +59,7 @@ export default function GdprPage() {
         <div className="card p-8 text-center max-w-md">
           <Shield className="w-12 h-12 text-slate-400 mx-auto mb-4" />
           <h2 className="text-lg font-semibold text-slate-900 mb-2">Access Denied</h2>
-          <p className="text-slate-600 mb-4">You don't have permission to access this page.</p>
+          <p className="text-slate-600 mb-4">You don&apos;t have permission to access this page.</p>
           <Link href="/projects" className="btn-primary">
             <ArrowLeft size={18} />
             Back to Projects

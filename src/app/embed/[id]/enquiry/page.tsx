@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, use } from 'react';
 import { Send, CheckCircle, AlertCircle } from 'lucide-react'
 
 const CATEGORIES = [
@@ -11,7 +11,8 @@ const CATEGORIES = [
   { value: 'complaint', label: 'Complaint' },
 ]
 
-export default function EnquiryFormPage({ params }: { params: { id: string } }) {
+export default function EnquiryFormPage(props: { params: Promise<{ id: string }> }) {
+  const params = use(props.params);
   const [form, setForm] = useState({
     submitterName: '',
     submitterEmail: '',
@@ -83,7 +84,7 @@ export default function EnquiryFormPage({ params }: { params: { id: string } }) 
             Submit an Enquiry
           </h1>
           <p className="text-slate-600">
-            We'd love to hear from you. Fill out the form below and we'll get back to you.
+            We&apos;d love to hear from you. Fill out the form below and we&apos;ll get back to you.
           </p>
         </div>
 

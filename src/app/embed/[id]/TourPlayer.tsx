@@ -34,7 +34,6 @@ export interface TourData {
 export interface TourResponse {
   id: string
   comment: string
-  name: string | null
   createdAt: string
 }
 
@@ -342,8 +341,6 @@ export function TourPlayer({
                   <div key={r.id} className="bg-gray-50 rounded-xl p-3">
                     <p className="text-sm text-gray-700 whitespace-pre-wrap">{r.comment}</p>
                     <p className="text-xs text-gray-400 mt-1.5">
-                      {r.name || 'Anonymous'}
-                      {' · '}
                       {new Date(r.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </p>
                   </div>

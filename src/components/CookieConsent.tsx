@@ -32,7 +32,7 @@ export default function CookieConsent() {
       <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="text-sm text-slate-600">
           <p>
-            We use essential cookies to make this site work. We'd also like to use analytics cookies to understand how you use our site and improve it.{' '}
+            We use essential cookies to make this site work. We&apos;d also like to use analytics cookies to understand how you use our site and improve it.{' '}
             <Link href="/privacy" className="text-green-600 hover:text-green-700 underline">
               Learn more in our Privacy Policy
             </Link>

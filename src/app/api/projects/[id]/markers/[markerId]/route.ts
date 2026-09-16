@@ -4,8 +4,9 @@ import { NextResponse } from 'next/server'
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string; markerId: string } }
+  props: { params: Promise<{ id: string; markerId: string }> }
 ) {
+  const params = await props.params;
   const denied = await authorizeProject(params.id, 'ADMIN')
   if (denied) return denied
 

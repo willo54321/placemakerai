@@ -183,7 +183,7 @@ export function MaterialClassification({ analysis, analyzedCount }: MaterialClas
                       <ul className="space-y-1">
                         {cat.examples.slice(0, 2).map((example, i) => (
                           <li key={i} className="text-sm text-slate-600 italic">
-                            "{example}"
+                            &ldquo;{example}&rdquo;
                           </li>
                         ))}
                       </ul>
@@ -229,7 +229,7 @@ export function MaterialClassification({ analysis, analyzedCount }: MaterialClas
                       <ul className="space-y-1">
                         {cat.examples.slice(0, 2).map((example, i) => (
                           <li key={i} className="text-sm text-slate-600 italic">
-                            "{example}"
+                            &ldquo;{example}&rdquo;
                           </li>
                         ))}
                       </ul>

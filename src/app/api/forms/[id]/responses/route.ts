@@ -14,11 +14,9 @@ export async function OPTIONS() {
   return NextResponse.json({}, { headers: corsHeaders })
 }
 
-export async function POST(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
-  const limited = rateLimitResponse(request, 'form-responses', 10, 60_000)
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const limited = await rateLimitResponse(request, 'form-responses', 10, 60_000)
   if (limited) return limited
 
   let body: any

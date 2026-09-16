@@ -32,7 +32,6 @@ interface PublicPin {
   geometry?: GeoJSONGeometry | null
   category: string
   comment: string
-  name: string | null
   votes: number
   createdAt: string
 }
@@ -885,11 +884,11 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
                   </div>
                 )}
 
-                <p className="text-xs text-gray-400 mb-3">
-                  — {pin.name || 'Anonymous'}
-                  {pin.createdAt &&
-                    ` · ${new Date(pin.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`}
-                </p>
+                {pin.createdAt && (
+                  <p className="text-xs text-gray-400 mb-3">
+                    {new Date(pin.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </p>
+                )}
 
                 {votedPins.has(pin.id) ? (
                   <div className="w-full flex items-center justify-center py-2 mb-3 border border-green-200 bg-green-50 rounded-lg">

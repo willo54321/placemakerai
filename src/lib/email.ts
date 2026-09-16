@@ -27,7 +27,7 @@ export interface ProjectSender {
  * one, or when EMAIL_FROM has no usable domain — uses the platform address.
  */
 function getFromAddress(project?: ProjectSender | null): string {
-  const platformFrom = process.env.EMAIL_FROM || 'Placemaker.ai <onboarding@resend.dev>'
+  const platformFrom = process.env.EMAIL_FROM || 'Placemaker <onboarding@resend.dev>'
   if (!project?.emailLocalPart) return platformFrom
   const domain = getSenderDomain()
   if (!domain) return platformFrom
@@ -60,11 +60,11 @@ export async function sendSetPasswordEmail({
 
   const isInvite = mode === 'invite'
   const subject = isInvite
-    ? 'You have been invited to Placemaker.ai'
-    : 'Reset your Placemaker.ai password'
+    ? 'You have been invited to Placemaker'
+    : 'Reset your Placemaker password'
   const intro = isInvite
-    ? 'An account has been created for you on Placemaker.ai. Click the button below to choose a password and sign in.'
-    : 'We received a request to reset your Placemaker.ai password. Click the button below to choose a new one.'
+    ? 'An account has been created for you on Placemaker. Click the button below to choose a password and sign in.'
+    : 'We received a request to reset your Placemaker password. Click the button below to choose a new one.'
   const expiryNote = isInvite
     ? 'This link expires in 7 days.'
     : 'This link expires in 2 hours. If you did not request a reset, you can safely ignore this email.'
@@ -76,7 +76,7 @@ export async function sendSetPasswordEmail({
       subject,
       html: `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <h2 style="color: #1e293b; margin-bottom: 20px;">${isInvite ? 'Welcome to Placemaker.ai' : 'Password Reset'}</h2>
+          <h2 style="color: #1e293b; margin-bottom: 20px;">${isInvite ? 'Welcome to Placemaker' : 'Password Reset'}</h2>
 
           <p style="color: #475569;">Hi ${escapeHtml(name || 'there')},</p>
 

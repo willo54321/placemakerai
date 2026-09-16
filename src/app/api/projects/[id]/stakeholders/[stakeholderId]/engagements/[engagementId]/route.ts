@@ -24,8 +24,9 @@ const ENGAGEMENT_UPDATABLE_FIELDS = [
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string; stakeholderId: string; engagementId: string } }
+  props: { params: Promise<{ id: string; stakeholderId: string; engagementId: string }> }
 ) {
+  const params = await props.params;
   const denied = await authorizeProject(params.id, 'ADMIN')
   if (denied) return denied
 
@@ -50,8 +51,9 @@ export async function PATCH(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string; stakeholderId: string; engagementId: string } }
+  props: { params: Promise<{ id: string; stakeholderId: string; engagementId: string }> }
 ) {
+  const params = await props.params;
   const denied = await authorizeProject(params.id, 'ADMIN')
   if (denied) return denied
 

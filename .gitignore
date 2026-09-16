@@ -10,3 +10,9 @@ node_modules/
 
 # Prisma build artifact
 tsconfig.tsbuildinfo
+
+# Local embedded dev database cluster
+.devdb/
+
+# Local pg_dump snapshots (db:backup:prod)
+backups/

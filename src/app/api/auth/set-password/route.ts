@@ -8,7 +8,7 @@ const MIN_PASSWORD_LENGTH = 8
 // Public endpoint: consume a set-password token (from an invite or a
 // forgot-password email) and set the user's password.
 export async function POST(request: Request) {
-  const limited = rateLimitResponse(request, 'set-password', 10, 15 * 60_000)
+  const limited = await rateLimitResponse(request, 'set-password', 10, 15 * 60_000)
   if (limited) return limited
 
   let token: unknown

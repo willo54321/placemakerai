@@ -10,7 +10,7 @@ import { rateLimitResponse } from '@/lib/rate-limit'
  * the List-Unsubscribe URL (?token=... query param). Accept both shapes.
  */
 export async function POST(request: Request) {
-  const limited = rateLimitResponse(request, 'unsubscribe', 10, 60_000)
+  const limited = await rateLimitResponse(request, 'unsubscribe', 10, 60_000)
   if (limited) return limited
 
   let token = new URL(request.url).searchParams.get('token')

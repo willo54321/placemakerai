@@ -5,10 +5,8 @@ import { canAccessProject } from '@/lib/permissions'
 import { logAudit } from '@/lib/audit'
 import { getSenderDomain, isValidEmailLocalPart } from '@/lib/email-identity'
 
-export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const session = await getAuth()
     if (!session?.user?.id) {
@@ -76,10 +74,8 @@ export async function GET(
   }
 }
 
-export async function PATCH(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const session = await getAuth()
     if (!session?.user?.id) {
@@ -158,10 +154,8 @@ export async function PATCH(
   }
 }
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const session = await getAuth()
     if (!session?.user?.id) {

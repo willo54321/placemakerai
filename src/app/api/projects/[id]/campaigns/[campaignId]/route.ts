@@ -7,8 +7,9 @@ import { NextResponse } from 'next/server'
 // drafts (and failed sends being retried) can change.
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string; campaignId: string } }
+  props: { params: Promise<{ id: string; campaignId: string }> }
 ) {
+  const params = await props.params;
   const denied = await authorizeProject(params.id, 'ADMIN')
   if (denied) return denied
 
@@ -38,8 +39,9 @@ export async function PATCH(
 // went out.
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string; campaignId: string } }
+  props: { params: Promise<{ id: string; campaignId: string }> }
 ) {
+  const params = await props.params;
   const denied = await authorizeProject(params.id, 'ADMIN')
   if (denied) return denied
 

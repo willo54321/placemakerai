@@ -21,7 +21,7 @@ export default function PrivacyPolicy() {
           <section className="mb-8">
             <h2 className="text-xl font-semibold text-slate-900 mb-4">1. Introduction</h2>
             <p className="text-slate-600 mb-4">
-              Placemaker.ai is a platform for public consultation on planning and development projects. Each consultation on this platform is run by an organisation — such as a council, developer, or their consultants — who decides what feedback to collect and how it is used. Placemaker.ai provides the software they use to collect and analyse it.
+              Placemaker is a platform for public consultation on planning and development projects. Each consultation on this platform is run by an organisation — such as a council, developer, or their consultants — who decides what feedback to collect and how it is used. Placemaker provides the software they use to collect and analyse it.
             </p>
             <p className="text-slate-600 mb-4">
               This Privacy Policy explains what personal data the platform collects, how it is used, and your rights. We handle personal data in accordance with the UK General Data Protection Regulation (UK GDPR) and the Data Protection Act 2018.
@@ -99,7 +99,7 @@ export default function PrivacyPolicy() {
               We never sell personal data. We use a small number of service providers to operate the platform: our database is hosted with Supabase in the European Union (Frankfurt, Germany), the application is hosted by Vercel, and AI analysis is provided by Anthropic in the United States. Where data is processed outside the UK, transfers are protected by appropriate safeguards, including standard contractual clauses.
             </p>
             <p className="text-slate-600 mb-4">
-              The interactive maps are provided by Google Maps. When you view a consultation map, your browser connects directly to Google, which processes your IP address in order to deliver the map. See Google's own privacy policy for how it handles this data.
+              The interactive maps are provided by Google Maps. When you view a consultation map, your browser connects directly to Google, which processes your IP address in order to deliver the map. See Google&apos;s own privacy policy for how it handles this data.
             </p>
           </section>
 
@@ -154,7 +154,7 @@ export default function PrivacyPolicy() {
           <section className="mb-8">
             <h2 className="text-xl font-semibold text-slate-900 mb-4">12. Complaints</h2>
             <p className="text-slate-600 mb-4">
-              If you are unhappy with how we have handled your personal data, you have the right to lodge a complaint with the Information Commissioner's Office (ICO):
+              If you are unhappy with how we have handled your personal data, you have the right to lodge a complaint with the Information Commissioner&apos;s Office (ICO):
             </p>
             <p className="text-slate-600">
               Website: <a href="https://ico.org.uk" target="_blank" rel="noopener noreferrer" className="text-green-600 hover:text-green-700">ico.org.uk</a><br />

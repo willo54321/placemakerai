@@ -5,7 +5,6 @@ import { forwardRef } from 'react';
 import type { InteractiveMapRef } from './InteractiveMap';
 
 // Simple dynamic import with no SSR - matches how EmbedMap works
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const DynamicMap = dynamic<any>(
   () => import('./InteractiveMap'),
   {
@@ -25,7 +24,6 @@ const DynamicMap = dynamic<any>(
 // (fitToOverlay) is a no-op. For consumers that need the imperative API, pass
 // `apiRef` (a normal prop InteractiveMap populates) instead of `ref`. The
 // `ref` passthrough is retained only for backward-compat / non-imperative use.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const InteractiveMap = forwardRef<InteractiveMapRef, any>((props, ref) => (
   <DynamicMap {...props} ref={ref} />
 ));

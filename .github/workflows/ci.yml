@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main, staging]
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    env:
+      # Build-time placeholders only — the build never connects to a database
+      # (all data fetching is client-side or in dynamic route handlers).
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+      NEXTAUTH_SECRET: ci-only-not-a-real-secret
+      NEXTAUTH_URL: http://localhost:3002
+      NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ci-dummy
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run lint
+
+      - run: npm test
+
+      - run: npm run build
+
+      # Blocking: fails the pipeline on high/critical advisories in production
+      # dependencies. Fixes must land as commits through the normal PR → CI →
+      # staging → main flow, never as ad-hoc `npm audit fix` pushes to prod.
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high

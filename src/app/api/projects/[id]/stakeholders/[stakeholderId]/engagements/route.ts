@@ -14,8 +14,9 @@ async function stakeholderBelongsToProject(stakeholderId: string, projectId: str
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string; stakeholderId: string } }
+  props: { params: Promise<{ id: string; stakeholderId: string }> }
 ) {
+  const params = await props.params;
   const denied = await authorizeProject(params.id, 'CLIENT')
   if (denied) return denied
 
@@ -32,8 +33,9 @@ export async function GET(
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string; stakeholderId: string } }
+  props: { params: Promise<{ id: string; stakeholderId: string }> }
 ) {
+  const params = await props.params;
   const denied = await authorizeProject(params.id, 'ADMIN')
   if (denied) return denied
 

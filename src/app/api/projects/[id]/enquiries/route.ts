@@ -7,10 +7,8 @@ import { authorizeProject } from '@/lib/api-auth'
 // Returns a lightweight row per enquiry plus a message count and the time of
 // the most recent reply, so the inbox can show unread/activity without loading
 // every thread.
-export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const denied = await authorizeProject(params.id, 'CLIENT')
   if (denied) return denied
 

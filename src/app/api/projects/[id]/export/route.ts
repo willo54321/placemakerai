@@ -8,10 +8,8 @@ import { logAudit } from '@/lib/audit'
  * requests. ?format=json (default) returns everything; ?format=csv returns
  * the feedback corpus flattened to one row per submission.
  */
-export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const denied = await authorizeProject(params.id, 'ADMIN')
   if (denied) return denied
 
@@ -46,7 +44,7 @@ export async function GET(
   if (format === 'csv') {
     const escape = (value: unknown) => {
       const text = value == null ? '' : String(value)
-      return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
+      return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
     }
     const rows: string[] = [
       'id,channel,submitted_at,name,email,category,latitude,longitude,approved,content',

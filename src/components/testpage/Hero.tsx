@@ -52,7 +52,7 @@ export default function Hero() {
           transition={{ duration: 0.8, delay: 0.2 }}
           className="text-xl text-[#595959] max-w-2xl mb-8 leading-relaxed"
         >
-          <span className="font-semibold text-[#0B2818]">placemaker.ai</span> adds interactive maps, feedback forms and AI analysis to the consultation website you already have — no restrictive CMS to migrate to, no templates to squeeze your brand into.
+          <span className="font-semibold text-[#0B2818]">placemakerai.io</span> adds interactive maps, feedback forms and AI analysis to the consultation website you already have — no restrictive CMS to migrate to, no templates to squeeze your brand into.
         </motion.p>
 
         {/* CTA Buttons */}

@@ -62,10 +62,8 @@ function buildSentimentOverTime(
 
 // GET - Retrieve the cached analysis, advancing an in-flight run if its batch
 // has finished. The frontend polls this while `processing` is true.
-export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const denied = await authorizeProject(params.id, 'CLIENT')
   if (denied) return denied
 
@@ -209,10 +207,8 @@ export async function GET(
 }
 
 // POST - Start a new analysis run (returns immediately; poll GET for results)
-export async function POST(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const denied = await authorizeProject(params.id, 'ADMIN')
   if (denied) return denied
 

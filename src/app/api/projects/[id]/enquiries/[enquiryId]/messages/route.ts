@@ -12,8 +12,9 @@ import { logAudit } from '@/lib/audit'
 // delivery outcome. Requires ADMIN.
 export async function POST(
   request: Request,
-  { params }: { params: { id: string; enquiryId: string } }
+  props: { params: Promise<{ id: string; enquiryId: string }> }
 ) {
+  const params = await props.params;
   const denied = await authorizeProject(params.id, 'ADMIN')
   if (denied) return denied
   const user = await requireAuth()

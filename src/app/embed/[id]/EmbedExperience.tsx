@@ -46,7 +46,6 @@ interface PublicPin {
   geometry: GeoJSONGeometry | null
   category: string
   comment: string
-  name: string | null
   votes: number
   createdAt: string
   tourStopId: string | null
@@ -360,7 +359,7 @@ export function EmbedExperience({
     for (const pin of project?.pins || []) {
       if (!pin.tourStopId) continue
       const list = byStop.get(pin.tourStopId) || []
-      list.push({ id: pin.id, comment: pin.comment, name: pin.name, createdAt: pin.createdAt })
+      list.push({ id: pin.id, comment: pin.comment, createdAt: pin.createdAt })
       byStop.set(pin.tourStopId, list)
     }
     return byStop

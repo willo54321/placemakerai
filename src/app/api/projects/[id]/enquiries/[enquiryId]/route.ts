@@ -33,8 +33,9 @@ async function loadEnquiry(projectId: string, enquiryId: string) {
 // (CLIENT) is enough.
 export async function GET(
   request: Request,
-  { params }: { params: { id: string; enquiryId: string } }
+  props: { params: Promise<{ id: string; enquiryId: string }> }
 ) {
+  const params = await props.params;
   const denied = await authorizeProject(params.id, 'CLIENT')
   if (denied) return denied
 
@@ -93,8 +94,9 @@ export async function GET(
 // route deliberately does not create messages.
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string; enquiryId: string } }
+  props: { params: Promise<{ id: string; enquiryId: string }> }
 ) {
+  const params = await props.params;
   const denied = await authorizeProject(params.id, 'ADMIN')
   if (denied) return denied
 

@@ -2,10 +2,11 @@
 
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { CheckCircle, AlertCircle } from 'lucide-react'
-import { useState } from 'react'
+import { useState, use } from 'react';
 import { fetchJson } from '@/lib/fetch-json'
 
-export default function PublicFormPage({ params }: { params: { id: string } }) {
+export default function PublicFormPage(props: { params: Promise<{ id: string }> }) {
+  const params = use(props.params);
   const [submitted, setSubmitted] = useState(false)
   const [formData, setFormData] = useState<Record<string, any>>({})
   const [gdprConsent, setGdprConsent] = useState(false)

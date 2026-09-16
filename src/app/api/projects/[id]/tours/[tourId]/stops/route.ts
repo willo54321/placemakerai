@@ -8,8 +8,9 @@ import { Prisma } from '@prisma/client'
 // POST - Add a stop to a tour (appended at the end)
 export const POST = withApiHandler(async (
   request: Request,
-  { params }: { params: { id: string; tourId: string } }
+  { params: paramsPromise }: { params: Promise<{ id: string; tourId: string }> }
 ) => {
+  const params = await paramsPromise
   const denied = await authorizeProject(params.id, 'ADMIN')
   if (denied) return denied
 

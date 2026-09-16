@@ -3,10 +3,8 @@ import { NextResponse } from 'next/server'
 
 // Public API - no auth required
 // Returns project data for embedding (if embedEnabled)
-export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: Request, props0: { params: Promise<{ id: string }> }) {
+  const params = await props0.params;
   const project = await prisma.project.findUnique({
     where: { id: params.id },
     include: {
@@ -70,7 +68,6 @@ export async function GET(
       geometry: p.geometry,
       category: p.category,
       comment: p.comment,
-      name: p.name,
       votes: p.votes,
       createdAt: p.createdAt,
       tourStopId: p.tourStopId

@@ -17,8 +17,9 @@ async function findStop(projectId: string, tourId: string, stopId: string) {
 // PATCH - Update a stop (partial: only provided fields change)
 export const PATCH = withApiHandler(async (
   request: Request,
-  { params }: { params: { id: string; tourId: string; stopId: string } }
+  { params: paramsPromise }: { params: Promise<{ id: string; tourId: string; stopId: string }> }
 ) => {
+  const params = await paramsPromise
   const denied = await authorizeProject(params.id, 'ADMIN')
   if (denied) return denied
 
@@ -44,8 +45,9 @@ export const PATCH = withApiHandler(async (
 // DELETE - Remove a stop and close the numbering gap
 export const DELETE = withApiHandler(async (
   request: Request,
-  { params }: { params: { id: string; tourId: string; stopId: string } }
+  { params: paramsPromise }: { params: Promise<{ id: string; tourId: string; stopId: string }> }
 ) => {
+  const params = await paramsPromise
   const denied = await authorizeProject(params.id, 'ADMIN')
   if (denied) return denied
 

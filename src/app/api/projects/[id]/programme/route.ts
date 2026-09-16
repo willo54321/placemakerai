@@ -49,7 +49,8 @@ const weekKey = (d: Date): string => {
 const findField = (fields: Field[], re: RegExp, id?: string): Field | undefined =>
   fields.find(f => (id && f.id === id)) || fields.find(f => re.test(f.label) || re.test(f.id))
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, props0: { params: Promise<{ id: string }> }) {
+  const params = await props0.params;
   const denied = await authorizeProject(params.id, 'CLIENT')
   if (denied) return denied
   const projectId = params.id

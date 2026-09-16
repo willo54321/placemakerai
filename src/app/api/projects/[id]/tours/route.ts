@@ -6,8 +6,9 @@ import { NextResponse } from 'next/server'
 // GET - List all tours for a project (with ordered stops)
 export const GET = withApiHandler(async (
   request: Request,
-  { params }: { params: { id: string } }
+  { params: paramsPromise }: { params: Promise<{ id: string }> }
 ) => {
+  const params = await paramsPromise
   const denied = await authorizeProject(params.id, 'CLIENT')
   if (denied) return denied
 
@@ -25,8 +26,9 @@ export const GET = withApiHandler(async (
 // POST - Create a new tour (starts as a draft)
 export const POST = withApiHandler(async (
   request: Request,
-  { params }: { params: { id: string } }
+  { params: paramsPromise }: { params: Promise<{ id: string }> }
 ) => {
+  const params = await paramsPromise
   const denied = await authorizeProject(params.id, 'ADMIN')
   if (denied) return denied
 

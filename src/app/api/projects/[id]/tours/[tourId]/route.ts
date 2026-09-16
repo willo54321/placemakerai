@@ -12,8 +12,9 @@ async function findTour(projectId: string, tourId: string) {
 // GET - A single tour with its ordered stops
 export const GET = withApiHandler(async (
   request: Request,
-  { params }: { params: { id: string; tourId: string } }
+  { params: paramsPromise }: { params: Promise<{ id: string; tourId: string }> }
 ) => {
+  const params = await paramsPromise
   const denied = await authorizeProject(params.id, 'CLIENT')
   if (denied) return denied
 
@@ -32,8 +33,9 @@ export const GET = withApiHandler(async (
 // PATCH - Update tour name/description/active
 export const PATCH = withApiHandler(async (
   request: Request,
-  { params }: { params: { id: string; tourId: string } }
+  { params: paramsPromise }: { params: Promise<{ id: string; tourId: string }> }
 ) => {
+  const params = await paramsPromise
   const denied = await authorizeProject(params.id, 'ADMIN')
   if (denied) return denied
 
@@ -72,8 +74,9 @@ export const PATCH = withApiHandler(async (
 // DELETE - Delete a tour (stops cascade; their feedback pins survive via SetNull)
 export const DELETE = withApiHandler(async (
   request: Request,
-  { params }: { params: { id: string; tourId: string } }
+  { params: paramsPromise }: { params: Promise<{ id: string; tourId: string }> }
 ) => {
+  const params = await paramsPromise
   const denied = await authorizeProject(params.id, 'ADMIN')
   if (denied) return denied
 

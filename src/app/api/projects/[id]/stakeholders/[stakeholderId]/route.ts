@@ -8,8 +8,9 @@ import { NextResponse } from 'next/server'
 // enquiry desk). Read access (CLIENT) is enough.
 export async function GET(
   request: Request,
-  { params }: { params: { id: string; stakeholderId: string } }
+  props: { params: Promise<{ id: string; stakeholderId: string }> }
 ) {
+  const params = await props.params;
   const denied = await authorizeProject(params.id, 'CLIENT')
   if (denied) return denied
 
@@ -44,8 +45,9 @@ const STAKEHOLDER_UPDATABLE_FIELDS = [
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string; stakeholderId: string } }
+  props: { params: Promise<{ id: string; stakeholderId: string }> }
 ) {
+  const params = await props.params;
   const denied = await authorizeProject(params.id, 'ADMIN')
   if (denied) return denied
 
@@ -85,8 +87,9 @@ export async function PATCH(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string; stakeholderId: string } }
+  props: { params: Promise<{ id: string; stakeholderId: string }> }
 ) {
+  const params = await props.params;
   const denied = await authorizeProject(params.id, 'ADMIN')
   if (denied) return denied
 

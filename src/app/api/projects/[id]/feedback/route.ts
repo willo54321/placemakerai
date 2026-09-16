@@ -41,13 +41,11 @@ export async function OPTIONS() {
  *   "gdprConsent": true
  * }
  */
-export async function POST(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const projectId = params.id
 
-  const limited = rateLimitResponse(request, 'ext-feedback', 10, 60_000)
+  const limited = await rateLimitResponse(request, 'ext-feedback', 10, 60_000)
   if (limited) return limited
 
   let body: any

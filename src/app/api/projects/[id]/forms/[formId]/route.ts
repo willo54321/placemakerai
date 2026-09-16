@@ -5,8 +5,9 @@ import { NextResponse } from 'next/server'
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string; formId: string } }
+  props: { params: Promise<{ id: string; formId: string }> }
 ) {
+  const params = await props.params;
   const denied = await authorizeProject(params.id, 'CLIENT')
   if (denied) return denied
 
@@ -24,8 +25,9 @@ export async function GET(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string; formId: string } }
+  props: { params: Promise<{ id: string; formId: string }> }
 ) {
+  const params = await props.params;
   const denied = await authorizeProject(params.id, 'ADMIN')
   if (denied) return denied
 

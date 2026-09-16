@@ -12,7 +12,7 @@ const dmSans = DM_Sans({
 })
 
 export const metadata: Metadata = {
-  title: 'Placemaker.ai',
+  title: 'Placemaker',
   description: 'Interactive maps, feedback forms, and AI-powered analysis for public consultation on planning projects',
 }
 

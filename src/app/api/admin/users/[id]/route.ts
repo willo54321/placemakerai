@@ -5,10 +5,8 @@ import { getAuth } from '@/lib/auth'
 import bcrypt from 'bcryptjs'
 
 // Get a single user
-export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const session = await getAuth()
     if (!session?.user?.id) {
@@ -55,10 +53,8 @@ export async function GET(
 }
 
 // Update a user
-export async function PATCH(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const session = await getAuth()
     if (!session?.user?.id) {
@@ -164,10 +160,8 @@ export async function PATCH(
 }
 
 // Delete a user
-export async function DELETE(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const session = await getAuth()
     if (!session?.user?.id) {

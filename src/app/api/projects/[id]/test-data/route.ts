@@ -43,12 +43,10 @@ const testFeedback = [
   { category: 'comment', comment: "Will there be a residents' meeting to discuss the S106 contributions? I'd like to understand what community benefits are being proposed." },
 ]
 
-export async function POST(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   if (process.env.NODE_ENV === 'production') return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  const denied = await authorizeSuperAdmin(); if (denied) return denied
+  const denied = await authorizeSuperAdmin();if (denied) return denied
 
   const projectId = params.id
 
@@ -99,12 +97,10 @@ export async function POST(
 }
 
 // DELETE to remove test data
-export async function DELETE(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   if (process.env.NODE_ENV === 'production') return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  const denied = await authorizeSuperAdmin(); if (denied) return denied
+  const denied = await authorizeSuperAdmin();if (denied) return denied
 
   const projectId = params.id
 

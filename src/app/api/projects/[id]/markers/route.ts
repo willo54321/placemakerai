@@ -2,10 +2,8 @@ import { prisma } from '@/lib/db'
 import { authorizeProject } from '@/lib/api-auth'
 import { NextResponse } from 'next/server'
 
-export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const denied = await authorizeProject(params.id, 'CLIENT')
   if (denied) return denied
 
@@ -16,10 +14,8 @@ export async function GET(
   return NextResponse.json(markers)
 }
 
-export async function POST(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const denied = await authorizeProject(params.id, 'ADMIN')
   if (denied) return denied
 

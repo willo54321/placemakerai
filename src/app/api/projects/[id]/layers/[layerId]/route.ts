@@ -5,8 +5,9 @@ import { NextResponse } from 'next/server'
 // PATCH update a geo layer
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string; layerId: string } }
+  props: { params: Promise<{ id: string; layerId: string }> }
 ) {
+  const params = await props.params;
   const denied = await authorizeProject(params.id, 'ADMIN')
   if (denied) return denied
 
@@ -45,8 +46,9 @@ export async function PATCH(
 // DELETE a geo layer
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string; layerId: string } }
+  props: { params: Promise<{ id: string; layerId: string }> }
 ) {
+  const params = await props.params;
   const denied = await authorizeProject(params.id, 'ADMIN')
   if (denied) return denied
 

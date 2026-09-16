@@ -8,10 +8,8 @@ export const maxDuration = 60
 
 // POST - Seed the stakeholder register with the project's MP and councillors,
 // resolved from the project's coordinates. Idempotent; requires ADMIN.
-export async function POST(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const denied = await authorizeProject(params.id, 'ADMIN')
   if (denied) return denied
 

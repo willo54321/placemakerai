@@ -10,11 +10,12 @@ export const runtime = 'nodejs'
 // Public API - upvote a pin (deduplicated per voter)
 export async function POST(
   request: Request,
-  { params }: { params: { id: string; pinId: string } }
+  props: { params: Promise<{ id: string; pinId: string }> }
 ) {
+  const params = await props.params;
   // A real person votes a handful of times per session; 10/min blunts
   // scripted vote-stuffing without touching legitimate use.
-  const limited = rateLimitResponse(request, 'embed-vote', 10, 60_000)
+  const limited = await rateLimitResponse(request, 'embed-vote', 10, 60_000)
   if (limited) return limited
 
   // Check if project exists and has embedding enabled

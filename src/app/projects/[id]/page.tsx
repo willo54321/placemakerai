@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useSession } from 'next-auth/react'
 import { ArrowLeft, Users, MapPin, Settings, LayoutDashboard, BarChart3, Globe, Eye, FileText, HelpCircle, Inbox, Mail, Route } from 'lucide-react'
 import Link from 'next/link'
-import { useState, Suspense } from 'react'
+import { useState, Suspense, use } from 'react';
 import dynamic from 'next/dynamic'
 import { OverviewTab } from './overview'
 import { SettingsTab } from './settings'
@@ -137,7 +137,8 @@ const tabGroups: TabGroup[] = [
   { id: 'help', label: 'Help', tabs: ['howto'] },
 ]
 
-export default function ProjectPage({ params }: { params: { id: string } }) {
+export default function ProjectPage(props: { params: Promise<{ id: string }> }) {
+  const params = use(props.params);
   const { data: session } = useSession()
   const [activeTab, setActiveTab] = useState<Tab>('overview')
   const [focusItem, setFocusItem] = useState<FocusItem | null>(null)

@@ -11,7 +11,7 @@ const MAX_SHORT = 200
 const MAX_MESSAGE = 5000
 
 export async function POST(request: Request) {
-  const limited = rateLimitResponse(request, 'contact', 5, 60_000)
+  const limited = await rateLimitResponse(request, 'contact', 5, 60_000)
   if (limited) return limited
 
   let body: {

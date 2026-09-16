@@ -7,10 +7,8 @@ import { collectFeedback, getBoundaryGeojson } from '@/lib/collect-feedback'
 // GET - Everything the analysis workspace needs in one payload: the completed
 // analysis plus the response texts it classified, so every count on screen can
 // be traced to the responses behind it.
-export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const denied = await authorizeProject(params.id, 'CLIENT')
   if (denied) return denied
 

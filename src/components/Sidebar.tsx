@@ -42,7 +42,7 @@ export function Sidebar() {
         <div className="w-9 h-9 bg-brand-600 rounded-xl flex items-center justify-center">
           <MapPin className="w-5 h-5 text-white" />
         </div>
-        <span className="text-lg font-semibold text-slate-900">Placemaker.ai</span>
+        <span className="text-lg font-semibold text-slate-900">Placemaker</span>
       </div>
 
       {/* Navigation */}

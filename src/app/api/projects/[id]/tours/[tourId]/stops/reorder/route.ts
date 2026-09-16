@@ -6,8 +6,9 @@ import { NextResponse } from 'next/server'
 // POST - Reorder stops. Body: { stops: [stopId, ...] } in the new order.
 export const POST = withApiHandler(async (
   request: Request,
-  { params }: { params: { id: string; tourId: string } }
+  { params: paramsPromise }: { params: Promise<{ id: string; tourId: string }> }
 ) => {
+  const params = await paramsPromise
   const denied = await authorizeProject(params.id, 'ADMIN')
   if (denied) return denied
 

@@ -26,10 +26,59 @@
  */
 import 'dotenv/config'
 import { PrismaClient } from '@prisma/client'
+import {
+  crossReference,
+  CrossRefItem,
+  CrossRefAssignment,
+} from '../src/lib/cross-reference'
 
 const prisma = new PrismaClient()
 
 const PROJECT_ID = 'untypical-demo'
+
+// ---------------------------------------------------------------------------
+// Pre-computed AI analysis (same approach as seed-silvertown): the corpus is
+// hand-classified below and the numbers are computed with the product's own
+// maths, so the AI Analytics tab is populated instantly with no paid run.
+// ---------------------------------------------------------------------------
+type Sent = 'positive' | 'negative' | 'neutral'
+type Area = 'entrance' | 'orchard' | 'school'
+
+const TAXONOMY = [
+  { name: 'Working hours & construction noise', description: 'Piling and site activity outside permitted hours, vibration, plant noise.', keywords: ['piling', 'permitted hours', '8am', 'vibration', 'generator'] },
+  { name: 'HGV movements & school-run safety', description: 'Lorry routing, queuing and timing conflicts with the school run and residential streets.', keywords: ['HGV', 'lorries', 'banksman', 'school', 'routing'] },
+  { name: 'Mud, dust & road cleanliness', description: 'Mud on the highway, dust from stockpiles and crushing, road sweeping.', keywords: ['mud', 'dust', 'sweeper', 'wheel wash', 'stockpiles'] },
+  { name: 'Property damage & condition', description: 'Cracks, boundary damage and condition-survey requests attributed to the works.', keywords: ['crack', 'ceiling', 'fence', 'survey', 'vibro'] },
+  { name: 'Site conduct & management', description: 'Contractor parking, radios, lighting, welfare units, signage — how the site is run.', keywords: ['parking', 'radio', 'lighting', 'welfare', 'signage'] },
+  { name: 'Scheme design & infrastructure', description: 'Density, drainage, landscape, school places and the spine road — the scheme itself.', keywords: ['density', 'drainage', 'hedgerow', 'school places', 'spine road'] },
+  { name: 'Support & scheme positives', description: 'What residents value: the play park, affordable-first phasing, retained trees.', keywords: ['play park', 'affordable', 'oaks', 'phasing'] },
+]
+
+// Damage claims and site conduct are civil/management matters, not material
+// planning considerations; everything else here is material.
+const themeIsMaterial = (t: number) => t !== 3 && t !== 4
+const materialFor = (themes: number[]): 'material' | 'non-material' | 'mixed' => {
+  if (themes.length === 0) return 'non-material'
+  const mat = themes.some(themeIsMaterial)
+  const non = themes.some(t => !themeIsMaterial(t))
+  return mat && non ? 'mixed' : mat ? 'material' : 'non-material'
+}
+
+// Replicates createFeedbackHash from src/lib/ai.ts exactly, so the stored
+// analysis matches the live corpus and is not flagged stale.
+function createFeedbackHash(items: { id: string; content: string }[]): string {
+  const content = items.map(item => `${item.id}:${item.content}`).sort().join('|')
+  let hash = 0
+  for (let i = 0; i < content.length; i++) {
+    const char = content.charCodeAt(i)
+    hash = ((hash << 5) - hash) + char
+    hash = hash & hash
+  }
+  return hash.toString(36)
+}
+
+const QUOTE_CHARS = 160
+const quote = (s: string) => (s.length > QUOTE_CHARS ? s.slice(0, QUOTE_CHARS) + '…' : s)
 
 // --- geography (fictional, near Wellingborough) ---------------------------
 const CENTRE = { lat: 52.303, lng: -0.665 }
@@ -109,6 +158,7 @@ async function main() {
   await prisma.stakeholder.deleteMany({ where: { projectId: PROJECT_ID } })
   await prisma.subscriber.deleteMany({ where: { projectId: PROJECT_ID } })
   await prisma.campaign.deleteMany({ where: { projectId: PROJECT_ID } })
+  await prisma.analysisResult.deleteMany({ where: { projectId: PROJECT_ID } })
 
   // --- map layers ---------------------------------------------------------
   await prisma.geoLayer.create({
@@ -334,8 +384,49 @@ async function main() {
     },
   ]
 
+  // Hand classification, aligned to ISSUES order (sentiment defaults to
+  // negative — these are complaints). `area` feeds the spatial insights.
+  const ISSUE_ANALYSIS: Array<{ s?: Sent; t: number[]; area: Area | null }> = [
+    { t: [2], area: 'entrance' },        // Karen Bloor — mud on Milton Road
+    { t: [1], area: 'entrance' },        // Dev Patel — HGV queuing
+    { t: [1], area: 'entrance' },        // Lynne Craddock — lorry on verge
+    { t: [4], area: 'entrance' },        // Marcus Webb — contractor parking
+    { t: [2], area: 'entrance' },        // Sofia Andersson — dust (polygon)
+    { t: [2], area: 'entrance' },        // Tim Osei — crusher dust
+    { t: [1], area: 'entrance' },        // Gary Truelove — tipper near-miss (pending)
+    { t: [4], area: 'entrance' },        // Janet Mercer — welfare units
+    { t: [0], area: 'orchard' },         // Sarah Whitfield — 6:45 piling
+    { t: [0], area: 'orchard' },         // Bill Hartley — early piling
+    { t: [0], area: 'orchard' },         // Meera Shah — Sunday deliveries
+    { t: [0], area: 'orchard' },         // Colin Drury — evening deliveries
+    { t: [0], area: 'orchard' },         // Angela Boyce — bleepers
+    { t: [0], area: 'orchard' },         // Stefan Kowalski — generator (pending)
+    { t: [3], area: 'orchard' },         // Rob Jennings — ceiling cracks
+    { t: [3], area: 'orchard' },         // Pat Nolan — fence panel
+    { t: [2], area: 'orchard' },         // Helen Barrow — dust windows
+    { t: [0], area: 'orchard' },         // Derek Muir — scaffold clatter
+    { t: [0, 4], area: 'orchard' },      // Fiona Gallagher — radio before 7am
+    { t: [3], area: 'orchard' },         // Tony Whelan — drive cracks (pending)
+    { t: [1], area: 'school' },          // Nadia Hussain — HGVs at drop-off
+    { t: [1], area: 'school' },          // James Corrigan — pick-up deliveries
+    { t: [1], area: 'school' },          // Beth Ellery — hoarding sightline
+    { t: [1], area: 'school' },          // Oliver Stanton — one-lane at drop-off
+    { s: 'neutral', t: [0], area: null },// Ruth Calder — Saturday hours query
+    { t: [1], area: null },              // Ian Frobisher — Glebe Lane sat-navs
+    { t: [2], area: null },              // Val Emery — washing ruined
+    { t: [4], area: null },              // Craig Donnelly — lighting glare
+    { s: 'neutral', t: [4], area: null },// Moira Petrie — footpath signage
+  ]
+
+  // Corpus rows mirror what collectFeedback() serves the live pipeline:
+  // approved pins + enquiries (no forms here). Unapproved reports stay out so
+  // the stored feedbackHash matches the live corpus exactly.
+  type CorpusRow = { id: string; content: string; source: 'pin' | 'enquiry'; latitude: number | null; longitude: number | null; createdAt: Date; sentiment: Sent; themes: number[]; area: Area | null }
+  const corpus: CorpusRow[] = []
+
   let issueCount = 0
-  for (const issue of ISSUES) {
+  for (let idx = 0; idx < ISSUES.length; idx++) {
+    const issue = ISSUES[idx]
     const created = await prisma.publicPin.create({
       data: {
         projectId: PROJECT_ID,
@@ -359,6 +450,16 @@ async function main() {
       },
     })
     issueCount++
+    const cls = ISSUE_ANALYSIS[idx]
+    if (issue.approved !== false && cls) {
+      corpus.push({
+        id: created.id, content: issue.comment, source: 'pin',
+        latitude: issue.polygon ? null : issue.at.lat,
+        longitude: issue.polygon ? null : issue.at.lng,
+        createdAt: d(issue.day, issue.hour ?? 12, 5),
+        sentiment: cls.s ?? 'negative', themes: cls.t, area: cls.area,
+      })
+    }
     if (issue.mailing) {
       await prisma.subscriber.create({
         data: {
@@ -386,8 +487,19 @@ async function main() {
     { at: jitter(CENTRE, 57, 0.004), category: 'question', day: 7, votes: 3, name: 'Priti Rao', comment: 'Will there be additional school places to go with Phase 2, or are the new families expected to travel?' },
     { at: jitter(CENTRE, 58, 0.004), category: 'comment', day: 28, votes: 1, comment: 'Please keep the two mature oaks by the northern footpath — they are the best thing on the site.' },
   ]
-  for (const fb of FEEDBACK) {
-    await prisma.publicPin.create({
+  const FEEDBACK_ANALYSIS: Array<{ s: Sent; t: number[] }> = [
+    { s: 'positive', t: [6] },  // play park
+    { s: 'positive', t: [6] },  // affordable first
+    { s: 'negative', t: [5] },  // density
+    { s: 'negative', t: [5] },  // hedgerow
+    { s: 'negative', t: [5] },  // drainage
+    { s: 'neutral', t: [1, 5] },// spine road (would relieve Milton Road)
+    { s: 'neutral', t: [5] },   // school places
+    { s: 'neutral', t: [5] },   // mature oaks
+  ]
+  for (let fbIdx = 0; fbIdx < FEEDBACK.length; fbIdx++) {
+    const fb = FEEDBACK[fbIdx]
+    const created = await prisma.publicPin.create({
       data: {
         projectId: PROJECT_ID,
         mode: 'feedback',
@@ -403,6 +515,13 @@ async function main() {
         gdprConsentDate: d(fb.day, 12, 0),
         createdAt: d(fb.day, 12, 0),
       },
+    })
+    const fbCls = FEEDBACK_ANALYSIS[fbIdx]
+    corpus.push({
+      id: created.id, content: fb.comment, source: 'pin',
+      latitude: fb.at.lat, longitude: fb.at.lng,
+      createdAt: d(fb.day, 12, 0),
+      sentiment: fbCls.s, themes: fbCls.t, area: null,
     })
   }
   console.log(`Feedback pins: ${FEEDBACK.length}`)
@@ -577,8 +696,16 @@ async function main() {
       category: 'general', status: 'open', read: true, day: 1, hour: 13,
     },
   ]
-  for (const q of ENQUIRIES) {
-    await prisma.enquiry.create({
+  const ENQUIRY_ANALYSIS: Array<{ s: Sent; t: number[] }> = [
+    { s: 'negative', t: [0, 1, 2, 3] }, // residents' association dossier
+    { s: 'negative', t: [0, 1, 2] },    // councillor's office
+    { s: 'negative', t: [1] },          // school-run safety
+    { s: 'negative', t: [3] },          // damage claim
+    { s: 'neutral', t: [0, 1] },        // press enquiry
+  ]
+  for (let qIdx = 0; qIdx < ENQUIRIES.length; qIdx++) {
+    const q = ENQUIRIES[qIdx]
+    const created = await prisma.enquiry.create({
       data: {
         projectId: PROJECT_ID,
         submitterName: q.name,
@@ -593,6 +720,12 @@ async function main() {
         gdprConsentDate: d(q.day, q.hour, 0),
         createdAt: d(q.day, q.hour, 0),
       },
+    })
+    const qCls = ENQUIRY_ANALYSIS[qIdx]
+    corpus.push({
+      id: created.id, content: `${q.subject}: ${q.message}`, source: 'enquiry',
+      latitude: null, longitude: null, createdAt: d(q.day, q.hour, 0),
+      sentiment: qCls.s, themes: qCls.t, area: null,
     })
   }
   console.log(`Enquiries: ${ENQUIRIES.length} (inbound only, no seeded replies)`)
@@ -638,9 +771,171 @@ Ashfield Park project team`,
   })
   console.log(`Subscribers: ${subscriberCount}; campaign: 1 draft (nothing seeded as sent)`)
 
+  // ========================================================================
+  // Build the AI analysis from the corpus, using the product's own maths.
+  // ========================================================================
+  const analysis = buildAnalysis(corpus)
+  const feedbackHash = createFeedbackHash(corpus.map(c => ({ id: c.id, content: c.content })))
+  await prisma.analysisResult.upsert({
+    where: { projectId_type: { projectId: PROJECT_ID, type: 'full' } },
+    update: { data: analysis as object, status: 'complete', feedbackHash, batchId: null, error: null },
+    create: { projectId: PROJECT_ID, type: 'full', data: analysis as object, status: 'complete', feedbackHash },
+  })
+  console.log(`Stored AI analysis (${corpus.length} items, hash ${feedbackHash})`)
+
   console.log(`\nDone. Project id: ${project.id}`)
   console.log(`Dashboard: /projects/${PROJECT_ID}`)
   console.log(`Issue reporter embed: /embed/${PROJECT_ID}/issues`)
+
+  // ----- inner: assemble a FullAnalysisResult ----------------------------
+  function buildAnalysis(rows: CorpusRow[]) {
+    const taxonomy = TAXONOMY
+    const assignments = rows.map(r => ({
+      id: r.id,
+      sentiment: r.sentiment,
+      confidence: 0.8 + ((r.themes.length * 7) % 15) / 100,
+      themeIds: r.themes,
+      material: materialFor(r.themes),
+      materialCategories: materialFor(r.themes) !== 'non-material' ? r.themes.filter(themeIsMaterial).map(t => taxonomy[t].name) : [],
+      nonMaterialCategories: materialFor(r.themes) !== 'material' ? r.themes.filter(t => !themeIsMaterial(t)).map(t => taxonomy[t].name) : [],
+    }))
+
+    // Real cross-reference maths — same code the live pipeline uses.
+    const crItems: CrossRefItem[] = rows.map(r => ({ id: r.id, type: r.source, latitude: r.latitude, longitude: r.longitude, createdAt: r.createdAt }))
+    const crAssign: CrossRefAssignment[] = rows.map(r => ({ id: r.id, sentiment: r.sentiment, themeIds: r.themes }))
+    const crossRef = crossReference(crItems, taxonomy.map(t => ({ name: t.name })), crAssign, { areaPrecision: 3, minSegmentSize: 8, minCount: 3 })
+
+    // Sentiment
+    const count = (pred: (r: CorpusRow) => boolean) => rows.filter(pred).length
+    const breakdown = { positive: count(r => r.sentiment === 'positive'), negative: count(r => r.sentiment === 'negative'), neutral: count(r => r.sentiment === 'neutral') }
+    const bySrc = (src: CorpusRow['source']) => ({ positive: count(r => r.source === src && r.sentiment === 'positive'), negative: count(r => r.source === src && r.sentiment === 'negative'), neutral: count(r => r.source === src && r.sentiment === 'neutral') })
+    const total = rows.length
+    const sentiment = {
+      overall: 'negative' as const,
+      score: Math.round(((breakdown.positive - breakdown.negative) / total) * 100) / 100,
+      breakdown,
+      bySource: { pins: bySrc('pin'), forms: { positive: 0, negative: 0, neutral: 0 }, enquiries: bySrc('enquiry') },
+      items: assignments.map(a => ({ id: a.id, sentiment: a.sentiment, confidence: a.confidence })),
+    }
+
+    // Themes
+    const themes = taxonomy.map((t, i) => {
+      const members = rows.filter(r => r.themes.includes(i))
+      const sb = { positive: members.filter(m => m.sentiment === 'positive').length, negative: members.filter(m => m.sentiment === 'negative').length, neutral: members.filter(m => m.sentiment === 'neutral').length }
+      const dominant: 'positive' | 'negative' | 'neutral' | 'mixed' = sb.positive > 0 && sb.negative > 0 ? 'mixed' : sb.positive >= sb.negative && sb.positive >= sb.neutral ? 'positive' : sb.negative >= sb.neutral ? 'negative' : 'neutral'
+      return { name: t.name, count: members.length, sentiment: dominant, keywords: t.keywords, sampleQuotes: members.slice(0, 3).map(m => quote(m.content)), sentimentBreakdown: sb }
+    }).filter(t => t.count > 0).sort((a, b) => b.count - a.count)
+
+    // Geographic clusters (~100m grid) from items with coordinates.
+    const grid = new Map<string, { lat: number; lng: number; pos: number; neg: number; neu: number; count: number; themes: Record<string, number> }>()
+    rows.filter(r => r.latitude != null && r.longitude != null).forEach(r => {
+      const key = `${r.latitude!.toFixed(3)},${r.longitude!.toFixed(3)}`
+      if (!grid.has(key)) grid.set(key, { lat: r.latitude!, lng: r.longitude!, pos: 0, neg: 0, neu: 0, count: 0, themes: {} })
+      const g = grid.get(key)!
+      g.count++
+      if (r.sentiment === 'positive') g.pos++; else if (r.sentiment === 'negative') g.neg++; else g.neu++
+      r.themes.forEach(t => { const n = taxonomy[t].name; g.themes[n] = (g.themes[n] || 0) + 1 })
+    })
+    const clusters = Array.from(grid.values()).map(g => ({
+      latitude: g.lat, longitude: g.lng,
+      sentiment: (g.pos > 0 && g.neg > 0 ? 'mixed' : g.pos >= g.neg && g.pos >= g.neu ? 'positive' : g.neg >= g.neu ? 'negative' : 'neutral') as 'positive' | 'negative' | 'neutral' | 'mixed',
+      count: g.count,
+      themes: Object.entries(g.themes).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([n]) => n),
+    }))
+
+    // Spatial insights — one per disruption hotspot, from real per-area counts.
+    const AREAS: Array<{ key: Area; label: string; centre: { lat: number; lng: number }; headline: string }> = [
+      {
+        key: 'entrance', label: 'Milton Road site entrance', centre: ENTRANCE,
+        headline: 'The site entrance generates the road-condition complaints — mud, dust and HGV queuing concentrate on this stretch of Milton Road, and the wheel-wash and sweeper regime is the visible test of the response.',
+      },
+      {
+        key: 'orchard', label: 'Orchard Close (northern boundary)', centre: ORCHARD,
+        headline: 'Orchard Close carries the heaviest burden: working-hours breaches — piling before 8am, Sunday and evening deliveries — dominate, and every property-damage claim on the log sits on this boundary.',
+      },
+      {
+        key: 'school', label: 'St Luke’s school corner', centre: SCHOOL,
+        headline: 'Every report at the St Luke’s corner describes the same conflict: HGV movements during school drop-off and pick-up. Highest-urgency location on the log — banksman cover and delivery windows are the fix residents are watching.',
+      },
+    ]
+    const spatialInsights = AREAS.map(a => {
+      const inArea = rows.filter(r => r.area === a.key)
+      const areaTotal = inArea.length || 1
+      const themeCounts: Record<number, number> = {}
+      inArea.forEach(r => r.themes.forEach(t => { themeCounts[t] = (themeCounts[t] || 0) + 1 }))
+      const topTheme = Number(Object.entries(themeCounts).sort((x, y) => y[1] - x[1])[0]?.[0] ?? 0)
+      const themeCount = themeCounts[topTheme] || 0
+      const baselineShare = Math.round((rows.filter(r => r.themes.includes(topTheme)).length / total) * 100) / 100
+      const share = Math.round((themeCount / areaTotal) * 100) / 100
+      return {
+        latitude: a.centre.lat, longitude: a.centre.lng, areaLabel: a.label,
+        theme: taxonomy[topTheme].name, headline: a.headline,
+        quote: quote(inArea.find(r => r.themes.includes(topTheme))?.content ?? ''),
+        count: themeCount, areaTotal, share,
+        baselineShare, lift: baselineShare > 0 ? Math.round((share / baselineShare) * 10) / 10 : 0, pValue: 0.01,
+        dominantSentiment: 'negative' as const,
+        responseIds: inArea.filter(r => r.themes.includes(topTheme)).slice(0, 5).map(r => r.id),
+      }
+    })
+
+    // Material considerations
+    const materialAnalysis = {
+      summary: { material: count(r => materialFor(r.themes) === 'material'), nonMaterial: count(r => materialFor(r.themes) === 'non-material'), mixed: count(r => materialFor(r.themes) === 'mixed') },
+      categories: {
+        material: [0, 1, 2, 5, 6].map(i => ({ name: taxonomy[i].name, count: rows.filter(r => r.themes.includes(i)).length, examples: rows.filter(r => r.themes.includes(i)).slice(0, 2).map(r => quote(r.content)) })).filter(c => c.count > 0),
+        nonMaterial: [3, 4].map(i => ({ name: taxonomy[i].name, count: rows.filter(r => r.themes.includes(i)).length, examples: rows.filter(r => r.themes.includes(i)).slice(0, 2).map(r => quote(r.content)) })).filter(c => c.count > 0),
+      },
+      items: assignments.map(a => ({ id: a.id, classification: a.material, materialCategories: a.materialCategories, nonMaterialCategories: a.nonMaterialCategories })),
+    }
+
+    // Campaign detection: nothing templated — itself a key finding here.
+    const campaignAnalysis = {
+      totalAnalyzed: total,
+      templatedCount: 0,
+      uniqueCount: total,
+      campaigns: [] as never[],
+    }
+
+    const disruption = rows.filter(r => r.themes.some(t => t <= 4)).length
+    const headlineStats = {
+      stats: [
+        { text: `${total} items analysed — ${disruption} (${Math.round((disruption / total) * 100)}%) concern construction practice, concentrated at three locations`, type: 'insight' as const },
+        { text: 'Working-hours breaches and HGV movements at school times are the two most urgent themes', type: 'concern' as const },
+        { text: 'Objection is to construction practice, not the scheme — scheme-level feedback remains balanced', type: 'insight' as const },
+        { text: '9 of 29 reported issues already resolved, with dated resolution notes published on the map', type: 'support' as const },
+        { text: 'No organised campaign detected: reports are individual, specific and located', type: 'insight' as const },
+      ],
+    }
+
+    const summary = {
+      executive: `Analysis of ${total} items — published issue reports, map feedback and enquiries — shows opposition that is real, local and specific, not a campaign against the scheme. Four in five items concern construction practice, and they concentrate at three locations: working-hours breaches (piling before 8am, Sunday and evening deliveries) on the Orchard Close boundary; mud, dust and HGV queuing at the Milton Road site entrance; and lorry movements during school drop-off at the St Luke’s corner. Scheme-level sentiment in the remaining fifth is balanced — the Phase 1 play park and affordable-first phasing draw genuine support, while density, drainage and the lost hedgerow draw measured criticism. The pattern matters for prioritisation: these are fixable site-management failures with identifiable owners, and the fastest route to defusing councillor and media attention is visible, dated remediation at the three hotspots — evidenced by the resolved-issue log — rather than scheme-level advocacy.`,
+      keyFindings: [
+        'Working hours & construction noise is the largest theme — piling before 8am on the Orchard Close boundary is the single most reported and most corroborated breach.',
+        'HGV movements at school drop-off and pick-up are the highest-urgency issue: every report at the St Luke’s corner describes the same conflict, and it is the likeliest source of a serious incident.',
+        'All property-damage claims sit on the Orchard Close boundary nearest the vibro and piling works — a condition-survey and claims process is needed, but these are civil matters, not planning ones.',
+        'Scheme-level feedback is balanced: support for the play park and affordable-first phasing sits alongside measured concerns about density, drainage and the lost hedgerow.',
+        'No templated or coordinated responses were detected — the volume reflects genuinely affected households, which makes remediation (not messaging) the credible response.',
+      ],
+      recommendations: [
+        'Enforce and evidence the 8am piling start: log the first rig start daily and publish the log — this single breach drives the most anger and the councillor involvement.',
+        'Hold all deliveries outside 8–9am and 3–4pm on school days with banksman cover at the St Luke’s corner, and confirm the arrangement in writing to the school and both ward councillors.',
+        'Maintain the wheel wash, twice-daily sweeper and delivery curfew at the Milton Road entrance, and keep resolving reports on the public map so the dated record builds.',
+        'Commission the condition survey for the Orchard Close boundary and set out the damage-claims process in writing to the affected households.',
+        'Use the resolved-issue log as the evidence base for the national-press response: a documented before/after record of remediation, not assurances.',
+      ],
+      concernAreas: ['Working hours compliance (piling before 8am)', 'HGV movements at school times', 'Mud and dust on Milton Road', 'Property damage on the Orchard Close boundary', 'Site conduct (parking, lighting, noise discipline)'],
+      supportAreas: ['Phase 1 play park', 'Affordable homes delivered first', 'Retained mature oaks and landscape', 'The published resolved-issue log', 'The spine road as a future relief for Milton Road'],
+    }
+
+    return {
+      sentiment, themes: { themes, totalFeedback: total }, summary,
+      headlineStats, materialAnalysis, campaignAnalysis,
+      geographic: { clusters }, crossReference: crossRef, spatialInsights,
+      taxonomy, assignments,
+      coverage: { total, analyzed: total, complete: true },
+      analyzedAt: new Date().toISOString(), feedbackCount: total,
+    }
+  }
 }
 
 main()

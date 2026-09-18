@@ -53,14 +53,17 @@ traffic/access, property damage, safety, working hours, other) on a dedicated ma
 `/embed/{projectId}/issues` — pin or area, **name + email required** (unlike feedback pins),
 **optional photo evidence** (public upload endpoint `/api/embed/{id}/issue-photo` → Vercel Blob
 under `issues/{projectId}/`, base64 data-URL fallback locally; submitted `photoUrl` is validated
-against that prefix so external URLs are rejected). Issue reports are `PublicPin`s with
-`mode: 'issues'` (+ `photoUrl`, `resolved`, `resolvedAt`, `resolvedNotes`) so they feed AI
-analysis automatically, but they are kept out of every feedback surface (feedback tab, counts,
-default embed GET filter on `mode`). Admin **Construction Issues** tab (`Collect` group,
-`src/app/projects/[id]/issues.tsx`): publish/unpublish, resolve-with-notes/reopen, delete,
-category stats, open/resolved filters. Public map shows approved reports — resolved ones stay
-visible (green check pin + "What was done" notes; visitor-toggleable) as a you-said-we-did log;
-"I'm affected too" voting. Enabled per project via `issuesEnabled` (Website settings) with
+against that prefix so external URLs are rejected). **Issue reports are NEVER public** (explicit
+user decision 2026-09-18): the embed is intake-only — the public API serves no issue pins under
+any state, the admin PATCH rejects `approved` on issue-mode pins, and the reporter UI says so.
+Issue reports are `PublicPin`s with `mode: 'issues'` (+ `photoUrl`, `resolved`, `resolvedAt`,
+`resolvedNotes`); `collectFeedback` analyses ALL of them regardless of publication state (they
+are consented submissions to the team, like enquiries), while feedback pins still join the
+analysis corpus only once approved. They are kept out of every feedback surface (feedback tab,
+counts, default embed GET filter on `mode`). Admin **Construction Issues** tab (`Collect`
+group, `src/app/projects/[id]/issues.tsx`): resolve-with-notes/reopen, delete, category stats,
+open/resolved filters — resolution notes are internal records (share via updates/campaigns, not
+the map). Enabled per project via `issuesEnabled` (Website settings) with
 `issueNotifyEmails` (comma-separated, parsed by `src/lib/issues.ts`) notifying e.g. the site
 manager on each new report from the platform address. Mailing-consent opt-in feeds the
 subscriber list (`source: 'issue_report'`).
@@ -196,8 +199,9 @@ export async function GET(request: Request, { params }: { params: { id: string }
 - Enquiry form embed: `/embed/{projectId}/enquiry` (submissions stored for AI analysis)
 - Guided tours: authored per project (Guided Tours tab), played on the map embed or the
   dedicated `/embed/{projectId}/tour` iframe; per-stop responses are moderated PublicPins
-- Construction issue reporting: dedicated embed `/embed/{projectId}/issues` (name/email
-  required, optional photo); triaged and resolved-with-notes in the Construction Issues tab
+- Construction issue reporting: dedicated intake-only embed `/embed/{projectId}/issues`
+  (name/email required, optional photo); reports are never shown publicly — triaged and
+  resolved-with-notes in the Construction Issues tab
 
 ### 2. Custom Feedback Forms
 - Drag-drop form builder with JSON field config

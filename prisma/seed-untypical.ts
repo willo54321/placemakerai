@@ -440,10 +440,9 @@ async function main() {
         comment: issue.comment,
         name: issue.name,
         email: issue.email,
-        votes: issue.votes ?? 0,
-        // Complaints stay private: only resolved reports are published, so the
-        // public embed reads as a what-we-fixed log, never a complaints wall.
-        approved: Boolean(issue.resolved),
+        // Issue reports are never public: no publication, no public voting.
+        votes: 0,
+        approved: false,
         resolved: Boolean(issue.resolved),
         resolvedAt: issue.resolved ? d(issue.resolved.day, 17, 0) : null,
         resolvedNotes: issue.resolved?.notes ?? null,
@@ -541,7 +540,7 @@ async function main() {
       notes: 'Leading the residents’ campaign publicly. Quoted in the Chronicle twice. Wants visible, dated commitments — not reassurance.',
       engagements: [
         { type: 'call', title: 'Call on Milton Road disruption', day: 1, hour: 8, minute: 30, description: 'First direct conversation since the Chronicle piece. Walked through the issue log category by category.', outcome: 'Concerns heard in full: early piling, HGVs at school run, mud on Milton Road. Agreed a joint site walk and a weekly written update she can forward to residents.', nextAction: 'Invite to Thursday site walk; share the mitigation tracker weekly' },
-        { type: 'email', title: 'Mitigation tracker sent', day: 0, hour: 17, minute: 10, description: 'Sent the dated mitigation tracker and a link to the public issue map showing resolved items.', outcome: 'Acknowledged same evening.' },
+        { type: 'email', title: 'Mitigation tracker sent', day: 0, hour: 17, minute: 10, description: 'Sent the dated mitigation tracker and a summary of resolved items from the issue log.', outcome: 'Acknowledged same evening.' },
       ],
     },
     {
@@ -581,7 +580,7 @@ async function main() {
       email: 'dana.price@example.com', type: 'other', category: 'neutral', influence: 3, interest: 4,
       notes: 'Two critical pieces so far, accurately reported. Responds well to specifics and access.',
       engagements: [
-        { type: 'call', title: 'Statement and mitigation list ahead of print deadline', day: 1, hour: 16, description: 'Provided an on-record statement acknowledging the disruption, plus the dated mitigation list and the public issue-map link.', outcome: 'Statement carried in full. Offered a site visit to see the measures working.', nextAction: 'Host site visit next week' },
+        { type: 'call', title: 'Statement and mitigation list ahead of print deadline', day: 1, hour: 16, description: 'Provided an on-record statement acknowledging the disruption, plus the dated mitigation list.', outcome: 'Statement carried in full. Offered a site visit to see the measures working.', nextAction: 'Host site visit next week' },
       ],
     },
     {
@@ -612,7 +611,7 @@ async function main() {
       at: ORCHARD,
       notes: 'Coordinates the Orchard Close complaints. Most affected street — piling noise and dust.',
       engagements: [
-        { type: 'letter', title: 'Letter drop: Orchard Close and Milton Road', day: 0, hour: 15, description: 'Hand-delivered letter to ~90 households setting out each commitment with dates, the named site contact and direct line, and the public issue-map link for reporting.', outcome: 'Delivered with Gwen Harris accompanying. Several residents raised items on the doorstep — logged as new issue reports.', nextAction: 'Door-knock follow-up on the four damage claims this week' },
+        { type: 'letter', title: 'Letter drop: Orchard Close and Milton Road', day: 0, hour: 15, description: 'Hand-delivered letter to ~90 households setting out each commitment with dates, the named site contact and direct line, and the link to the issue reporter (reports go privately to the team).', outcome: 'Delivered with Gwen Harris accompanying. Several residents raised items on the doorstep — logged as new issue reports.', nextAction: 'Door-knock follow-up on the four damage claims this week' },
       ],
     },
     {
@@ -764,7 +763,7 @@ We have heard clearly from residents of Milton Road, Orchard Close and the St Lu
 • No deliveries before 8am, after 5:30pm, or on Sundays.
 • Contractor parking has moved inside the site compound.
 
-Every report on the issue map gets looked at, and you can see what has been fixed — with dates — on the map itself. If something is wrong, please keep telling us there, or contact our named site contact directly.
+Every report made through the issue reporter goes straight to the project team and is private to us — and we will keep publishing what has been fixed, with dates, in these updates. If something is wrong, please keep telling us there, or contact our named site contact directly.
 
 Ashfield Park project team`,
       status: 'draft',
@@ -903,7 +902,7 @@ Ashfield Park project team`,
         { text: `${total} items analysed — ${disruption} (${Math.round((disruption / total) * 100)}%) concern construction practice, concentrated at three locations`, type: 'insight' as const },
         { text: 'Working-hours breaches and HGV movements at school times are the two most urgent themes', type: 'concern' as const },
         { text: 'Objection is to construction practice, not the scheme — scheme-level feedback remains balanced', type: 'insight' as const },
-        { text: '9 of 29 reported issues already resolved, with dated resolution notes published on the map', type: 'support' as const },
+        { text: '9 of 29 reported issues already resolved, with dated resolution notes on the record', type: 'support' as const },
         { text: 'No organised campaign detected: reports are individual, specific and located', type: 'insight' as const },
       ],
     }
@@ -920,12 +919,12 @@ Ashfield Park project team`,
       recommendations: [
         'Enforce and evidence the 8am piling start: log the first rig start daily and publish the log — this single breach drives the most anger and the councillor involvement.',
         'Hold all deliveries outside 8–9am and 3–4pm on school days with banksman cover at the St Luke’s corner, and confirm the arrangement in writing to the school and both ward councillors.',
-        'Maintain the wheel wash, twice-daily sweeper and delivery curfew at the Milton Road entrance, and keep resolving reports on the public map so the dated record builds.',
+        'Maintain the wheel wash, twice-daily sweeper and delivery curfew at the Milton Road entrance, and keep the dated resolution record building — share it in the weekly councillor and residents’ updates.',
         'Commission the condition survey for the Orchard Close boundary and set out the damage-claims process in writing to the affected households.',
         'Use the resolved-issue log as the evidence base for the national-press response: a documented before/after record of remediation, not assurances.',
       ],
       concernAreas: ['Working hours compliance (piling before 8am)', 'HGV movements at school times', 'Mud and dust on Milton Road', 'Property damage on the Orchard Close boundary', 'Site conduct (parking, lighting, noise discipline)'],
-      supportAreas: ['Phase 1 play park', 'Affordable homes delivered first', 'Retained mature oaks and landscape', 'The published resolved-issue log', 'The spine road as a future relief for Milton Road'],
+      supportAreas: ['Phase 1 play park', 'Affordable homes delivered first', 'Retained mature oaks and landscape', 'The documented resolved-issue record', 'The spine road as a future relief for Milton Road'],
     }
 
     return {

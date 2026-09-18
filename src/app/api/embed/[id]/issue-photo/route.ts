@@ -66,8 +66,8 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   const blobToken = process.env.BLOB_READ_WRITE_TOKEN
 
   if (blobToken) {
-    // Random filename: uploads must not be guessable (they're public URLs
-    // held for moderation before the report itself is published).
+    // Random filename: uploads must not be guessable (blob URLs are publicly
+    // fetchable by anyone who has the exact URL, and reports are private).
     const filename = `issues/${params.id}/${crypto.randomUUID()}.${ext}`
     try {
       const response = await fetch(`https://blob.vercel-storage.com/${filename}`, {

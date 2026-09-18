@@ -179,9 +179,6 @@ export function EmbedExperience({
   const [categoryFilters, setCategoryFilters] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(categories.map(c => [c.id, true]))
   )
-  // Issue reporter: resolved reports stay visible by default ("you said, we
-  // did"), but can be hidden.
-  const [showResolved, setShowResolved] = useState(true)
   // Map type - will be set when project loads based on embedDefaultSatellite setting
   const [mapType, setMapType] = useState<'roadmap' | 'satellite' | null>(null)
   const [votedPins, setVotedPins] = useState<Set<string>>(new Set())
@@ -420,11 +417,7 @@ export function EmbedExperience({
     return project.pins.filter(p => p.category === categoryId).length
   }
 
-  const filteredPins = project?.pins.filter(p =>
-    categoryFilters[p.category] !== false && (showResolved || !p.resolved)
-  ) || []
-
-  const resolvedCount = issuesMode ? (project?.pins.filter(p => p.resolved).length || 0) : 0
+  const filteredPins = project?.pins.filter(p => categoryFilters[p.category] !== false) || []
 
   // ---- Guided tour wiring (not shown on the issue reporter) ----
   const tours = useMemo(() => (issuesMode ? [] : project?.tours || []), [project?.tours, issuesMode])
@@ -748,10 +741,10 @@ export function EmbedExperience({
           <div className={`bg-brand-600 p-4 flex items-start justify-between ${sidebarCollapsed ? 'rounded-xl' : 'rounded-t-xl'}`}>
             {!sidebarCollapsed && (
               <div className="text-white flex-1 mr-3">
-                <h2 className="font-bold text-lg">{issuesMode ? 'Construction Issues' : 'Feedback Map'}</h2>
+                <h2 className="font-bold text-lg">{issuesMode ? 'Report a Construction Issue' : 'Feedback Map'}</h2>
                 <p className="text-brand-200 text-sm mt-1">
                   {issuesMode
-                    ? 'Report a construction issue, or click a report to see its status.'
+                    ? 'Reports go directly to the project team.'
                     : 'Click feedback to view details or add your own.'}
                 </p>
               </div>
@@ -768,6 +761,26 @@ export function EmbedExperience({
           {!sidebarCollapsed && (
             <div className="bg-white rounded-b-xl shadow-lg max-h-[calc(100vh-6rem)] overflow-y-auto">
               <div className="p-4">
+                {issuesMode ? (
+                  <div className="space-y-3">
+                    <ol className="space-y-3">
+                      {[
+                        'Click "Report an Issue", then place a pin (or draw an area) where the problem is',
+                        'Describe the issue and add a photo if it helps',
+                        'The project team reviews every report and follows up with you by email',
+                      ].map((step, i) => (
+                        <li key={i} className="flex items-start gap-3">
+                          <span className="w-6 h-6 shrink-0 rounded-full bg-brand-50 text-brand-600 text-sm font-semibold flex items-center justify-center">{i + 1}</span>
+                          <span className="text-sm text-gray-700">{step}</span>
+                        </li>
+                      ))}
+                    </ol>
+                    <p className="text-xs text-gray-500 border-t border-gray-100 pt-3">
+                      Reports are private — they go to the project team and are never displayed publicly.
+                    </p>
+                  </div>
+                ) : (
+                <>
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
                   Categories
                 </p>
@@ -809,31 +822,7 @@ export function EmbedExperience({
                     )
                   })}
                 </div>
-
-                {issuesMode && resolvedCount > 0 && (
-                  <div className="mt-3 flex items-center justify-between p-3 border border-gray-100 rounded-xl">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
-                        <CheckCircle size={20} className="text-green-600" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900 text-sm">Show resolved</p>
-                        <p className="text-xs text-gray-400">{resolvedCount} resolved</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setShowResolved(v => !v)}
-                      className={`relative w-12 h-7 rounded-full transition-colors ${
-                        showResolved ? 'bg-brand-500' : 'bg-gray-200'
-                      }`}
-                    >
-                      <div
-                        className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                          showResolved ? 'left-6' : 'left-1'
-                        }`}
-                      />
-                    </button>
-                  </div>
+                </>
                 )}
               </div>
             </div>
@@ -914,7 +903,7 @@ export function EmbedExperience({
               <h2 className="text-xl font-semibold text-gray-900 mb-2">Thank you</h2>
               <p className="text-gray-600 mb-6">
                 {issuesMode
-                  ? 'Your report has been received and passed to the project team. It will appear on the map once it has been reviewed.'
+                  ? 'Your report has been passed to the project team. They will follow up with you by email if needed.'
                   : 'Your feedback has been received and will appear on the map once it has been reviewed.'}
               </p>
               <button
@@ -1073,7 +1062,7 @@ export function EmbedExperience({
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                   <p className="text-sm text-amber-800">
                     <strong>Please note:</strong> {issuesMode
-                      ? 'Reports are reviewed by the project team before appearing on the map. Your name and email are never shown publicly.'
+                      ? 'Your report goes directly to the project team and is never displayed publicly. The team can follow up with you by email.'
                       : 'All comments are moderated before being published. There may be a short delay between submitting your feedback and it appearing on the map.'}
                   </p>
                 </div>
@@ -1105,7 +1094,7 @@ export function EmbedExperience({
                     />
                     <label htmlFor="gdprConsent" className="text-xs text-gray-600">
                       {issuesMode
-                        ? 'I consent to my report (not my name or email) being displayed publicly and my details being processed by the project team. *'
+                        ? 'I consent to my report and contact details being processed by the project team so they can investigate and respond. *'
                         : 'I consent to my feedback being displayed publicly and processed by the project team. *'}{' '}
                       <a href="/privacy" target="_blank" className="text-brand-600 hover:underline">
                         Privacy Policy

@@ -34,8 +34,12 @@ export async function PATCH(
     resolvedNotes?: string | null
   } = {}
 
-  // Handle approval toggle
+  // Handle approval toggle. Issue reports are never public, so approval
+  // (which controls public display) does not apply to them.
   if (typeof body.approved === 'boolean') {
+    if (pin.mode === 'issues') {
+      return NextResponse.json({ error: 'Issue reports are never published publicly' }, { status: 400 })
+    }
     updateData.approved = body.approved
   }
 

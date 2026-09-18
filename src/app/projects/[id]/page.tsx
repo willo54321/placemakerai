@@ -33,7 +33,7 @@ const TOUR_COPY: Record<Tab, { title: string; body: string }> = {
   },
   issues: {
     title: 'Construction issues',
-    body: 'Reports of construction disruption — noise, traffic, damage — with photos, straight from residents. Triage each one, mark it resolved with a note, and publish the record.',
+    body: 'Reports of construction disruption — noise, traffic, damage — with photos, straight from residents. Reports are never shown publicly: triage each one here and mark it resolved with a note for the record.',
   },
   website: {
     title: 'Your website embed',

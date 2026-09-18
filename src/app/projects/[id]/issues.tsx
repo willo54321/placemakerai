@@ -14,13 +14,10 @@ import {
   MoreHorizontal,
   CheckCircle,
   Trash2,
-  Eye,
-  EyeOff,
   ExternalLink,
   Copy,
   Check,
   Code,
-  ThumbsUp,
 } from 'lucide-react'
 import { ISSUE_CATEGORY_LABELS, type IssueCategory } from '@/lib/issues'
 
@@ -82,7 +79,7 @@ export function IssuesTab({ projectId, project, isAdmin }: { projectId: string; 
   const [copiedCode, setCopiedCode] = useState(false)
 
   const updatePin = useMutation({
-    mutationFn: async ({ pinId, ...data }: { pinId: string; approved?: boolean; resolved?: boolean; resolvedNotes?: string }) => {
+    mutationFn: async ({ pinId, ...data }: { pinId: string; resolved?: boolean; resolvedNotes?: string }) => {
       const response = await fetch(`/api/projects/${projectId}/pins/${pinId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -93,13 +90,9 @@ export function IssuesTab({ projectId, project, isAdmin }: { projectId: string; 
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
-      if (typeof variables.resolved === 'boolean') {
-        setResolvingPinId(null)
-        setResolveNotes('')
-        toast.success(variables.resolved ? 'Issue marked resolved' : 'Issue reopened')
-      } else if (typeof variables.approved === 'boolean') {
-        toast.success(variables.approved ? 'Published — now visible on the public issue map' : 'Unpublished — hidden from the public issue map')
-      }
+      setResolvingPinId(null)
+      setResolveNotes('')
+      toast.success(variables.resolved ? 'Issue marked resolved' : 'Issue reopened')
     },
     onError: () => {
       toast.error('Failed to update — no change was made')
@@ -172,7 +165,7 @@ export function IssuesTab({ projectId, project, isAdmin }: { projectId: string; 
               <h2 className="font-semibold text-slate-900">Construction Issue Reporter</h2>
               <p className="text-sm text-slate-600">
                 {project.issuesEnabled && project.embedEnabled
-                  ? 'Residents can report issues, with photos, on the public map'
+                  ? 'Residents report issues, with photos, directly to your team — reports are never shown publicly'
                   : 'Enable issue reporting in Website settings'}
               </p>
             </div>
@@ -298,17 +291,6 @@ export function IssuesTab({ projectId, project, isAdmin }: { projectId: string; 
                             <Clock size={12} /> Open
                           </span>
                         )}
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full flex items-center gap-1 ${
-                          pin.approved ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'
-                        }`}>
-                          {pin.approved ? <Eye size={12} /> : <EyeOff size={12} />}
-                          {pin.approved ? 'Published' : 'Not published'}
-                        </span>
-                        {pin.votes > 0 && (
-                          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 flex items-center gap-1">
-                            <ThumbsUp size={12} /> {pin.votes} affected
-                          </span>
-                        )}
                         {pin.name && <span className="text-sm font-medium text-slate-700">{pin.name}</span>}
                         <span className="text-xs text-slate-400">
                           {new Date(pin.createdAt).toLocaleDateString('en-GB', {
@@ -353,7 +335,7 @@ export function IssuesTab({ projectId, project, isAdmin }: { projectId: string; 
                             onChange={(e) => setResolveNotes(e.target.value)}
                             className="w-full p-2 border border-slate-300 rounded-lg text-sm"
                             rows={2}
-                            placeholder="Describe what was done — shown publicly under the resolved issue"
+                            placeholder="Describe what was done — kept on the issue record"
                           />
                           <div className="flex gap-2 mt-2">
                             <button
@@ -377,14 +359,6 @@ export function IssuesTab({ projectId, project, isAdmin }: { projectId: string; 
                     {/* Actions */}
                     {isAdmin && (
                       <div className="flex flex-col gap-1">
-                        <button
-                          onClick={() => updatePin.mutate({ pinId: pin.id, approved: !pin.approved })}
-                          disabled={updatePin.isPending}
-                          className={`p-2 rounded-lg ${pin.approved ? 'text-slate-500 hover:bg-slate-100' : 'text-blue-600 hover:bg-blue-50'}`}
-                          title={pin.approved ? 'Unpublish from the public issue map' : 'Publish to the public issue map'}
-                        >
-                          {pin.approved ? <EyeOff size={18} /> : <Eye size={18} />}
-                        </button>
                         {!pin.resolved && resolvingPinId !== pin.id && (
                           <button
                             onClick={() => setResolvingPinId(pin.id)}

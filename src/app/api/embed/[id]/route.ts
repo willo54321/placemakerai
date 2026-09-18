@@ -6,8 +6,8 @@ import { NextResponse } from 'next/server'
 export async function GET(request: Request, props0: { params: Promise<{ id: string }> }) {
   const params = await props0.params;
   // ?mode=issues serves the construction-issue reporter embed: same project
-  // config, but the pin set is the approved issue reports (open and resolved,
-  // so the reporter page can show a "you said, we did" log).
+  // config, but intake-only — issue reports are never served publicly, so the
+  // pin set is always empty in issues mode regardless of any admin state.
   const { searchParams } = new URL(request.url)
   const mode = searchParams.get('mode') === 'issues' ? 'issues' : 'feedback'
 
@@ -19,7 +19,7 @@ export async function GET(request: Request, props0: { params: Promise<{ id: stri
         orderBy: { createdAt: 'asc' }
       },
       publicPins: {
-        where: { approved: true, mode },
+        where: mode === 'issues' ? { id: { in: [] } } : { approved: true, mode: 'feedback' },
         orderBy: { createdAt: 'desc' }
       },
       geoLayers: {
@@ -84,12 +84,6 @@ export async function GET(request: Request, props0: { params: Promise<{ id: stri
       votes: p.votes,
       createdAt: p.createdAt,
       tourStopId: p.tourStopId,
-      ...(mode === 'issues' ? {
-        photoUrl: p.photoUrl,
-        resolved: p.resolved,
-        resolvedAt: p.resolvedAt,
-        resolvedNotes: p.resolvedNotes,
-      } : {})
     })),
     tours: project.tours
       .filter(t => t.stops.length > 0)

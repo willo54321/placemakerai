@@ -1462,7 +1462,7 @@ export function EmbedSettingsTab({ projectId, project }: { projectId: string; pr
                     <div>
                       <p className="font-medium text-gray-900">Construction Issue Reporting</p>
                       <p className="text-sm text-gray-500">
-                        Separate embed where residents report construction issues, with photos
+                        Separate embed where residents report construction issues, with photos — reports stay private to your team
                       </p>
                     </div>
                   </div>

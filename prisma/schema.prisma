@@ -417,8 +417,8 @@ model PublicPin {
   // "feedback" for proposal feedback, "issues" for construction-issue reports
   // (name/email required so the team can follow up; resolve workflow below).
   mode            String    @default("feedback")
-  // Optional photo evidence on issue reports (Vercel Blob URL; only shown
-  // publicly once the report is approved).
+  // Optional photo evidence on issue reports (Vercel Blob URL). Issue
+  // reports — including photos — are never displayed publicly.
   photoUrl        String?
   resolved        Boolean   @default(false)
   resolvedAt      DateTime?

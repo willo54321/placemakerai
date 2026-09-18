@@ -13,6 +13,7 @@
     "db:push": "prisma db push",
     "db:push:staging": "set -a && . ./.env.staging && set +a && prisma db push",
     "db:push:prod": "set -a && . ./.env.prod && set +a && prisma db push",
+    "seed:untypical:prod": "set -a && . ./.env.prod && set +a && npx tsx prisma/seed-untypical.ts",
     "db:backup:prod": "set -a && . ./.env.prod && set +a && mkdir -p backups && pg_dump \"$DATABASE_URL\" -Fc -f \"backups/prod-$(date +%Y%m%d-%H%M%S).dump\"",
     "db:studio": "prisma studio",
     "test": "vitest run"

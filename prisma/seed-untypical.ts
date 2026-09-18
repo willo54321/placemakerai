@@ -210,7 +210,7 @@ async function main() {
     day: number
     hour?: number
     votes?: number
-    approved?: boolean // default true
+    approved?: boolean // legacy marker, unused — publication is derived below
     resolved?: { day: number; notes: string }
     polygon?: number[][] // ring, [lng,lat]
     mailing?: boolean
@@ -419,8 +419,9 @@ async function main() {
   ]
 
   // Corpus rows mirror what collectFeedback() serves the live pipeline:
-  // approved pins + enquiries (no forms here). Unapproved reports stay out so
-  // the stored feedbackHash matches the live corpus exactly.
+  // ALL issue reports (analysable whether published or not) + approved
+  // feedback pins + enquiries (no forms here), so the stored feedbackHash
+  // matches the live corpus exactly.
   type CorpusRow = { id: string; content: string; source: 'pin' | 'enquiry'; latitude: number | null; longitude: number | null; createdAt: Date; sentiment: Sent; themes: number[]; area: Area | null }
   const corpus: CorpusRow[] = []
 
@@ -440,7 +441,9 @@ async function main() {
         name: issue.name,
         email: issue.email,
         votes: issue.votes ?? 0,
-        approved: issue.approved !== false,
+        // Complaints stay private: only resolved reports are published, so the
+        // public embed reads as a what-we-fixed log, never a complaints wall.
+        approved: Boolean(issue.resolved),
         resolved: Boolean(issue.resolved),
         resolvedAt: issue.resolved ? d(issue.resolved.day, 17, 0) : null,
         resolvedNotes: issue.resolved?.notes ?? null,
@@ -451,15 +454,13 @@ async function main() {
     })
     issueCount++
     const cls = ISSUE_ANALYSIS[idx]
-    if (issue.approved !== false && cls) {
-      corpus.push({
-        id: created.id, content: issue.comment, source: 'pin',
-        latitude: issue.polygon ? null : issue.at.lat,
-        longitude: issue.polygon ? null : issue.at.lng,
-        createdAt: d(issue.day, issue.hour ?? 12, 5),
-        sentiment: cls.s ?? 'negative', themes: cls.t, area: cls.area,
-      })
-    }
+    corpus.push({
+      id: created.id, content: issue.comment, source: 'pin',
+      latitude: issue.polygon ? null : issue.at.lat,
+      longitude: issue.polygon ? null : issue.at.lng,
+      createdAt: d(issue.day, issue.hour ?? 12, 5),
+      sentiment: cls.s ?? 'negative', themes: cls.t, area: cls.area,
+    })
     if (issue.mailing) {
       await prisma.subscriber.create({
         data: {
@@ -908,7 +909,7 @@ Ashfield Park project team`,
     }
 
     const summary = {
-      executive: `Analysis of ${total} items — published issue reports, map feedback and enquiries — shows opposition that is real, local and specific, not a campaign against the scheme. Four in five items concern construction practice, and they concentrate at three locations: working-hours breaches (piling before 8am, Sunday and evening deliveries) on the Orchard Close boundary; mud, dust and HGV queuing at the Milton Road site entrance; and lorry movements during school drop-off at the St Luke’s corner. Scheme-level sentiment in the remaining fifth is balanced — the Phase 1 play park and affordable-first phasing draw genuine support, while density, drainage and the lost hedgerow draw measured criticism. The pattern matters for prioritisation: these are fixable site-management failures with identifiable owners, and the fastest route to defusing councillor and media attention is visible, dated remediation at the three hotspots — evidenced by the resolved-issue log — rather than scheme-level advocacy.`,
+      executive: `Analysis of ${total} items — issue reports, map feedback and enquiries — shows opposition that is real, local and specific, not a campaign against the scheme. Four in five items concern construction practice, and they concentrate at three locations: working-hours breaches (piling before 8am, Sunday and evening deliveries) on the Orchard Close boundary; mud, dust and HGV queuing at the Milton Road site entrance; and lorry movements during school drop-off at the St Luke’s corner. Scheme-level sentiment in the remaining fifth is balanced — the Phase 1 play park and affordable-first phasing draw genuine support, while density, drainage and the lost hedgerow draw measured criticism. The pattern matters for prioritisation: these are fixable site-management failures with identifiable owners, and the fastest route to defusing councillor and media attention is visible, dated remediation at the three hotspots — evidenced by the resolved-issue log — rather than scheme-level advocacy.`,
       keyFindings: [
         'Working hours & construction noise is the largest theme — piling before 8am on the Orchard Close boundary is the single most reported and most corroborated breach.',
         'HGV movements at school drop-off and pick-up are the highest-urgency issue: every report at the St Luke’s corner describes the same conflict, and it is the likeliest source of a serious incident.',

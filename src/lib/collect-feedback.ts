@@ -9,9 +9,12 @@ import { FeedbackItem } from '@/lib/ai'
 export async function collectFeedback(projectId: string): Promise<FeedbackItem[]> {
   const feedbackItems: FeedbackItem[] = []
 
-  // Get public pins
+  // Get public pins. Feedback pins join the corpus once approved (approval
+  // gates publication, and only published opinions are analysed). Issue
+  // reports are consented submissions to the project team — like enquiries —
+  // so they are all analysable whether or not the admin publishes them.
   const pins = await prisma.publicPin.findMany({
-    where: { projectId, approved: true },
+    where: { projectId, OR: [{ approved: true }, { mode: 'issues' }] },
     orderBy: { createdAt: 'desc' },
   })
 

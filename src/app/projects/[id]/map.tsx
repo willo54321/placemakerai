@@ -1,7 +1,7 @@
 'use client'
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2, X, Pentagon, Minus, Eye, EyeOff, Upload, Save, ChevronLeft, ChevronRight, Image, ZoomIn, Code, MessageCircle, Globe, Copy, Check, ThumbsUp, ThumbsDown, HelpCircle, ExternalLink, Clock, CheckCircle, XCircle, FileUp, Layers, MapPinned, Palette, Type, MapIcon } from 'lucide-react'
+import { Plus, Trash2, X, Pentagon, Minus, Eye, EyeOff, Upload, Save, ChevronLeft, ChevronRight, Image, ZoomIn, Code, MessageCircle, Globe, Copy, Check, ThumbsUp, ThumbsDown, HelpCircle, ExternalLink, Clock, CheckCircle, XCircle, FileUp, Layers, MapPinned, Palette, Type, MapIcon, HardHat } from 'lucide-react'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import dynamic from 'next/dynamic'
 import { toast } from 'sonner'
@@ -121,6 +121,9 @@ interface Project {
   embedHideStreetLabels: boolean
   embedReferenceOnly: boolean
   embedDefaultSatellite: boolean
+  // Construction issue reporting
+  issuesEnabled: boolean
+  issueNotifyEmails: string | null
 }
 
 const CATEGORY_CONFIG: Record<string, { color: string; icon: any; label: string; bg: string }> = {
@@ -1306,6 +1309,7 @@ export function EmbedSettingsTab({ projectId, project }: { projectId: string; pr
   const queryClient = useQueryClient()
   const [copiedFeedback, setCopiedFeedback] = useState(false)
   const [toggling, setToggling] = useState<string | null>(null)
+  const [notifyEmails, setNotifyEmails] = useState(project.issueNotifyEmails || '')
 
   const toggleSetting = useMutation({
     mutationFn: async (setting: { key: string; value: boolean }) => {
@@ -1447,6 +1451,58 @@ export function EmbedSettingsTab({ projectId, project }: { projectId: string; pr
                   Both interactions are disabled. The map will be view-only (reference mode).
                 </p>
               )}
+
+              {/* Construction Issue Reporting Toggle */}
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center">
+                      <HardHat size={20} className="text-gray-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900">Construction Issue Reporting</p>
+                      <p className="text-sm text-gray-500">
+                        Separate embed where residents report construction issues, with photos
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => toggleSetting.mutate({ key: 'issuesEnabled', value: !project.issuesEnabled })}
+                    disabled={toggling === 'issuesEnabled'}
+                    className={`relative w-12 h-6 rounded-full transition-colors ${
+                      project.issuesEnabled ? 'bg-brand-500' : 'bg-gray-300'
+                    } ${toggling === 'issuesEnabled' ? 'opacity-50' : ''}`}
+                  >
+                    <span
+                      className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                        project.issuesEnabled ? 'left-6' : 'left-0.5'
+                      }`}
+                    />
+                  </button>
+                </div>
+                {project.issuesEnabled && (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Notify these emails when an issue is reported
+                    </label>
+                    <input
+                      type="text"
+                      value={notifyEmails}
+                      onChange={e => setNotifyEmails(e.target.value)}
+                      onBlur={() => {
+                        if (notifyEmails !== (project.issueNotifyEmails || '')) {
+                          toggleSetting.mutate({ key: 'issueNotifyEmails', value: notifyEmails } as any)
+                        }
+                      }}
+                      placeholder="site.manager@example.com, comms@example.com"
+                      className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Comma-separated. Leave blank for no email notifications. The embed code is in the Construction Issues tab.
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Display Settings */}

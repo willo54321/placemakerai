@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { useSession } from 'next-auth/react'
-import { ArrowLeft, Users, MapPin, Settings, LayoutDashboard, BarChart3, Globe, Eye, FileText, HelpCircle, Inbox, Mail, Route } from 'lucide-react'
+import { ArrowLeft, Users, MapPin, Settings, LayoutDashboard, BarChart3, Globe, Eye, FileText, HelpCircle, Inbox, Mail, Route, HardHat } from 'lucide-react'
 import Link from 'next/link'
 import { useState, Suspense, use } from 'react';
 import dynamic from 'next/dynamic'
@@ -10,6 +10,7 @@ import { OverviewTab } from './overview'
 import { SettingsTab } from './settings'
 import { AnalyticsTab } from './analytics'
 import { EnquiriesTab } from './enquiries'
+import { IssuesTab } from './issues'
 import { StakeholdersTab } from './stakeholders'
 import { MailingListTab } from './mailing'
 import { HowToTab, type GuideStep } from './how-to'
@@ -29,6 +30,10 @@ const TOUR_COPY: Record<Tab, { title: string; body: string }> = {
   forms: {
     title: 'Feedback forms',
     body: 'Build custom survey forms, share their public link, and read responses as they come in.',
+  },
+  issues: {
+    title: 'Construction issues',
+    body: 'Reports of construction disruption — noise, traffic, damage — with photos, straight from residents. Triage each one, mark it resolved with a note, and publish the record.',
   },
   website: {
     title: 'Your website embed',
@@ -113,7 +118,7 @@ const ToursTab = dynamic(() => import('./tours').then(mod => ({ default: mod.Tou
   )
 })
 
-type Tab = 'overview' | 'feedback' | 'forms' | 'enquiries' | 'stakeholders' | 'mailing' | 'website' | 'tours' | 'analytics' | 'settings' | 'howto'
+type Tab = 'overview' | 'feedback' | 'issues' | 'forms' | 'enquiries' | 'stakeholders' | 'mailing' | 'website' | 'tours' | 'analytics' | 'settings' | 'howto'
 
 // Deep-link target passed alongside a tab switch (e.g. from the activity
 // feed): jump straight to a specific pin or form response.
@@ -130,7 +135,7 @@ type TabGroup = {
 
 const tabGroups: TabGroup[] = [
   { id: 'top', label: '', tabs: ['overview'] },
-  { id: 'collect', label: 'Collect', tabs: ['feedback', 'forms', 'enquiries', 'analytics'] },
+  { id: 'collect', label: 'Collect', tabs: ['feedback', 'issues', 'forms', 'enquiries', 'analytics'] },
   { id: 'engage', label: 'Engage', tabs: ['stakeholders', 'mailing'] },
   { id: 'publish', label: 'Publish', tabs: ['website', 'tours'] },
   { id: 'configure', label: 'Configure', tabs: ['settings'] },
@@ -250,8 +255,9 @@ export default function ProjectPage(props: { params: Promise<{ id: string }> }) 
     )
   }
 
-  // Calculate counts for different feedback types
-  const pinFeedbackCount = project.publicPins?.length || 0
+  // Calculate counts for different feedback types (issue reports are their own tab)
+  const pinFeedbackCount = project.publicPins?.filter((p: any) => p.mode !== 'issues').length || 0
+  const openIssueCount = project.publicPins?.filter((p: any) => p.mode === 'issues' && !p.resolved).length || 0
   const formResponseCount = project.feedbackForms?.reduce((sum: number, form: any) => sum + (form._count?.responses || form.responses?.length || 0), 0) || 0
 
   const allTabs = [
@@ -267,6 +273,13 @@ export default function ProjectPage(props: { params: Promise<{ id: string }> }) 
       label: 'Map Feedback',
       icon: MapPin,
       count: pinFeedbackCount,
+      adminOnly: false,
+    },
+    {
+      id: 'issues' as Tab,
+      label: 'Construction Issues',
+      icon: HardHat,
+      count: openIssueCount,
       adminOnly: false,
     },
     {
@@ -524,6 +537,11 @@ export default function ProjectPage(props: { params: Promise<{ id: string }> }) 
               onFocusHandled={() => setFocusItem(null)}
               subTabOverride={guideSubTab}
             />
+          )}
+          {activeTab === 'issues' && (
+            <div className="p-6">
+              <IssuesTab projectId={params.id} project={project} isAdmin={Boolean(isAdmin)} />
+            </div>
           )}
           {activeTab === 'forms' && (
             <FormsTabWrapper

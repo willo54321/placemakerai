@@ -78,7 +78,8 @@ export function FeedbackTab({
     if (subTabOverride) setActiveSubTab(subTabOverride)
   }, [subTabOverride])
 
-  const feedbackPinCount = project.publicPins?.length || 0
+  // Construction-issue reports live in their own tab, not the feedback queue.
+  const feedbackPinCount = project.publicPins?.filter((p: { mode?: string }) => p.mode !== 'issues').length || 0
 
   const subTabs = [
     {

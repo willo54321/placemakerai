@@ -21,7 +21,7 @@ export async function recordMailingConsent({
   projectId: string
   email: string
   name?: string | null
-  source: 'manual' | 'enquiry' | 'feedback_form' | 'subscribe_embed'
+  source: 'manual' | 'enquiry' | 'feedback_form' | 'subscribe_embed' | 'issue_report'
   sourceId?: string | null
 }) {
   const normalized = email.trim().toLowerCase()

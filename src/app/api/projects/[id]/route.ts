@@ -109,6 +109,14 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     if (body.embedHideStreetLabels !== undefined) updateData.embedHideStreetLabels = body.embedHideStreetLabels
     if (body.embedReferenceOnly !== undefined) updateData.embedReferenceOnly = body.embedReferenceOnly
     if (body.embedDefaultSatellite !== undefined) updateData.embedDefaultSatellite = body.embedDefaultSatellite
+    if (body.issuesEnabled !== undefined) updateData.issuesEnabled = body.issuesEnabled
+    if ('issueNotifyEmails' in body) {
+      // Stored as entered; parsed into a clean recipient list at send time.
+      updateData.issueNotifyEmails =
+        typeof body.issueNotifyEmails === 'string' && body.issueNotifyEmails.trim()
+          ? body.issueNotifyEmails.slice(0, 2000)
+          : null
+    }
     if ('emailLocalPart' in body) {
       const raw = body.emailLocalPart
       if (raw === null || raw === '') {

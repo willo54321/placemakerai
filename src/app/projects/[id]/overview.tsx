@@ -1,13 +1,14 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { MapPin, Globe, Clock, CheckCircle, ArrowRight, MessageCircle, FileText, BarChart3, Mail, ChevronDown, AlertTriangle } from 'lucide-react'
+import { MapPin, Globe, Clock, CheckCircle, ArrowRight, MessageCircle, FileText, BarChart3, Mail, ChevronDown, AlertTriangle, HardHat } from 'lucide-react'
 import { clusterResponses } from '@/lib/campaign-detection'
+import { issueCategoryLabel } from '@/lib/issues'
 
 // Copies below this count are treated as coincidence, not a campaign.
 const CAMPAIGN_ALERT_MIN_COPIES = 3
 
-type Tab = 'overview' | 'feedback' | 'forms' | 'website' | 'analytics' | 'settings'
+type Tab = 'overview' | 'feedback' | 'forms' | 'website' | 'analytics' | 'settings' | 'issues'
 
 type FocusItem =
   | { kind: 'pin'; id: string }
@@ -22,16 +23,20 @@ export function OverviewTab({ project, onNavigate }: OverviewTabProps) {
   // Activity feed shows the newest few and expands on demand.
   const [visibleActivity, setVisibleActivity] = useState(5)
   const mapMarkerCount = project.mapMarkers?.length || 0
-  const publicPinCount = project.publicPins?.length || 0
+  // Issue reports are their own workflow — keep them out of the feedback numbers.
+  const feedbackPins = (project.publicPins || []).filter((p: any) => p.mode !== 'issues')
+  const issuePins = (project.publicPins || []).filter((p: any) => p.mode === 'issues')
+  const publicPinCount = feedbackPins.length
   const formCount = project.feedbackForms?.length || 0
 
   // Calculate pending items
-  const pendingComments = project.publicPins?.filter((p: any) => !p.approved)?.length || 0
+  const pendingComments = feedbackPins.filter((p: any) => !p.approved).length
+  const openIssues = issuePins.filter((p: any) => !p.resolved).length
 
-  // Unified activity feed: pins, form responses, and enquiries, newest first.
+  // Unified activity feed: pins, issue reports, form responses, and enquiries, newest first.
   type ActivityItem = {
     id: string
-    kind: 'pin' | 'form' | 'enquiry'
+    kind: 'pin' | 'issue' | 'form' | 'enquiry'
     date: string
     title: string
     detail: string
@@ -42,7 +47,7 @@ export function OverviewTab({ project, onNavigate }: OverviewTabProps) {
   }
 
   const activity: ActivityItem[] = [
-    ...(project.publicPins || []).map((pin: any): ActivityItem => ({
+    ...feedbackPins.map((pin: any): ActivityItem => ({
       id: `pin-${pin.id}`,
       kind: 'pin',
       date: pin.createdAt,
@@ -52,6 +57,16 @@ export function OverviewTab({ project, onNavigate }: OverviewTabProps) {
       target: 'feedback',
       targetLabel: 'Review',
       focus: { kind: 'pin', id: pin.id },
+    })),
+    ...issuePins.map((pin: any): ActivityItem => ({
+      id: `pin-${pin.id}`,
+      kind: 'issue',
+      date: pin.createdAt,
+      title: `${issueCategoryLabel(pin.category)} issue from ${pin.name || 'a resident'}`,
+      detail: pin.comment,
+      pending: !pin.resolved,
+      target: 'issues',
+      targetLabel: 'Review',
     })),
     ...(project.feedbackForms || []).flatMap((form: any) =>
       (form.responses || []).map((response: any): ActivityItem => {
@@ -118,6 +133,7 @@ export function OverviewTab({ project, onNavigate }: OverviewTabProps) {
 
   const ACTIVITY_ICON = {
     pin: { icon: MessageCircle, bg: 'bg-purple-50', color: 'text-purple-600' },
+    issue: { icon: HardHat, bg: 'bg-orange-50', color: 'text-orange-600' },
     form: { icon: FileText, bg: 'bg-blue-50', color: 'text-blue-600' },
     enquiry: { icon: Mail, bg: 'bg-slate-100', color: 'text-slate-600' },
   } as const
@@ -150,6 +166,17 @@ export function OverviewTab({ project, onNavigate }: OverviewTabProps) {
       textColor: 'text-slate-700',
       onClick: () => onNavigate('forms'),
     },
+    ...(project.issuesEnabled || issuePins.length > 0
+      ? [{
+          label: 'Open Issues',
+          value: openIssues,
+          icon: HardHat,
+          color: 'bg-orange-500',
+          bgColor: 'bg-orange-50',
+          textColor: 'text-orange-700',
+          onClick: () => onNavigate('issues'),
+        }]
+      : []),
   ]
 
   return (

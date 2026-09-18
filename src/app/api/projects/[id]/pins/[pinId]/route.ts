@@ -27,11 +27,26 @@ export async function PATCH(
   }
 
   // Build update data
-  const updateData: { approved?: boolean } = {}
+  const updateData: {
+    approved?: boolean
+    resolved?: boolean
+    resolvedAt?: Date | null
+    resolvedNotes?: string | null
+  } = {}
 
   // Handle approval toggle
   if (typeof body.approved === 'boolean') {
     updateData.approved = body.approved
+  }
+
+  // Handle resolve/reopen on construction-issue reports. Reopening clears the
+  // resolution so a stale note never lingers on an open issue.
+  if (typeof body.resolved === 'boolean') {
+    updateData.resolved = body.resolved
+    updateData.resolvedAt = body.resolved ? new Date() : null
+    updateData.resolvedNotes = body.resolved && typeof body.resolvedNotes === 'string'
+      ? body.resolvedNotes.slice(0, 2000).trim() || null
+      : null
   }
 
   const updatedPin = await prisma.publicPin.update({
@@ -43,6 +58,15 @@ export async function PATCH(
     await logAudit({
       projectId: params.id,
       action: updateData.approved ? 'pin.approve' : 'pin.unapprove',
+      targetType: 'PublicPin',
+      targetId: params.pinId,
+    })
+  }
+
+  if (typeof updateData.resolved === 'boolean') {
+    await logAudit({
+      projectId: params.id,
+      action: updateData.resolved ? 'pin.resolve' : 'pin.reopen',
       targetType: 'PublicPin',
       targetId: params.pinId,
     })

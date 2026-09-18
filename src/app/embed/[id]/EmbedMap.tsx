@@ -34,6 +34,10 @@ interface PublicPin {
   comment: string
   votes: number
   createdAt: string
+  // Construction-issue reports only
+  photoUrl?: string | null
+  resolved?: boolean
+  resolvedNotes?: string | null
 }
 
 type DrawMode = 'pin' | 'polygon' | null
@@ -86,6 +90,8 @@ interface EmbedMapProps {
   // Styling options
   hideStreetLabels?: boolean
   primaryColor?: string
+  // Issue-reporter embed: changes popup copy only (icons key off category ids)
+  issuesMode?: boolean
 }
 
 const CATEGORY_CONFIG: Record<string, { color: string; bg: string; icon: any; label: string }> = {
@@ -93,6 +99,15 @@ const CATEGORY_CONFIG: Record<string, { color: string; bg: string; icon: any; la
   negative: { color: '#EF4444', bg: '#EF4444', icon: ThumbsDown, label: 'NEGATIVE' },
   positive: { color: '#10B981', bg: '#10B981', icon: ThumbsUp, label: 'POSITIVE' },
   comment: { color: '#6366F1', bg: '#6366F1', icon: MessageCircle, label: 'COMMENT' },
+  // Construction-issue categories (issue-reporter embed) — ids don't collide
+  // with the feedback ids, so both modes share one config.
+  noise: { color: '#EF4444', bg: '#EF4444', icon: AlertTriangle, label: 'NOISE' },
+  dust: { color: '#F59E0B', bg: '#F59E0B', icon: AlertTriangle, label: 'DUST/POLLUTION' },
+  traffic: { color: '#8B5CF6', bg: '#8B5CF6', icon: AlertTriangle, label: 'TRAFFIC/ACCESS' },
+  damage: { color: '#DC2626', bg: '#DC2626', icon: AlertTriangle, label: 'PROPERTY DAMAGE' },
+  safety: { color: '#EF4444', bg: '#EF4444', icon: AlertTriangle, label: 'SAFETY' },
+  hours: { color: '#6366F1', bg: '#6366F1', icon: AlertTriangle, label: 'WORKING HOURS' },
+  other: { color: '#6B7280', bg: '#6B7280', icon: AlertTriangle, label: 'OTHER' },
 }
 
 // SVG icons for each category (centered at 24, 22)
@@ -112,14 +127,53 @@ const CATEGORY_ICONS: Record<string, string> = {
     <circle cx="24" cy="22" r="2.5" fill="#6366F1"/>
     <circle cx="31" cy="22" r="2.5" fill="#6366F1"/>
   `,
+  noise: `
+    <path d="M16 19v6h4l6 5V14l-6 5h-4z" fill="#EF4444"/>
+    <path d="M29 18c1.6 1 2.6 2.4 2.6 4s-1 3-2.6 4" stroke="#EF4444" stroke-width="2" fill="none" stroke-linecap="round"/>
+  `,
+  dust: `
+    <path d="M14 18h11a3 3 0 1 0-3-3.5M14 23h15a3 3 0 1 1-3 3.5M14 28h8" stroke="#F59E0B" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  `,
+  traffic: `
+    <path d="M17 21l2.2-5h9.6l2.2 5" stroke="#8B5CF6" stroke-width="2.5" fill="none" stroke-linejoin="round"/>
+    <rect x="14.5" y="21" width="19" height="6.5" rx="2" fill="#8B5CF6"/>
+    <circle cx="19" cy="29.5" r="2" fill="#8B5CF6"/>
+    <circle cx="29" cy="29.5" r="2" fill="#8B5CF6"/>
+  `,
+  damage: `
+    <path d="M14.5 22l9.5-8.5 9.5 8.5" stroke="#DC2626" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M17.5 22.5V30h13v-7.5" stroke="#DC2626" stroke-width="2.5" fill="none" stroke-linejoin="round"/>
+  `,
+  safety: `
+    <path d="M24 12.5l10 17.5H14l10-17.5z" stroke="#EF4444" stroke-width="2.5" fill="none" stroke-linejoin="round"/>
+    <rect x="22.9" y="19.5" width="2.2" height="6" rx="1.1" fill="#EF4444"/>
+    <circle cx="24" cy="27.6" r="1.4" fill="#EF4444"/>
+  `,
+  hours: `
+    <circle cx="24" cy="22" r="8.5" stroke="#6366F1" stroke-width="2.5" fill="none"/>
+    <path d="M24 16.5V22l3.8 2.4" stroke="#6366F1" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  `,
+  other: `
+    <circle cx="17" cy="22" r="2.5" fill="#6B7280"/>
+    <circle cx="24" cy="22" r="2.5" fill="#6B7280"/>
+    <circle cx="31" cy="22" r="2.5" fill="#6B7280"/>
+  `,
 }
 
-function createPinIcon(category: string, isHovered: boolean = false): google.maps.Icon {
+function createPinIcon(category: string, isHovered: boolean = false, resolved: boolean = false): google.maps.Icon {
   const config = CATEGORY_CONFIG[category] || CATEGORY_CONFIG.question
   const iconSvg = CATEGORY_ICONS[category] || CATEGORY_ICONS.question
 
   const shadowBlur = isHovered ? '3' : '2'
   const shadowOpacity = isHovered ? '0.3' : '0.25'
+
+  // Resolved issue reports keep their category glyph but turn green with a
+  // check badge, so the public map reads as a you-said-we-did log.
+  const bodyColor = resolved ? '#16a34a' : config.color
+  const resolvedBadge = resolved
+    ? `<circle cx="38" cy="9" r="7.5" fill="#16a34a" stroke="white" stroke-width="2"/>
+       <path d="M34.5 9l2.4 2.4 4.6-4.6" stroke="white" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`
+    : ''
 
   const svg = `
     <svg width="48" height="58" viewBox="0 0 48 58" xmlns="http://www.w3.org/2000/svg">
@@ -129,9 +183,10 @@ function createPinIcon(category: string, isHovered: boolean = false): google.map
         </filter>
       </defs>
       <g filter="url(#shadow)">
-        <path d="M24 2C12.95 2 4 10.95 4 22c0 14.25 20 32 20 32s20-17.75 20-32c0-11.05-8.95-20-20-20z" fill="${config.color}"/>
+        <path d="M24 2C12.95 2 4 10.95 4 22c0 14.25 20 32 20 32s20-17.75 20-32c0-11.05-8.95-20-20-20z" fill="${bodyColor}"/>
         <circle cx="24" cy="22" r="14" fill="white"/>
         ${iconSvg}
+        ${resolvedBadge}
       </g>
     </svg>
   `
@@ -146,16 +201,16 @@ function createPinIcon(category: string, isHovered: boolean = false): google.map
   }
 }
 
-// Module-level cache for marker icons keyed by (category|hovered).
+// Module-level cache for marker icons keyed by (category|hovered|resolved).
 // google.maps.Icon objects are only created once loaded; the cache avoids
 // building a fresh object (and triggering setIcon churn) on every render.
 const pinIconCache = new Map<string, google.maps.Icon>()
 
-function getPinIcon(category: string, isHovered: boolean = false): google.maps.Icon {
-  const key = `${category}|${isHovered ? 'h' : 'n'}`
+function getPinIcon(category: string, isHovered: boolean = false, resolved: boolean = false): google.maps.Icon {
+  const key = `${category}|${isHovered ? 'h' : 'n'}|${resolved ? 'r' : 'o'}`
   const cached = pinIconCache.get(key)
   if (cached) return cached
-  const icon = createPinIcon(category, isHovered)
+  const icon = createPinIcon(category, isHovered, resolved)
   pinIconCache.set(key, icon)
   return icon
 }
@@ -189,6 +244,14 @@ function getCategoryColor(category: string, opacity: number = 1): string {
     negative: `rgba(239, 68, 68, ${opacity})`,
     positive: `rgba(16, 185, 129, ${opacity})`,
     comment: `rgba(99, 102, 241, ${opacity})`,
+    // Issue categories
+    noise: `rgba(239, 68, 68, ${opacity})`,
+    dust: `rgba(245, 158, 11, ${opacity})`,
+    traffic: `rgba(139, 92, 246, ${opacity})`,
+    damage: `rgba(220, 38, 38, ${opacity})`,
+    safety: `rgba(239, 68, 68, ${opacity})`,
+    hours: `rgba(99, 102, 241, ${opacity})`,
+    other: `rgba(107, 114, 128, ${opacity})`,
   }
   return feedbackColors[category] || feedbackColors.comment
 }
@@ -236,7 +299,8 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
   activeTourStopIndex = null,
   onTourStopClick,
   hideStreetLabels = false,
-  primaryColor
+  primaryColor,
+  issuesMode = false
 }, ref) {
   const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script-embed',
@@ -758,7 +822,7 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
           <MarkerF
             key={pin.id}
             position={{ lat: pin.latitude!, lng: pin.longitude! }}
-            icon={getPinIcon(pin.category, hoveredPin === pin.id)}
+            icon={getPinIcon(pin.category, hoveredPin === pin.id, Boolean(pin.resolved))}
             title={pin.comment ? pin.comment.split(/(?<=[.!?])\s+/)[0] : undefined}
             onClick={() => {
               if (selectedPin === pin.id) {
@@ -857,6 +921,11 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
                     >
                       {config.label}
                     </span>
+                    {pin.resolved && (
+                      <span className="text-xs font-bold text-white px-3 py-1 rounded-full whitespace-nowrap bg-green-600">
+                        RESOLVED
+                      </span>
+                    )}
                     {shapeLabel && (
                       <span className="text-xs font-medium text-brand-600 bg-brand-100 px-2 py-0.5 rounded">
                         {shapeLabel}
@@ -864,6 +933,17 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
                     )}
                   </div>
                 </div>
+
+                {pin.photoUrl && (
+                  <a href={pin.photoUrl} target="_blank" rel="noopener noreferrer" className="block mb-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={pin.photoUrl}
+                      alt="Photo attached to this report"
+                      className="w-full max-h-36 object-cover rounded-lg border border-gray-200"
+                    />
+                  </a>
+                )}
 
                 {description && (
                   <div className="mb-3">
@@ -884,6 +964,13 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
                   </div>
                 )}
 
+                {pin.resolvedNotes && (
+                  <div className="mb-3 p-2.5 bg-green-50 border border-green-200 rounded-lg">
+                    <p className="text-xs font-semibold text-green-700 mb-1">What was done</p>
+                    <p className="text-sm text-green-800 leading-relaxed">{pin.resolvedNotes}</p>
+                  </div>
+                )}
+
                 {pin.createdAt && (
                   <p className="text-xs text-gray-400 mb-3">
                     {new Date(pin.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -894,7 +981,7 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
                   <div className="w-full flex items-center justify-center py-2 mb-3 border border-green-200 bg-green-50 rounded-lg">
                     <ThumbsUp size={18} className="text-green-500 mr-2" fill="currentColor" />
                     <span className="text-green-700 font-medium mr-1">{pin.votes}</span>
-                    <span className="text-green-600">Voted</span>
+                    <span className="text-green-600">{issuesMode ? 'Also affected' : 'Voted'}</span>
                   </div>
                 ) : (
                   <button
@@ -923,7 +1010,7 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
                   >
                     <ThumbsUp size={18} className="mr-2" style={{ color: primaryColor || '#10B981' }} />
                     <span className="text-gray-700 font-medium mr-1">{pin.votes}</span>
-                    <span className="text-gray-500">{`Vote${pin.votes !== 1 ? 's' : ''}`}</span>
+                    <span className="text-gray-500">{issuesMode ? "I'm affected too" : `Vote${pin.votes !== 1 ? 's' : ''}`}</span>
                   </button>
                 )}
 

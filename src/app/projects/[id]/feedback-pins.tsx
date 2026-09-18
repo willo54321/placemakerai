@@ -133,7 +133,8 @@ export function FeedbackPinsTab({
     }
   }
 
-  const feedbackPins = project.publicPins || []
+  // Construction-issue reports are moderated in the Issues tab, not here.
+  const feedbackPins = (project.publicPins || []).filter(pin => (pin as { mode?: string }).mode !== 'issues')
 
   const categoryStats = feedbackPins.reduce((acc, pin) => {
     acc[pin.category] = (acc[pin.category] || 0) + 1

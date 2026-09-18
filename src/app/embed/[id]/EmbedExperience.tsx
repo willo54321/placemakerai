@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useJsApiLoader } from '@react-google-maps/api'
-import { MessageCircle, ThumbsUp, ThumbsDown, X, Send, MapPin, ChevronLeft, ChevronRight, Lightbulb, Pentagon, CheckCircle, AlertCircle, Layers } from 'lucide-react'
+import { MessageCircle, ThumbsUp, ThumbsDown, X, Send, MapPin, ChevronLeft, ChevronRight, Lightbulb, Pentagon, CheckCircle, AlertCircle, Layers, HardHat, Camera, Volume2, Wind, Car, Home, ShieldAlert, Clock, MoreHorizontal } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { TourPlayer, StartTourButton } from './TourPlayer'
 import type { TourData, TourStopData, TourResponse } from './TourPlayer'
+import { ISSUE_CATEGORY_LABELS } from '@/lib/issues'
 
 const EmbedMap = dynamic(() => import('./EmbedMap'), {
   ssr: false,
@@ -49,6 +50,10 @@ interface PublicPin {
   votes: number
   createdAt: string
   tourStopId: string | null
+  // Issue-reporter embed only
+  photoUrl?: string | null
+  resolved?: boolean
+  resolvedNotes?: string | null
 }
 
 interface Overlay {
@@ -110,18 +115,38 @@ const CATEGORIES = [
   { id: 'comment', label: 'Comment', icon: MessageCircle, color: '#6366F1', bg: '#E0E7FF' },
 ]
 
-// Shared by the main map embed (/embed/[id]) and the dedicated tour route
-// (/embed/[id]/tour). tourMode hides the feedback chrome and auto-opens the
-// tour on load.
+// Issue-reporter categories; labels shared with the admin tab and
+// notification emails via lib/issues.
+const ISSUE_CATEGORIES = [
+  { id: 'noise', label: ISSUE_CATEGORY_LABELS.noise, icon: Volume2, color: '#EF4444', bg: '#FEE2E2' },
+  { id: 'dust', label: ISSUE_CATEGORY_LABELS.dust, icon: Wind, color: '#F59E0B', bg: '#FEF3C7' },
+  { id: 'traffic', label: ISSUE_CATEGORY_LABELS.traffic, icon: Car, color: '#8B5CF6', bg: '#EDE9FE' },
+  { id: 'damage', label: ISSUE_CATEGORY_LABELS.damage, icon: Home, color: '#DC2626', bg: '#FEE2E2' },
+  { id: 'safety', label: ISSUE_CATEGORY_LABELS.safety, icon: ShieldAlert, color: '#EF4444', bg: '#FEE2E2' },
+  { id: 'hours', label: ISSUE_CATEGORY_LABELS.hours, icon: Clock, color: '#6366F1', bg: '#E0E7FF' },
+  { id: 'other', label: ISSUE_CATEGORY_LABELS.other, icon: MoreHorizontal, color: '#6B7280', bg: '#F3F4F6' },
+]
+
+const MAX_PHOTO_BYTES = 4 * 1024 * 1024
+
+// Shared by the main map embed (/embed/[id]), the dedicated tour route
+// (/embed/[id]/tour) and the issue reporter (/embed/[id]/issues). tourMode
+// hides the feedback chrome and auto-opens the tour on load; issuesMode swaps
+// the categories for construction-issue ones, requires name/email, allows a
+// photo, and shows resolved reports with their resolution notes.
 export function EmbedExperience({
   projectId,
   tourMode = false,
+  issuesMode = false,
   initialTourId,
 }: {
   projectId: string
   tourMode?: boolean
+  issuesMode?: boolean
   initialTourId?: string
 }) {
+  const categories = issuesMode ? ISSUE_CATEGORIES : CATEGORIES
+
   const [project, setProject] = useState<ProjectData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -132,7 +157,7 @@ export function EmbedExperience({
   const [showForm, setShowForm] = useState(false)
 
   // Form state
-  const [selectedCategory, setSelectedCategory] = useState('question')
+  const [selectedCategory, setSelectedCategory] = useState(issuesMode ? 'noise' : 'question')
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitSuccess, setSubmitSuccess] = useState(false)
@@ -140,18 +165,23 @@ export function EmbedExperience({
   const [form, setForm] = useState({
     comment: '',
     name: '',
+    email: '',
     gdprConsent: false,
+    mailingConsent: false,
   })
+  // Optional photo evidence on issue reports (uploaded on submit)
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
 
   // UI state - start collapsed on small screens so the sidebar doesn't cover
   // the top-right action buttons in narrow iframes (initialized on mount).
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [categoryFilters, setCategoryFilters] = useState<Record<string, boolean>>({
-    question: true,
-    negative: true,
-    positive: true,
-    comment: true,
-  })
+  const [categoryFilters, setCategoryFilters] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(categories.map(c => [c.id, true]))
+  )
+  // Issue reporter: resolved reports stay visible by default ("you said, we
+  // did"), but can be hidden.
+  const [showResolved, setShowResolved] = useState(true)
   // Map type - will be set when project loads based on embedDefaultSatellite setting
   const [mapType, setMapType] = useState<'roadmap' | 'satellite' | null>(null)
   const [votedPins, setVotedPins] = useState<Set<string>>(new Set())
@@ -182,7 +212,7 @@ export function EmbedExperience({
 
   // Load voted pins from localStorage on mount
   useEffect(() => {
-    const storageKey = `voted_pins_${projectId}`
+    const storageKey = `voted_pins_${projectId}${issuesMode ? '_issues' : ''}`
     const stored = localStorage.getItem(storageKey)
     if (stored) {
       try {
@@ -192,10 +222,10 @@ export function EmbedExperience({
         // Invalid data, ignore
       }
     }
-  }, [projectId])
+  }, [projectId, issuesMode])
 
   useEffect(() => {
-    fetch(`/api/embed/${projectId}`)
+    fetch(`/api/embed/${projectId}${issuesMode ? '?mode=issues' : ''}`)
       .then(r => {
         if (!r.ok) throw new Error('Failed to load')
         return r.json()
@@ -207,10 +237,10 @@ export function EmbedExperience({
         setLoading(false)
       })
       .catch(err => {
-        setError('This map is not available')
+        setError(issuesMode ? 'This issue reporter is not available' : 'This map is not available')
         setLoading(false)
       })
-  }, [projectId])
+  }, [projectId, issuesMode])
 
   // Exit draw mode on Escape (only while drawing and the form isn't open)
   useEffect(() => {
@@ -238,18 +268,61 @@ export function EmbedExperience({
     setDrawMode(null)
   }
 
+  const handlePhotoChange = (file: File | null) => {
+    setSubmitError(null)
+    if (photoPreview) URL.revokeObjectURL(photoPreview)
+    if (!file) {
+      setPhotoFile(null)
+      setPhotoPreview(null)
+      return
+    }
+    if (file.size > MAX_PHOTO_BYTES) {
+      setPhotoFile(null)
+      setPhotoPreview(null)
+      setSubmitError('Photo too large — maximum size is 4MB.')
+      return
+    }
+    setPhotoFile(file)
+    setPhotoPreview(URL.createObjectURL(file))
+  }
+
   const handleSubmit = async () => {
     if (!pendingShape || !form.comment.trim() || !form.gdprConsent) return
+    if (issuesMode && (!form.name.trim() || !form.email.trim())) return
 
     setSubmitting(true)
     setSubmitError(null)
     try {
+      // Issue reports can carry photo evidence: upload it first, then attach
+      // the returned URL to the report.
+      let photoUrl: string | null = null
+      if (issuesMode && photoFile) {
+        const formData = new FormData()
+        formData.append('file', photoFile)
+        const uploadResponse = await fetch(`/api/embed/${projectId}/issue-photo`, {
+          method: 'POST',
+          body: formData,
+        })
+        if (!uploadResponse.ok) {
+          const uploadError = await uploadResponse.json().catch(() => null)
+          throw new Error(uploadError?.error || 'Failed to upload photo')
+        }
+        photoUrl = (await uploadResponse.json()).url
+      }
+
       let body: Record<string, unknown> = {
         shapeType: pendingShape.type,
         category: selectedCategory,
         comment: form.comment,
         name: form.name || null,
         gdprConsent: form.gdprConsent,
+      }
+
+      if (issuesMode) {
+        body.mode = 'issues'
+        body.email = form.email
+        body.mailingConsent = form.mailingConsent
+        if (photoUrl) body.photoUrl = photoUrl
       }
 
       if (pendingShape.type === 'pin') {
@@ -278,7 +351,7 @@ export function EmbedExperience({
       setSubmitSuccess(true)
     } catch (err) {
       // Inline error (window.alert is blocked in cross-origin iframes).
-      setSubmitError('Failed to submit your feedback. Please try again.')
+      setSubmitError(issuesMode ? 'Failed to submit your report. Please try again.' : 'Failed to submit your feedback. Please try again.')
     } finally {
       setSubmitting(false)
     }
@@ -290,8 +363,9 @@ export function EmbedExperience({
     setDrawMode(null)
     setSubmitError(null)
     setSubmitSuccess(false)
-    setForm({ comment: '', name: '', gdprConsent: false })
-    setSelectedCategory('question')
+    setForm({ comment: '', name: '', email: '', gdprConsent: false, mailingConsent: false })
+    setSelectedCategory(issuesMode ? 'noise' : 'question')
+    handlePhotoChange(null)
   }
 
   const handleVote = async (pinId: string) => {
@@ -324,7 +398,7 @@ export function EmbedExperience({
       newVotedPins.add(pinId)
       setVotedPins(newVotedPins)
 
-      const storageKey = `voted_pins_${projectId}`
+      const storageKey = `voted_pins_${projectId}${issuesMode ? '_issues' : ''}`
       localStorage.setItem(storageKey, JSON.stringify(Array.from(newVotedPins)))
     } catch (err) {
       console.error('Failed to vote:', err)
@@ -346,10 +420,14 @@ export function EmbedExperience({
     return project.pins.filter(p => p.category === categoryId).length
   }
 
-  const filteredPins = project?.pins.filter(p => categoryFilters[p.category] !== false) || []
+  const filteredPins = project?.pins.filter(p =>
+    categoryFilters[p.category] !== false && (showResolved || !p.resolved)
+  ) || []
 
-  // ---- Guided tour wiring ----
-  const tours = useMemo(() => project?.tours || [], [project?.tours])
+  const resolvedCount = issuesMode ? (project?.pins.filter(p => p.resolved).length || 0) : 0
+
+  // ---- Guided tour wiring (not shown on the issue reporter) ----
+  const tours = useMemo(() => (issuesMode ? [] : project?.tours || []), [project?.tours, issuesMode])
   const activeTour = tours.find(t => t.id === activeTourId) || null
   const activeStop = activeTour && tourStopIndex >= 0 ? activeTour.stops[tourStopIndex] : null
 
@@ -508,7 +586,7 @@ export function EmbedExperience({
         <MapsScriptPreloader />
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-brand-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-          <p className="text-gray-500">{tourMode ? 'Loading tour...' : 'Loading consultation map...'}</p>
+          <p className="text-gray-500">{tourMode ? 'Loading tour...' : issuesMode ? 'Loading issue reporter...' : 'Loading consultation map...'}</p>
         </div>
       </div>
     )
@@ -521,8 +599,8 @@ export function EmbedExperience({
           <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <MapPin size={32} className="text-gray-400" />
           </div>
-          <h1 className="text-xl font-semibold text-gray-900 mb-2">Map Unavailable</h1>
-          <p className="text-gray-500">{error || 'This consultation map is not available'}</p>
+          <h1 className="text-xl font-semibold text-gray-900 mb-2">{issuesMode ? 'Issue Reporter Unavailable' : 'Map Unavailable'}</h1>
+          <p className="text-gray-500">{error || (issuesMode ? 'This issue reporter is not available' : 'This consultation map is not available')}</p>
         </div>
       </div>
     )
@@ -592,6 +670,7 @@ export function EmbedExperience({
           onTourStopClick={handleTourStopIndexChange}
           hideStreetLabels={project.embedHideStreetLabels || false}
           primaryColor={project.embedPrimaryColor || undefined}
+          issuesMode={issuesMode}
         />
 
         {/* Feedback Buttons - Top Right (only if pins or drawing allowed and not reference mode) */}
@@ -613,8 +692,8 @@ export function EmbedExperience({
                     : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
                 }`}
               >
-                <MapPin size={18} />
-                <span>Add Pin</span>
+                {issuesMode ? <HardHat size={18} /> : <MapPin size={18} />}
+                <span>{issuesMode ? 'Report an Issue' : 'Add Pin'}</span>
               </button>
             )}
 
@@ -669,9 +748,11 @@ export function EmbedExperience({
           <div className={`bg-brand-600 p-4 flex items-start justify-between ${sidebarCollapsed ? 'rounded-xl' : 'rounded-t-xl'}`}>
             {!sidebarCollapsed && (
               <div className="text-white flex-1 mr-3">
-                <h2 className="font-bold text-lg">Feedback Map</h2>
+                <h2 className="font-bold text-lg">{issuesMode ? 'Construction Issues' : 'Feedback Map'}</h2>
                 <p className="text-brand-200 text-sm mt-1">
-                  Click feedback to view details or add your own.
+                  {issuesMode
+                    ? 'Report a construction issue, or click a report to see its status.'
+                    : 'Click feedback to view details or add your own.'}
                 </p>
               </div>
             )}
@@ -691,7 +772,7 @@ export function EmbedExperience({
                   Categories
                 </p>
                 <div className="space-y-2">
-                  {CATEGORIES.map(cat => {
+                  {categories.map(cat => {
                     const count = getCategoryCount(cat.id)
                     const isEnabled = categoryFilters[cat.id]
                     return (
@@ -728,6 +809,32 @@ export function EmbedExperience({
                     )
                   })}
                 </div>
+
+                {issuesMode && resolvedCount > 0 && (
+                  <div className="mt-3 flex items-center justify-between p-3 border border-gray-100 rounded-xl">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
+                        <CheckCircle size={20} className="text-green-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900 text-sm">Show resolved</p>
+                        <p className="text-xs text-gray-400">{resolvedCount} resolved</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setShowResolved(v => !v)}
+                      className={`relative w-12 h-7 rounded-full transition-colors ${
+                        showResolved ? 'bg-brand-500' : 'bg-gray-200'
+                      }`}
+                    >
+                      <div
+                        className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                          showResolved ? 'left-6' : 'left-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -806,7 +913,9 @@ export function EmbedExperience({
               </div>
               <h2 className="text-xl font-semibold text-gray-900 mb-2">Thank you</h2>
               <p className="text-gray-600 mb-6">
-                Your feedback has been received and will appear on the map once it has been reviewed.
+                {issuesMode
+                  ? 'Your report has been received and passed to the project team. It will appear on the map once it has been reviewed.'
+                  : 'Your feedback has been received and will appear on the map once it has been reviewed.'}
               </p>
               <button
                 onClick={cancelDrawing}
@@ -825,7 +934,7 @@ export function EmbedExperience({
               {/* Form Header */}
               <div className="bg-gradient-to-r from-brand-600 to-brand-600 text-white px-5 py-4 rounded-t-xl">
                 <div className="flex items-center justify-between">
-                  <h2 className="font-semibold text-lg">Leave Feedback</h2>
+                  <h2 className="font-semibold text-lg">{issuesMode ? 'Report a Construction Issue' : 'Leave Feedback'}</h2>
                   <button
                     onClick={cancelDrawing}
                     className="p-1 hover:bg-white/20 rounded transition-colors"
@@ -834,7 +943,9 @@ export function EmbedExperience({
                   </button>
                 </div>
                 <p className="text-brand-200 text-sm mt-1">
-                  Share your thoughts about this {getShapeLabel()}
+                  {issuesMode
+                    ? `Describe the issue at this ${getShapeLabel() === 'area' ? 'area' : 'location'}`
+                    : `Share your thoughts about this ${getShapeLabel()}`}
                 </p>
               </div>
 
@@ -842,10 +953,10 @@ export function EmbedExperience({
                 {/* Category Selection */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Type of feedback
+                    {issuesMode ? 'Type of issue' : 'Type of feedback'}
                   </label>
                   <div className="space-y-2">
-                    {CATEGORIES.map(cat => (
+                    {categories.map(cat => (
                       <button
                         key={cat.id}
                         onClick={() => setSelectedCategory(cat.id)}
@@ -870,12 +981,14 @@ export function EmbedExperience({
                 {/* Comment */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Your comment *
+                    {issuesMode ? 'Describe the issue *' : 'Your comment *'}
                   </label>
                   <textarea
                     value={form.comment}
                     onChange={(e) => setForm({ ...form, comment: e.target.value })}
-                    placeholder={`What would you like to share about this ${getShapeLabel()}?`}
+                    placeholder={issuesMode
+                      ? 'What happened, and when? Include anything that will help the team put it right.'
+                      : `What would you like to share about this ${getShapeLabel()}?`}
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 resize-none"
                     rows={4}
                     maxLength={2000}
@@ -885,10 +998,47 @@ export function EmbedExperience({
                   </p>
                 </div>
 
-                {/* Optional Fields */}
+                {/* Photo evidence (issue reports only) */}
+                {issuesMode && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Photo (optional)
+                    </label>
+                    {photoPreview ? (
+                      <div className="relative">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={photoPreview}
+                          alt="Photo to attach to this report"
+                          className="w-full max-h-40 object-cover rounded-lg border border-gray-200"
+                        />
+                        <button
+                          onClick={() => handlePhotoChange(null)}
+                          aria-label="Remove photo"
+                          className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center bg-white/90 hover:bg-white rounded-full shadow"
+                        >
+                          <X size={16} className="text-gray-600" />
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="flex items-center justify-center gap-2 w-full p-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-gray-400 cursor-pointer transition-colors">
+                        <Camera size={18} />
+                        <span className="text-sm font-medium">Add a photo</span>
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif"
+                          className="hidden"
+                          onChange={(e) => handlePhotoChange(e.target.files?.[0] || null)}
+                        />
+                      </label>
+                    )}
+                  </div>
+                )}
+
+                {/* Name / contact details */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Name (optional)
+                    {issuesMode ? 'Name *' : 'Name (optional)'}
                   </label>
                   <input
                     type="text"
@@ -900,12 +1050,48 @@ export function EmbedExperience({
                   />
                 </div>
 
+                {issuesMode && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Email *
+                    </label>
+                    <input
+                      type="email"
+                      value={form.email}
+                      onChange={(e) => setForm({ ...form, email: e.target.value })}
+                      placeholder="you@example.com"
+                      className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+                      maxLength={255}
+                    />
+                    <p className="text-xs text-gray-400 mt-1">
+                      So the project team can follow up with you about this issue. Never shown publicly.
+                    </p>
+                  </div>
+                )}
+
                 {/* Moderation Notice */}
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                   <p className="text-sm text-amber-800">
-                    <strong>Please note:</strong> All comments are moderated before being published. There may be a short delay between submitting your feedback and it appearing on the map.
+                    <strong>Please note:</strong> {issuesMode
+                      ? 'Reports are reviewed by the project team before appearing on the map. Your name and email are never shown publicly.'
+                      : 'All comments are moderated before being published. There may be a short delay between submitting your feedback and it appearing on the map.'}
                   </p>
                 </div>
+
+                {issuesMode && (
+                  <div className="flex items-start gap-3">
+                    <input
+                      id="mailingConsent"
+                      type="checkbox"
+                      checked={form.mailingConsent}
+                      onChange={e => setForm({ ...form, mailingConsent: e.target.checked })}
+                      className="mt-1 w-4 h-4 text-brand-600 border-gray-300 rounded focus:ring-brand-600"
+                    />
+                    <label htmlFor="mailingConsent" className="text-xs text-gray-600">
+                      Email me project updates (you can unsubscribe at any time)
+                    </label>
+                  </div>
+                )}
 
                 {/* GDPR Consent */}
                 <div className="space-y-3 pt-2 border-t border-gray-200">
@@ -918,7 +1104,9 @@ export function EmbedExperience({
                       className="mt-1 w-4 h-4 text-brand-600 border-gray-300 rounded focus:ring-brand-600"
                     />
                     <label htmlFor="gdprConsent" className="text-xs text-gray-600">
-                      I consent to my feedback being displayed publicly and processed by the project team. *{' '}
+                      {issuesMode
+                        ? 'I consent to my report (not my name or email) being displayed publicly and my details being processed by the project team. *'
+                        : 'I consent to my feedback being displayed publicly and processed by the project team. *'}{' '}
                       <a href="/privacy" target="_blank" className="text-brand-600 hover:underline">
                         Privacy Policy
                       </a>
@@ -944,7 +1132,7 @@ export function EmbedExperience({
                   </button>
                   <button
                     onClick={handleSubmit}
-                    disabled={!form.comment.trim() || !form.gdprConsent || submitting}
+                    disabled={!form.comment.trim() || !form.gdprConsent || submitting || (issuesMode && (!form.name.trim() || !form.email.trim()))}
                     className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-brand-600 text-white rounded-lg hover:bg-brand-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     {submitting ? (

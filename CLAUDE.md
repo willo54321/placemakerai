@@ -47,6 +47,24 @@ cinematic fly-to between stops (driven via EmbedMap's `tourCamera` prop — deli
 feedback map, and feed AI analysis with no extra pipeline; approved ones render under each stop.
 Only `active: true` tours appear publicly (`/api/embed/{id}` returns `tours`).
 
+**Re-added 2026-09-18 — Construction issues** (explicit user decision; rebuilt from the
+pre-descope design with additions): residents report construction issues (noise, dust,
+traffic/access, property damage, safety, working hours, other) on a dedicated map embed at
+`/embed/{projectId}/issues` — pin or area, **name + email required** (unlike feedback pins),
+**optional photo evidence** (public upload endpoint `/api/embed/{id}/issue-photo` → Vercel Blob
+under `issues/{projectId}/`, base64 data-URL fallback locally; submitted `photoUrl` is validated
+against that prefix so external URLs are rejected). Issue reports are `PublicPin`s with
+`mode: 'issues'` (+ `photoUrl`, `resolved`, `resolvedAt`, `resolvedNotes`) so they feed AI
+analysis automatically, but they are kept out of every feedback surface (feedback tab, counts,
+default embed GET filter on `mode`). Admin **Construction Issues** tab (`Collect` group,
+`src/app/projects/[id]/issues.tsx`): publish/unpublish, resolve-with-notes/reopen, delete,
+category stats, open/resolved filters. Public map shows approved reports — resolved ones stay
+visible (green check pin + "What was done" notes; visitor-toggleable) as a you-said-we-did log;
+"I'm affected too" voting. Enabled per project via `issuesEnabled` (Website settings) with
+`issueNotifyEmails` (comma-separated, parsed by `src/lib/issues.ts`) notifying e.g. the site
+manager on each new report from the platform address. Mailing-consent opt-in feeds the
+subscriber list (`source: 'issue_report'`).
+
 **Re-added 2026-09-09 — Mailing list + campaigns** (explicit user decision to rebuild the descoped
 feature): consented subscriber capture (`mailingConsent` on enquiry/external-feedback submissions,
 public `POST /api/embed/{id}/subscribe`, manual add), a Mailing List tab (subscribers register +
@@ -127,7 +145,7 @@ non-blocking `npm audit` on every push/PR.
 | User | System users (systemRole: SUPER_ADMIN, USER) |
 | Project | Main entity - consultation projects |
 | ProjectAccess | User-project role (ADMIN, CLIENT) |
-| PublicPin | Map feedback (pins, lines, polygons) |
+| PublicPin | Map feedback (pins, lines, polygons); `mode: 'issues'` rows are construction-issue reports with photo + resolution workflow |
 | FeedbackForm | Custom forms with JSON field config |
 | FeedbackResponse | Form submissions (data as JSON) |
 | Enquiry | Public enquiry submissions (analyzed by AI; thread + outbound replies) |
@@ -178,6 +196,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
 - Enquiry form embed: `/embed/{projectId}/enquiry` (submissions stored for AI analysis)
 - Guided tours: authored per project (Guided Tours tab), played on the map embed or the
   dedicated `/embed/{projectId}/tour` iframe; per-stop responses are moderated PublicPins
+- Construction issue reporting: dedicated embed `/embed/{projectId}/issues` (name/email
+  required, optional photo); triaged and resolved-with-notes in the Construction Issues tab
 
 ### 2. Custom Feedback Forms
 - Drag-drop form builder with JSON field config
@@ -244,3 +264,13 @@ Requires `embedEnabled: true` on the project.
 - Mock auth context available for dev testing
 - Test map page at `/test-map`
 - Use Prisma Studio for database inspection
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

@@ -279,6 +279,66 @@ export async function sendInboundEmailNotification({
 }
 
 /**
+ * Tell the project's nominated recipients a construction issue was reported.
+ * The dashboard Issues tab is the source of truth — this is just the nudge.
+ * Sent from the platform address with no Reply-To: follow-up with the
+ * reporter belongs in the dashboard, where the report is triaged.
+ */
+export async function sendIssueNotification({
+  to,
+  projectId,
+  projectName,
+  categoryLabel,
+  reporterName,
+  reporterEmail,
+  comment,
+  photoUrl,
+  baseUrl,
+}: {
+  to: string[]
+  projectId: string
+  projectName: string
+  categoryLabel: string
+  reporterName: string
+  reporterEmail: string
+  comment: string
+  photoUrl?: string | null
+  baseUrl: string
+}) {
+  const client = getResend()
+  if (!client || to.length === 0) return null
+
+  try {
+    const { error } = await client.emails.send({
+      from: getFromAddress(),
+      to,
+      subject: `New construction issue (${categoryLabel}) — ${projectName}`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #1e293b;">New construction issue reported</h2>
+          <p style="color: #475569;"><strong>${escapeHtml(categoryLabel)}</strong> — ${escapeHtml(projectName)}</p>
+          <p style="color: #475569;">Reported by ${escapeHtml(reporterName)} &lt;${escapeHtml(reporterEmail)}&gt;</p>
+          <p style="color: #475569; white-space: pre-wrap; border-left: 3px solid #ea580c; padding-left: 12px;">${escapeHtml(comment)}</p>
+          ${photoUrl ? `<p><a href="${escapeHtml(photoUrl)}" style="color: #ea580c;">View attached photo</a></p>` : ''}
+          <a href="${baseUrl}/projects/${projectId}" style="display: inline-block; background: #ea580c; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 500; margin: 12px 0;">
+            Open the Issues tab
+          </a>
+          <p style="color: #94a3b8; font-size: 13px;">The report is held for review and won't appear publicly until it is approved.</p>
+        </div>
+      `,
+    })
+    if (error) {
+      console.error('Failed to send issue notification:', error)
+      return null
+    }
+    return true
+  } catch (err) {
+    console.error('Issue notification send error:', err)
+    return null
+  }
+}
+
+/**
  * Substitute {{name}} / {{project}} / {{subject}} placeholders in
  * admin-authored campaign subject lines and bodies.
  */

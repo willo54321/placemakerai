@@ -1,10 +1,15 @@
 import { prisma } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { rateLimitResponse } from '@/lib/rate-limit'
+import { recordMailingConsent } from '@/lib/subscribers'
+import { sendIssueNotification } from '@/lib/email'
+import { ISSUE_CATEGORIES, issueCategoryLabel, parseNotifyEmails, isAllowedIssuePhotoUrl } from '@/lib/issues'
 
 const FEEDBACK_CATEGORIES = ['positive', 'negative', 'question', 'comment']
 
-// Public API - submit feedback (pin, line, or polygon)
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+// Public API - submit feedback or a construction-issue report (pin, line, or polygon)
 export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   const limited = await rateLimitResponse(request, 'embed-pins', 15, 60_000)
@@ -15,6 +20,8 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     where: { id: params.id },
     select: {
       embedEnabled: true,
+      issuesEnabled: true,
+      issueNotifyEmails: true,
       name: true
     }
   })
@@ -29,6 +36,13 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
 
   const body = await request.json()
 
+  // "feedback" (proposal feedback) or "issues" (construction-issue report).
+  const mode = body.mode === 'issues' ? 'issues' : 'feedback'
+
+  if (mode === 'issues' && !project.issuesEnabled) {
+    return NextResponse.json({ error: 'Issue reporting not enabled for this project' }, { status: 403 })
+  }
+
   // Validate shape type
   const validShapeTypes = ['pin', 'line', 'polygon']
   const shapeType = validShapeTypes.includes(body.shapeType) ? body.shapeType : 'pin'
@@ -38,12 +52,15 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   const errors: string[] = []
 
   // Reject unknown fields so integrator typos (e.g. `type` instead of
-  // `category`) fail loudly instead of being silently ignored. `email` and
-  // `mailingConsent` are tolerated as no-ops for legacy embeds.
-  const KNOWN_FIELDS = ['shapeType', 'latitude', 'longitude', 'geometry', 'category', 'comment', 'name', 'gdprConsent', 'email', 'mailingConsent', 'tourStopId']
+  // `category`) fail loudly instead of being silently ignored.
+  const KNOWN_FIELDS = ['mode', 'shapeType', 'latitude', 'longitude', 'geometry', 'category', 'comment', 'name', 'gdprConsent', 'email', 'mailingConsent', 'tourStopId', 'photoUrl']
   const unknownFields = Object.keys(body).filter(k => !KNOWN_FIELDS.includes(k))
   if (unknownFields.length > 0) {
-    errors.push(`unknown field${unknownFields.length > 1 ? 's' : ''}: ${unknownFields.join(', ')} (accepted fields: shapeType, latitude, longitude, geometry, category, comment, name, gdprConsent, tourStopId)`)
+    errors.push(`unknown field${unknownFields.length > 1 ? 's' : ''}: ${unknownFields.join(', ')} (accepted fields: ${KNOWN_FIELDS.join(', ')})`)
+  }
+
+  if (body.mode !== undefined && !['feedback', 'issues'].includes(body.mode)) {
+    errors.push('mode must be "feedback" or "issues"')
   }
 
   // Feedback left from a guided-tour stop panel carries the stop id so it can
@@ -51,7 +68,9 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   // project — otherwise submitters could attach feedback to arbitrary stops.
   let tourStopId: string | null = null
   if (body.tourStopId !== undefined && body.tourStopId !== null) {
-    if (typeof body.tourStopId !== 'string') {
+    if (mode === 'issues') {
+      errors.push('tourStopId cannot be set on an issue report')
+    } else if (typeof body.tourStopId !== 'string') {
       errors.push('tourStopId must be a string')
     } else {
       const stop = await prisma.tourStop.findUnique({
@@ -92,10 +111,38 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     errors.push('comment must be 2000 characters or fewer')
   }
 
-  if (body.category !== undefined && !FEEDBACK_CATEGORIES.includes(body.category)) {
-    errors.push(`category must be one of: ${FEEDBACK_CATEGORIES.join(', ')}`)
+  const validCategories = mode === 'issues' ? ISSUE_CATEGORIES as readonly string[] : FEEDBACK_CATEGORIES
+  if (body.category !== undefined && !validCategories.includes(body.category)) {
+    errors.push(`category must be one of: ${validCategories.join(', ')}`)
   }
-  const category = FEEDBACK_CATEGORIES.includes(body.category) ? body.category : 'comment'
+  const category = validCategories.includes(body.category)
+    ? body.category
+    : (mode === 'issues' ? 'other' : 'comment')
+
+  // Issue reports need a way to follow up (and to send the resolution), so
+  // name and a valid email are required — unlike map feedback, where email is
+  // deliberately not collected (data minimization).
+  const name = typeof body.name === 'string' ? body.name.trim() : ''
+  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
+  if (mode === 'issues') {
+    if (!name) errors.push('name is required for an issue report')
+    if (!email || !EMAIL_RE.test(email) || email.length > 255) {
+      errors.push('a valid email is required for an issue report')
+    }
+  }
+
+  // Optional photo evidence on issue reports. Must be an upload our own
+  // issue-photo endpoint produced for this project — never an external URL.
+  let photoUrl: string | null = null
+  if (body.photoUrl !== undefined && body.photoUrl !== null && body.photoUrl !== '') {
+    if (mode !== 'issues') {
+      errors.push('photoUrl is only accepted on issue reports')
+    } else if (typeof body.photoUrl !== 'string' || !isAllowedIssuePhotoUrl(body.photoUrl, params.id)) {
+      errors.push('photoUrl must be an upload returned by the issue-photo endpoint')
+    } else {
+      photoUrl = body.photoUrl
+    }
+  }
 
   if (!body.gdprConsent) {
     errors.push('GDPR consent is required')
@@ -108,23 +155,57 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   const pin = await prisma.publicPin.create({
     data: {
       projectId: params.id,
+      mode,
       shapeType,
       latitude: lat,
       longitude: lng,
       geometry: shapeType !== 'pin' ? body.geometry : null,
       category,
       comment: body.comment.slice(0, 2000), // Limit comment length
-      name: body.name?.slice(0, 100) || null,
-      // Email is deliberately not collected on map feedback (data minimization) —
-      // it served no purpose: no reply workflow, no notifications, no mailing list.
+      name: name.slice(0, 100) || null,
+      // Email is collected on issue reports only — feedback pins stay
+      // email-free (no reply workflow there).
+      email: mode === 'issues' ? email : null,
+      photoUrl,
       gdprConsent: true,
       gdprConsentDate: new Date(),
       tourStopId,
     }
   })
 
+  if (mode === 'issues') {
+    // Nudge the nominated recipients (e.g. the site manager). Never fails the
+    // submission — sendIssueNotification swallows its own errors.
+    const recipients = parseNotifyEmails(project.issueNotifyEmails)
+    if (recipients.length > 0) {
+      const baseUrl = process.env.NEXTAUTH_URL || 'https://platform.placemakerai.io'
+      await sendIssueNotification({
+        to: recipients,
+        projectId: params.id,
+        projectName: project.name,
+        categoryLabel: issueCategoryLabel(category),
+        reporterName: name,
+        reporterEmail: email,
+        comment: pin.comment,
+        photoUrl: photoUrl && !photoUrl.startsWith('data:') ? photoUrl : null,
+        baseUrl,
+      })
+    }
+
+    if (body.mailingConsent === true) {
+      await recordMailingConsent({
+        projectId: params.id,
+        email,
+        name,
+        source: 'issue_report',
+        sourceId: pin.id,
+      })
+    }
+  }
+
   return NextResponse.json({
     id: pin.id,
+    mode: pin.mode,
     shapeType: pin.shapeType,
     latitude: pin.latitude,
     longitude: pin.longitude,

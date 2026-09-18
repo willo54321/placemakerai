@@ -537,8 +537,10 @@ async function main() {
     {
       name: 'Cllr Margaret Doyle', role: 'Ward councillor, Ashfield East', organization: 'North Northamptonshire Council',
       email: 'margaret.doyle@example.com', phone: '01933 000001', type: 'authority', category: 'opposed', influence: 4, interest: 5,
-      notes: 'Leading the residents’ campaign publicly. Quoted in the Chronicle twice. Wants visible, dated commitments — not reassurance.',
+      notes: 'Leading the residents’ campaign publicly. Quoted in the Chronicle twice. Wants visible, dated commitments — not reassurance. Constructive relationship since consent — see log.',
       engagements: [
+        { type: 'meeting', title: 'Introductory briefing following Phase 2 consent', day: 425, hour: 10, description: 'Walked through the approved scheme, construction programme and the commitments in the CEMP.', outcome: 'Asked to be told before piling and highways works start. Agreed to notify her office ahead of each major construction stage.', nextAction: 'Notify before commencement' },
+        { type: 'email', title: 'Commencement notification', day: 270, hour: 9, description: 'Advance notice of the Phase 2 start date, working hours and the agreed HGV route, as promised at the consent briefing.', outcome: 'Acknowledged — forwarded to residents via her newsletter.' },
         { type: 'call', title: 'Call on Milton Road disruption', day: 1, hour: 8, minute: 30, description: 'First direct conversation since the Chronicle piece. Walked through the issue log category by category.', outcome: 'Concerns heard in full: early piling, HGVs at school run, mud on Milton Road. Agreed a joint site walk and a weekly written update she can forward to residents.', nextAction: 'Invite to Thursday site walk; share the mitigation tracker weekly' },
         { type: 'email', title: 'Mitigation tracker sent', day: 0, hour: 17, minute: 10, description: 'Sent the dated mitigation tracker and a summary of resolved items from the issue log.', outcome: 'Acknowledged same evening.' },
       ],
@@ -548,6 +550,7 @@ async function main() {
       email: 'james.obi@example.com', phone: '01933 000002', type: 'authority', category: 'undecided', influence: 4, interest: 4,
       notes: 'Measured so far. Focused on the school-corner safety issue specifically.',
       engagements: [
+        { type: 'email', title: 'Construction programme briefing', day: 300, hour: 11, description: 'Plain-English summary of the Phase 2 programme and traffic management plan for his ward newsletter.', outcome: 'Used in his October newsletter; no issues raised.' },
         { type: 'call', title: 'Call on school-corner safety', day: 1, hour: 9, minute: 15, outcome: 'Set out the banksman and delivery-window plan agreed with the school. He will hold comment until he sees it operating.', nextAction: 'Confirm in writing once banksman cover has run for a week' },
       ],
     },
@@ -556,14 +559,19 @@ async function main() {
       email: 'sarah.bell.office@example.com', type: 'authority', category: 'neutral', influence: 5, interest: 3,
       notes: 'Office has received constituent letters. No public comment yet.',
       engagements: [
+        { type: 'meeting', title: 'Introductory meeting at constituency office', day: 380, hour: 14, description: 'Introduced the Phase 2 scheme ahead of construction: programme, local employment commitments, points of contact.', outcome: 'Supportive of the affordable-first phasing. Asked for advance notice of anything residents would notice.' },
+        { type: 'email', title: 'Six-month programme update', day: 180, hour: 10, description: 'Update to the office: groundworks progress, first completions timeline, apprenticeship numbers.', outcome: 'No response required.' },
         { type: 'email', title: 'Briefing note to constituency office', day: 1, hour: 17, minute: 30, description: 'One-page factual briefing: what went wrong, what is being fixed, dated commitments, single point of contact.', outcome: 'Office acknowledged; asked to be copied on remediation updates.', nextAction: 'Copy office on the weekly update' },
       ],
     },
     {
       name: 'Peter Hale', role: 'Chair', organization: 'Ashfield Residents’ Association',
       email: 'peter.hale@example.com', phone: '01933 000004', type: 'community', category: 'opposed', influence: 3, interest: 5,
-      notes: 'Compiled the residents’ complaint dossier. Firm but constructive in person — wants a named contact, not a call centre.',
+      notes: 'Compiled the residents’ complaint dossier. Firm but constructive in person — wants a named contact, not a call centre. Long-standing contact: engaged since the Phase 2 exhibition.',
       engagements: [
+        { type: 'event', title: 'Phase 2 public exhibition', day: 430, hour: 15, description: 'Attended both exhibition days with association members; submitted the association’s written response.', outcome: 'Association response broadly neutral: supportive of affordable-first phasing, concerns about construction traffic — on record before consent.' },
+        { type: 'meeting', title: 'Quarterly community liaison meeting', day: 260, hour: 18, minute: 30, description: 'First liaison meeting after commencement. Agreed the meeting rhythm, newsletter content and how residents should report problems.', outcome: 'Agreed quarterly meetings and a named site contact. Association to circulate the reporting link.', nextAction: 'Standing quarterly meeting' },
+        { type: 'meeting', title: 'Quarterly community liaison meeting', day: 170, hour: 18, minute: 30, description: 'Second liaison meeting: groundworks progress, upcoming piling programme, parking questions.', outcome: 'Flagged early concerns about contractor parking on Milton Road — passed to the site manager.' },
         { type: 'meeting', title: 'Site walk: haul road and northern boundary', day: 1, hour: 14, description: 'Walked Milton Road, the site entrance and the Orchard Close boundary with the site manager. Stopped at each complaint location from the dossier.', outcome: 'Agreed on the spot: wheel wash at exit, sweeper twice daily, piling from 8am, delivery curfew, named site contact with a direct number. Follow-up walk in two weeks.', nextAction: 'Letter drop confirming all commitments by Friday' },
       ],
     },
@@ -571,15 +579,18 @@ async function main() {
       name: 'Teresa Okafor', role: 'Headteacher', organization: 'St Luke’s Primary School',
       email: 'head@example.com', phone: '01933 000005', type: 'community', category: 'neutral', influence: 3, interest: 4,
       at: SCHOOL,
+      notes: 'Raised delivery timing at the school run seven months ago — commitment on record in the log and revisited in the current response.',
       engagements: [
-        { type: 'meeting', title: 'School-run safety meeting', day: 0, hour: 11, minute: 30, description: 'Met at the school with the site manager. Reviewed the corner sightline and delivery timings against drop-off and pick-up.', outcome: 'Banksman posted 8–9am and 3–4pm on school days; deliveries held outside those windows; hoarding panel by the crossing to be set back this week.', nextAction: 'Check in after one week of banksman cover' },
+        { type: 'meeting', title: 'Pre-commencement school liaison', day: 210, hour: 16, description: 'Met ahead of groundworks: agreed deliveries would avoid drop-off and pick-up windows, and that the school would have a direct contact.', outcome: 'Delivery-timing commitment recorded and shared with the contractor. School satisfied at the time.', nextAction: 'Revisit once piling programme confirmed' },
+        { type: 'meeting', title: 'School-run safety meeting', day: 0, hour: 11, minute: 30, description: 'Met at the school with the site manager. Reviewed the corner sightline and delivery timings against drop-off and pick-up — and the commitment made at the pre-commencement meeting.', outcome: 'Banksman posted 8–9am and 3–4pm on school days; deliveries held outside those windows; hoarding panel by the crossing to be set back this week.', nextAction: 'Check in after one week of banksman cover' },
       ],
     },
     {
       name: 'Dana Price', role: 'Regional journalist', organization: 'Northampton Chronicle',
       email: 'dana.price@example.com', type: 'other', category: 'neutral', influence: 3, interest: 4,
-      notes: 'Two critical pieces so far, accurately reported. Responds well to specifics and access.',
+      notes: 'Two critical pieces so far, accurately reported. Responds well to specifics and access. Covered the scheme fairly at consent.',
       engagements: [
+        { type: 'email', title: 'Consent announcement and interview', day: 400, hour: 12, description: 'Press release on the Phase 2 consent plus an interview with the regional director.', outcome: 'Balanced piece on the consent, quoting the affordable-first phasing.' },
         { type: 'call', title: 'Statement and mitigation list ahead of print deadline', day: 1, hour: 16, description: 'Provided an on-record statement acknowledging the disruption, plus the dated mitigation list.', outcome: 'Statement carried in full. Offered a site visit to see the measures working.', nextAction: 'Host site visit next week' },
       ],
     },
@@ -595,6 +606,8 @@ async function main() {
       name: 'Alan Whitcombe', role: 'Chair', organization: 'Ashfield Parish Council',
       email: 'alan.whitcombe@example.com', type: 'authority', category: 'undecided', influence: 2, interest: 4,
       engagements: [
+        { type: 'event', title: 'Parish council meeting — scheme presentation', day: 390, hour: 19, description: 'Presented the consented scheme and construction programme at the parish council’s monthly meeting.', outcome: 'Minuted as broadly welcomed; parish asked for quarterly written updates.' },
+        { type: 'email', title: 'Quarterly parish update', day: 100, hour: 9, outcome: 'Third quarterly update sent as agreed; no matters raised.' },
         { type: 'email', title: 'Update to parish council', day: 0, hour: 9, minute: 40, outcome: 'Standing item added to the next parish meeting; invited a representative on the Thursday site walk.' },
       ],
     },
@@ -602,6 +615,7 @@ async function main() {
       name: 'Priya Nair', role: 'Highways officer', organization: 'North Northamptonshire Council — Highways',
       email: 'priya.nair@example.com', type: 'authority', category: 'neutral', influence: 3, interest: 3,
       engagements: [
+        { type: 'meeting', title: 'Pre-commencement HGV routing agreement', day: 290, hour: 10, description: 'Agreed the construction traffic management plan: approved HGV route via the A509 and Milton Road, no site traffic on Glebe Lane, delivery hours.', outcome: 'Routing plan signed off and issued to the principal contractor — the baseline the current breaches are measured against.' },
         { type: 'call', title: 'HGV routing review', day: 0, hour: 12, minute: 15, description: 'Reviewed the approved routing plan against the Glebe Lane sat-nav problem and the school-corner timings.', outcome: 'Temporary advisory signage agreed for Glebe Lane; routing map re-issued to all hauliers with the delivery curfew.', nextAction: 'Confirm signage installed; monitor gate log for compliance' },
       ],
     },
@@ -611,6 +625,7 @@ async function main() {
       at: ORCHARD,
       notes: 'Coordinates the Orchard Close complaints. Most affected street — piling noise and dust.',
       engagements: [
+        { type: 'meeting', title: 'Doorstep meeting on hoarding works', day: 185, hour: 17, description: 'Met on Orchard Close as the boundary hoarding went up; walked the affected gardens.', outcome: 'Raised hoarding height and loss of light — hoarding lowered by 300mm along the garden boundary in response.', nextAction: 'Check back once piling starts' },
         { type: 'letter', title: 'Letter drop: Orchard Close and Milton Road', day: 0, hour: 15, description: 'Hand-delivered letter to ~90 households setting out each commitment with dates, the named site contact and direct line, and the link to the issue reporter (reports go privately to the team).', outcome: 'Delivered with Gwen Harris accompanying. Several residents raised items on the doorstep — logged as new issue reports.', nextAction: 'Door-knock follow-up on the four damage claims this week' },
       ],
     },
@@ -618,6 +633,8 @@ async function main() {
       name: 'Dave McAllister', role: 'Site manager', organization: 'Brayford Construction (principal contractor)',
       email: 'dave.mcallister@example.com', phone: '07700 900006', type: 'business', category: 'supporter', influence: 3, interest: 2,
       engagements: [
+        { type: 'meeting', title: 'Monthly progress and community matters meeting', day: 60, hour: 9, description: 'Standing monthly meeting: programme, community matters, complaint themes.', outcome: 'Early complaints about deliveries noted; contractor to remind hauliers of the agreed hours.' },
+        { type: 'meeting', title: 'Monthly progress and community matters meeting', day: 30, hour: 9, description: 'Standing monthly meeting: programme, community matters, complaint themes.', outcome: 'Rising complaint volume flagged as a risk; site manager to review gate discipline and piling start times.', nextAction: 'Report back at next monthly' },
         { type: 'meeting', title: 'Mitigation planning meeting', day: 1, hour: 10, description: 'Full review of the issue log with the contractor before any external commitments were made.', outcome: 'Agreed and costed: wheel wash relocation, sweeper schedule, 8am piling start, banksman cover at the school corner, delivery curfew, boundary storage moved. All items given owners and dates.', nextAction: 'Daily check-in during the remediation fortnight' },
       ],
     },
@@ -663,7 +680,7 @@ async function main() {
   const ENQUIRIES: Array<{
     name: string; email: string; org?: string; phone?: string
     subject: string; message: string; category: string
-    status: 'new' | 'open'; read: boolean; day: number; hour: number
+    status: 'new' | 'open' | 'closed'; read: boolean; day: number; hour: number
   }> = [
     {
       name: 'Peter Hale', email: 'peter.hale@example.com', org: 'Ashfield Residents’ Association',
@@ -695,6 +712,26 @@ async function main() {
       message: 'I am preparing a follow-up piece on construction disruption at Ashfield Park Phase 2, including claims that piling has repeatedly started before permitted hours and that residents’ complaints have gone unanswered. Do you wish to comment? Specifically: (1) how many complaints have been received in the past month; (2) what action has been taken; (3) whether the group considers this site typical of its approach to communities. Deadline Thursday 4pm.',
       category: 'general', status: 'open', read: true, day: 1, hour: 13,
     },
+    // Historic enquiries (closed) — the relationship record that predates the
+    // crisis: prior asks and commitments, retrievable the moment they matter.
+    {
+      name: 'Peter Hale', email: 'peter.hale@example.com', org: 'Ashfield Residents’ Association',
+      subject: 'Construction traffic routing plan — request for a copy',
+      message: 'At the liaison meeting you mentioned the agreed construction traffic route. Please could the association have a copy of the routing plan and the delivery hours so we can share them in our newsletter? It helps to be able to tell members what was actually agreed.',
+      category: 'general', status: 'closed', read: true, day: 240, hour: 10,
+    },
+    {
+      name: 'Teresa Okafor', email: 'head@example.com', org: 'St Luke’s Primary School',
+      subject: 'Deliveries at school drop-off — request for agreed timings',
+      message: 'Ahead of the main works starting, the school would like written confirmation of delivery timings. Our concern is the corner outside the school gate between 8:30 and 9:00 and again from 3:00 to 3:30. Could we agree that deliveries avoid these windows on school days?',
+      category: 'general', status: 'closed', read: true, day: 212, hour: 9,
+    },
+    {
+      name: 'Gwen Harris', email: 'gwen.harris@example.com', org: 'Orchard Close residents',
+      subject: 'Hoarding height and loss of light — Orchard Close',
+      message: 'The new hoarding along the backs of Orchard Close is considerably taller than we expected and several gardens have lost their afternoon light. Could someone come and look? A number of neighbours have asked me to raise this.',
+      category: 'complaint', status: 'closed', read: true, day: 186, hour: 16,
+    },
   ]
   const ENQUIRY_ANALYSIS: Array<{ s: Sent; t: number[] }> = [
     { s: 'negative', t: [0, 1, 2, 3] }, // residents' association dossier
@@ -702,6 +739,9 @@ async function main() {
     { s: 'negative', t: [1] },          // school-run safety
     { s: 'negative', t: [3] },          // damage claim
     { s: 'neutral', t: [0, 1] },        // press enquiry
+    { s: 'neutral', t: [1] },           // historic: routing plan request
+    { s: 'neutral', t: [1] },           // historic: school delivery timings
+    { s: 'negative', t: [4] },          // historic: hoarding height/light
   ]
   for (let qIdx = 0; qIdx < ENQUIRIES.length; qIdx++) {
     const q = ENQUIRIES[qIdx]

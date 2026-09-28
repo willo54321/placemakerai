@@ -7,7 +7,7 @@ import { Spinner } from '@/components/Spinner'
 import { toast } from 'sonner'
 import {
   Users, Plus, Building2, Mail, Phone, Trash2, X, Pencil,
-  MessageSquare, CalendarDays, ArrowRight, Inbox, Target, Landmark,
+  MessageSquare, CalendarDays, ArrowRight, Inbox, Target, Landmark, Download,
 } from 'lucide-react'
 
 // ---- domain vocab -----------------------------------------------------------
@@ -239,6 +239,12 @@ export function StakeholdersTab({ projectId, isAdmin }: { projectId: string; isA
         </h2>
         {isAdmin && (
           <div className="flex items-center gap-2 flex-wrap">
+            {stakeholders.length > 0 && (
+              <a href={`/api/projects/${projectId}/stakeholders/export`} className="btn-secondary">
+                <Download size={18} aria-hidden="true" />
+                Export CSV
+              </a>
+            )}
             <button
               onClick={() => importReps.mutate()}
               disabled={importReps.isPending}

@@ -1,7 +1,7 @@
 'use client'
 
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
-import { Plus, Trash2, X, Eye, Copy, FileText, Check, GripVertical, List, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, Trash2, X, Eye, Copy, FileText, Check, GripVertical, List, ChevronDown, ChevronUp, Download } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { usePermissions } from '@/hooks/usePermissions'
 
@@ -593,16 +593,27 @@ export function FormsTab({
                       </p>
                     </div>
                   </div>
-                  <button
-                    onClick={() => {
-                      setViewingResponses(null)
-                      setExpandedResponse(null)
-                    }}
-                    className="p-2 hover:bg-white/50 rounded-lg transition-colors"
-                    aria-label="Close responses"
-                  >
-                    <X size={20} className="text-slate-500" aria-hidden="true" />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {(responsesData?.responses?.length || 0) > 0 && (
+                      <a
+                        href={`/api/projects/${projectId}/forms/${viewingResponses}/export`}
+                        className="flex items-center gap-1.5 text-sm text-blue-700 hover:text-blue-800 px-3 py-1.5 bg-white/70 hover:bg-white rounded-lg border border-blue-200 transition-colors"
+                      >
+                        <Download size={14} aria-hidden="true" />
+                        Export CSV
+                      </a>
+                    )}
+                    <button
+                      onClick={() => {
+                        setViewingResponses(null)
+                        setExpandedResponse(null)
+                      }}
+                      className="p-2 hover:bg-white/50 rounded-lg transition-colors"
+                      aria-label="Close responses"
+                    >
+                      <X size={20} className="text-slate-500" aria-hidden="true" />
+                    </button>
+                  </div>
                 </div>
               </div>
 

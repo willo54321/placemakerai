@@ -693,15 +693,19 @@ function EngagementTimeline({
         <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
           <CalendarDays size={13} /> Engagement log ({engagements.length})
         </h4>
-        {isAdmin && !adding && (
-          <button onClick={() => setAdding(true)} className="text-xs font-medium text-green-700 hover:text-green-800 inline-flex items-center gap-1">
-            <Plus size={13} /> Log engagement
-          </button>
-        )}
       </div>
 
       {adding && (
         <AddEngagementForm onCancel={() => setAdding(false)} onSubmit={b => create.mutate(b)} submitting={create.isPending} />
+      )}
+
+      {isAdmin && !adding && (
+        <button
+          onClick={() => setAdding(true)}
+          className="w-full mb-3 py-2 rounded-lg border border-dashed border-green-300 text-sm font-medium text-green-700 hover:bg-green-50 hover:border-green-400 inline-flex items-center justify-center gap-1.5"
+        >
+          <Plus size={15} /> Log engagement
+        </button>
       )}
 
       {engagements.length === 0 && !adding ? (

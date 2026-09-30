@@ -4,6 +4,8 @@ import { prisma } from '@/lib/db'
 import { authorizeProject } from '@/lib/api-auth'
 import {
   startFullAnalysis,
+  runFullAnalysisSync,
+  SYNC_ANALYSIS_MAX_ITEMS,
   isAnalysisBatchReady,
   finalizeFullAnalysis,
   createFeedbackHash,
@@ -16,9 +18,10 @@ import { logAudit } from '@/lib/audit'
 
 // Analysis runs through the Batch API: POST submits the run (one taxonomy call
 // plus the batch submission, well under a minute), and GET finalizes it once
-// the batch ends (aggregation in code plus two summary calls). Neither leg
-// scales with the size of the consultation, so 60s covers both.
-export const maxDuration = 60
+// the batch ends (aggregation in code plus two summary calls). Small corpora
+// (≤ SYNC_ANALYSIS_MAX_ITEMS) instead run end-to-end inside the POST with
+// direct model calls, so the ceiling covers a complete run.
+export const maxDuration = 120
 
 function isEmptyData(data: unknown): boolean {
   return !data || Object.keys(data as object).length === 0
@@ -291,6 +294,47 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
         { error: `Daily analysis limit reached (${RUNS_PER_DAY} runs in 24h). Try again tomorrow.` },
         { status: 429 }
       )
+    }
+
+    // Small corpora run end-to-end right here: the batch queue wait would
+    // dwarf the work, and a direct run completes within the request.
+    if (feedbackItems.length <= SYNC_ANALYSIS_MAX_ITEMS) {
+      const analysis = await runFullAnalysisSync(feedbackItems, {
+        boundaryGeojson: await getBoundaryGeojson(projectId),
+      })
+
+      await logAudit({
+        projectId,
+        action: 'analysis.run',
+        targetType: 'AnalysisResult',
+        detail: { itemCount: feedbackItems.length, forced: force, sync: true },
+      })
+
+      await prisma.analysisResult.upsert({
+        where: { projectId_type: { projectId, type: 'full' } },
+        update: {
+          data: analysis as object,
+          status: 'complete',
+          batchId: null,
+          pending: Prisma.DbNull,
+          feedbackHash,
+          error: null,
+          updatedAt: new Date(),
+        },
+        create: {
+          projectId,
+          type: 'full',
+          data: analysis as object,
+          status: 'complete',
+          feedbackHash,
+        },
+      })
+
+      return NextResponse.json({
+        analysis,
+        feedbackCount: feedbackItems.length,
+        lastAnalyzed: new Date().toISOString(),
+      })
     }
 
     // Submit the run: taxonomy call + batch submission. The previous result

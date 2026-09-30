@@ -587,6 +587,29 @@ export interface PendingAnalysis {
  * typically a few minutes later.
  */
 export async function startFullAnalysis(feedbackItems: FeedbackItem[]): Promise<PendingAnalysis> {
+  const submission = await buildAnalysisSubmission(feedbackItems)
+  const batch = await getAnthropic().messages.batches.create({ requests: submission.requests })
+
+  return {
+    batchId: batch.id,
+    taxonomy: submission.taxonomy,
+    coverage: submission.coverage,
+    chunks: submission.chunks,
+    campaign: submission.campaign,
+    startedAt: new Date().toISOString(),
+  }
+}
+
+/** The model requests and bookkeeping for a run, shared by both transports. */
+interface AnalysisSubmission {
+  requests: Anthropic.Messages.BatchCreateParams['requests']
+  taxonomy: ThemeDefinition[]
+  coverage: AnalysisCoverage
+  chunks: string[][]
+  campaign: PendingAnalysis['campaign']
+}
+
+async function buildAnalysisSubmission(feedbackItems: FeedbackItem[]): Promise<AnalysisSubmission> {
   const { items, coverage } = selectForAnalysis(feedbackItems)
   if (items.length === 0) {
     throw new Error('No feedback to analyze')
@@ -678,10 +701,8 @@ export async function startFullAnalysis(feedbackItems: FeedbackItem[]): Promise<
     })
   }
 
-  const batch = await getAnthropic().messages.batches.create({ requests })
-
   return {
-    batchId: batch.id,
+    requests,
     taxonomy,
     coverage,
     chunks: batches.map(b => b.map(item => item.id)),
@@ -693,8 +714,55 @@ export async function startFullAnalysis(feedbackItems: FeedbackItem[]): Promise<
       })),
       unclusteredIds: unclustered.map(item => item.id),
     },
+  }
+}
+
+/**
+ * Corpora at or below this size skip the Batch API and run synchronously:
+ * the batch queue wait dwarfs the actual work, and the 50% batch discount
+ * amounts to pennies at this scale.
+ */
+export const SYNC_ANALYSIS_MAX_ITEMS = 25
+
+/**
+ * Run a full analysis end-to-end with direct (non-batch) model calls. Same
+ * requests, same assembly as the batch route — only the transport differs.
+ */
+export async function runFullAnalysisSync(
+  feedbackItems: FeedbackItem[],
+  options?: { boundaryGeojson?: unknown | null }
+): Promise<FullAnalysisResult> {
+  const submission = await buildAnalysisSubmission(feedbackItems)
+
+  const entries = (
+    await Promise.all(
+      submission.requests.map(async request => {
+        try {
+          const message = await getAnthropic().messages.create(request.params)
+          const textBlock = message.content.find(
+            (block): block is Anthropic.TextBlock => block.type === 'text'
+          )
+          return textBlock ? { customId: request.custom_id, text: textBlock.text } : null
+        } catch (err) {
+          // A failed request drops out of the counts and shows up in
+          // coverage rather than killing the run, matching the batch route.
+          console.warn(`runFullAnalysisSync: request ${request.custom_id} failed`, err)
+          return null
+        }
+      })
+    )
+  ).filter((entry): entry is ResultEntry => entry !== null)
+
+  const pending: PendingAnalysis = {
+    batchId: '',
+    taxonomy: submission.taxonomy,
+    coverage: submission.coverage,
+    chunks: submission.chunks,
+    campaign: submission.campaign,
     startedAt: new Date().toISOString(),
   }
+
+  return assembleFullAnalysis(pending, feedbackItems, entries, options)
 }
 
 const SPATIAL_SCHEMA = {
@@ -887,6 +955,42 @@ export async function finalizeFullAnalysis(
     boundaryGeojson?: unknown | null
   }
 ): Promise<FullAnalysisResult> {
+  const entries: ResultEntry[] = []
+  const results = await getAnthropic().messages.batches.results(pending.batchId)
+  for await (const entry of results) {
+    if (entry.result.type !== 'succeeded') {
+      console.warn(`finalizeFullAnalysis: request ${entry.custom_id} ${entry.result.type}`)
+      continue
+    }
+    const textBlock = entry.result.message.content.find(
+      (block): block is Anthropic.TextBlock => block.type === 'text'
+    )
+    if (textBlock) entries.push({ customId: entry.custom_id, text: textBlock.text })
+  }
+
+  return assembleFullAnalysis(pending, feedbackItems, entries, options)
+}
+
+/** One request's result text, keyed by the custom_id it was submitted under. */
+interface ResultEntry {
+  customId: string
+  text: string
+}
+
+/**
+ * Assemble the full analysis from per-request result texts. All counting and
+ * statistics run in code; the only model calls are the summary and spatial
+ * insights, written from the counted figures.
+ */
+async function assembleFullAnalysis(
+  pending: PendingAnalysis,
+  feedbackItems: FeedbackItem[],
+  resultEntries: ResultEntry[],
+  options?: {
+    /** The project's boundary layer, used to name spatial findings. */
+    boundaryGeojson?: unknown | null
+  }
+): Promise<FullAnalysisResult> {
   const byId = new Map(feedbackItems.map(item => [item.id, truncateContent(item)]))
 
   // The classified items, in the order they were sent. Items deleted since
@@ -900,27 +1004,17 @@ export async function finalizeFullAnalysis(
   let campaignRaw: CampaignCharacterisation | null = null
   const seen = new Set<string>()
 
-  const results = await getAnthropic().messages.batches.results(pending.batchId)
-  for await (const entry of results) {
-    if (entry.result.type !== 'succeeded') {
-      console.warn(`finalizeFullAnalysis: request ${entry.custom_id} ${entry.result.type}`)
-      continue
-    }
-    const textBlock = entry.result.message.content.find(
-      (block): block is Anthropic.TextBlock => block.type === 'text'
-    )
-    if (!textBlock) continue
-
-    if (entry.custom_id === 'campaigns') {
+  for (const entry of resultEntries) {
+    if (entry.customId === 'campaigns') {
       try {
-        campaignRaw = JSON.parse(textBlock.text) as CampaignCharacterisation
+        campaignRaw = JSON.parse(entry.text) as CampaignCharacterisation
       } catch {
-        console.warn('finalizeFullAnalysis: campaign characterisation unparseable')
+        console.warn('assembleFullAnalysis: campaign characterisation unparseable')
       }
       continue
     }
 
-    const match = entry.custom_id.match(/^classify-(\d+)$/)
+    const match = entry.customId.match(/^classify-(\d+)$/)
     if (!match) continue
     const chunkIds = pending.chunks[Number(match[1])]
     if (!chunkIds) continue
@@ -937,9 +1031,9 @@ export async function finalizeFullAnalysis(
       }>
     }
     try {
-      parsed = JSON.parse(textBlock.text)
+      parsed = JSON.parse(entry.text)
     } catch {
-      console.warn(`finalizeFullAnalysis: chunk ${entry.custom_id} unparseable`)
+      console.warn(`assembleFullAnalysis: chunk ${entry.customId} unparseable`)
       continue
     }
 

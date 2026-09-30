@@ -375,8 +375,20 @@ const CLASSIFY_SCHEMA = {
           confidence: { type: 'number', description: '0 to 1' },
           themes: {
             type: 'array',
-            items: { type: 'integer' },
-            description: 'Numbers of every theme that applies. Empty if none do.',
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                theme: { type: 'integer', description: 'Number of a theme that applies' },
+                quote: {
+                  type: 'string',
+                  description:
+                    'Verbatim excerpt from the response (one sentence or clause) showing why this theme applies. Copied exactly, character for character — no paraphrasing, no form question labels. Empty string if no short excerpt works.',
+                },
+              },
+              required: ['theme', 'quote'],
+            },
+            description: 'Every theme that applies, each with its supporting excerpt. Empty if none do.',
           },
           material: { type: 'string', enum: ['material', 'non-material', 'mixed'] },
           materialCategories: { type: 'array', items: { type: 'string' } },
@@ -411,6 +423,12 @@ export interface ItemAssignment {
   confidence: number
   /** Indices into the taxonomy. */
   themeIds: number[]
+  /**
+   * Verbatim supporting excerpt per assigned theme, keyed by theme index as a
+   * string (survives JSON round-trips). Validated as a true substring of the
+   * response at assembly time; absent on analyses from before the field.
+   */
+  themeQuotes?: Record<string, string>
   material: 'material' | 'non-material' | 'mixed'
   materialCategories: string[]
   nonMaterialCategories: string[]
@@ -474,7 +492,7 @@ For each response, decide four things. Use the number in brackets as the respons
 
 STANCE — positive if it supports or praises, negative if it opposes or raises concerns, neutral if it only asks a question or gives information. Judge the response's position on the proposal, not the tone of its language: a politely worded objection is negative.
 
-THEMES — which of the numbered themes below the response raises. A response may raise several themes, or none. Assign a theme only when the response genuinely addresses it; do not stretch to give every response a theme.
+THEMES — which of the numbered themes below the response raises. A response may raise several themes, or none. Assign a theme only when the response genuinely addresses it; do not stretch to give every response a theme. For each theme you assign, also copy the short part of the response (one sentence or clause) that shows why the theme applies. The excerpt must be copied verbatim, character for character — never paraphrase, and never include form question labels or headings, only the respondent's own words.
 
 THEMES:
 ${taxonomyText || '(no themes identified)'}
@@ -1024,7 +1042,7 @@ async function assembleFullAnalysis(
         id: string
         sentiment: 'positive' | 'negative' | 'neutral'
         confidence: number
-        themes: number[]
+        themes: Array<number | { theme: number; quote?: string }>
         material: 'material' | 'non-material' | 'mixed'
         materialCategories: string[]
         nonMaterialCategories: string[]
@@ -1045,14 +1063,29 @@ async function assembleFullAnalysis(
       if (!originalId || seen.has(originalId) || !byId.has(originalId)) continue
       seen.add(originalId)
 
+      const content = byId.get(originalId)!.content
+      const themeIds: number[] = []
+      const themeQuotes: Record<string, string> = {}
+      for (const raw of result.themes || []) {
+        // Older cached runs sent bare theme numbers; current runs send
+        // { theme, quote }. Model-supplied indices are 1-based and can be
+        // out of range.
+        const themeNumber = typeof raw === 'number' ? raw : raw?.theme
+        const index = (themeNumber ?? 0) - 1
+        if (index < 0 || index >= pending.taxonomy.length) continue
+        if (!themeIds.includes(index)) themeIds.push(index)
+        // Keep the excerpt only when it is genuinely verbatim, so every
+        // quote shown in a report traces back to the response it came from.
+        const quote = typeof raw === 'object' && raw?.quote ? raw.quote.trim() : ''
+        if (quote && content.includes(quote)) themeQuotes[String(index)] = quote
+      }
+
       assignments.push({
         id: originalId,
         sentiment: result.sentiment,
         confidence: result.confidence,
-        themeIds: (result.themes || [])
-          // Model-supplied indices are 1-based and can be out of range.
-          .map(n => n - 1)
-          .filter(index => index >= 0 && index < pending.taxonomy.length),
+        themeIds,
+        ...(Object.keys(themeQuotes).length > 0 ? { themeQuotes } : {}),
         material: result.material,
         materialCategories: result.materialCategories || [],
         nonMaterialCategories: result.nonMaterialCategories || [],
@@ -1207,13 +1240,26 @@ export function deriveThemes(classification: CorpusClassification): ThemesResult
     const sentimentBreakdown = { positive: 0, negative: 0, neutral: 0 }
     members.forEach(member => sentimentBreakdown[member.sentiment]++)
 
-    // Prefer quotes with enough substance to stand alone, shortest first so
-    // they read cleanly in a report.
-    const sampleQuotes = members
-      .map(member => itemsById.get(member.id)?.content?.trim())
-      .filter((text): text is string => !!text && text.length >= 40)
+    // Prefer the classifier's per-theme excerpts (validated verbatim at
+    // assembly time) so the quote shown is the part of the response that is
+    // actually about this theme; analyses from before the field fall back to
+    // whole responses. Shortest first so they read cleanly in a report.
+    const excerpts = Array.from(
+      new Set(
+        members
+          .map(member => member.themeQuotes?.[String(themeId)]?.trim())
+          .filter((text): text is string => !!text && text.length >= 15)
+      )
+    )
+    const pool =
+      excerpts.length > 0
+        ? excerpts
+        : members
+            .map(member => itemsById.get(member.id)?.content?.trim())
+            .filter((text): text is string => !!text && text.length >= 40)
+    const sampleQuotes = pool
       .sort((a, b) => a.length - b.length)
-      .slice(0, 2)
+      .slice(0, 3)
       .map(text => (text.length > QUOTE_CHARS ? `${text.slice(0, QUOTE_CHARS).trimEnd()}…` : text))
 
     const count = members.length

@@ -2,6 +2,7 @@
 
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import { Plus, Trash2, X, Eye, Copy, FileText, Check, GripVertical, List, ChevronDown, ChevronUp, Download } from 'lucide-react'
+import { toast } from 'sonner'
 import { useState, useRef, useEffect } from 'react'
 import { usePermissions } from '@/hooks/usePermissions'
 
@@ -124,6 +125,22 @@ export function FormsTab({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
       setDeleteConfirm(null)
+    },
+  })
+
+  const deleteResponse = useMutation({
+    mutationFn: async (responseId: string) => {
+      const res = await fetch(`/api/projects/${projectId}/forms/${viewingResponses}/responses/${responseId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error(`Failed to delete: ${res.status}`)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['form-responses', viewingResponses] })
+      queryClient.invalidateQueries({ queryKey: ['project', projectId] })
+      setExpandedResponse(null)
+      toast.success('Response permanently deleted')
+    },
+    onError: () => {
+      toast.error('Failed to delete — the response is unchanged')
     },
   })
 
@@ -783,6 +800,20 @@ export function FormsTab({
                                         </div>
                                       )
                                     })}
+                                </div>
+                                <div className="mt-4 pt-3 border-t border-slate-100 flex justify-end">
+                                  <button
+                                    onClick={() => {
+                                      if (confirm('Permanently delete this response?\n\nIt will be removed from exports and from the next AI analysis run. This cannot be undone.')) {
+                                        deleteResponse.mutate(response.id)
+                                      }
+                                    }}
+                                    disabled={deleteResponse.isPending}
+                                    className="flex items-center gap-1.5 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                                  >
+                                    <Trash2 size={14} aria-hidden="true" />
+                                    Delete response
+                                  </button>
                                 </div>
                               </div>
                             </div>

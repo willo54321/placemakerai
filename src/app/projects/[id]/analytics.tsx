@@ -206,6 +206,12 @@ type AnalyticsView = typeof ANALYTICS_VIEWS[number]['id']
 
 export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
   const queryClient = useQueryClient()
+  // Newest feedback-kind Word template (if any) powers the Export Word button
+  const { data: reportTemplates } = useQuery<Array<{ id: string; kind: string }>>({
+    queryKey: ['report-templates', projectId],
+    queryFn: () => fetchJson(`/api/projects/${projectId}/report-templates`),
+  })
+  const wordTemplate = (reportTemplates || []).find(t => t.kind === 'feedback')
   const [selectedTheme, setSelectedTheme] = useState<Theme | null>(null)
   const [showAllFindings, setShowAllFindings] = useState(false)
   const [focusResponse, setFocusResponse] = useState<{ id: string; nonce: number } | null>(null)
@@ -443,6 +449,15 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
                 ? `${newResponses} new response${newResponses === 1 ? '' : 's'} since this analysis`
                 : 'Feedback has changed since this analysis'}
             </span>
+          )}
+          {wordTemplate && (
+            <a
+              href={`/api/projects/${projectId}/report-templates/${wordTemplate.id}/render`}
+              className="btn-secondary"
+              title="Download this analysis as a branded Word report"
+            >
+              Export Word
+            </a>
           )}
           <button
             onClick={() => runAnalysis.mutate({ force: true })}

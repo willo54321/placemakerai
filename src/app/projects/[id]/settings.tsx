@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useState, useRef } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
-import { Save, Trash2, AlertTriangle } from 'lucide-react'
+import { Save, Trash2, AlertTriangle, FileUp, FileText } from 'lucide-react'
 import { toast } from 'sonner'
 import { usePermissions } from '@/hooks/usePermissions'
 
@@ -275,6 +275,9 @@ export function SettingsTab({ projectId, project }: SettingsTabProps) {
         </div>
       </section>
 
+      {/* Word report templates */}
+      <ReportTemplatesSection projectId={projectId} />
+
       {/* Danger Zone */}
       {canDeleteProject && (
         <section className="card p-6 border-red-200 bg-red-50">
@@ -337,5 +340,122 @@ export function SettingsTab({ projectId, project }: SettingsTabProps) {
         </section>
       )}
     </div>
+  )
+}
+
+const TEMPLATE_KIND_LABELS: Record<string, string> = {
+  stakeholders: 'Stakeholder engagement',
+  feedback: 'Feedback report',
+}
+
+// Company .docx templates for branded Word exports. The newest template of
+// each kind is the one the Export Word buttons use.
+function ReportTemplatesSection({ projectId }: { projectId: string }) {
+  const queryClient = useQueryClient()
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [uploadKind, setUploadKind] = useState('stakeholders')
+
+  const { data: templates } = useQuery({
+    queryKey: ['report-templates', projectId],
+    queryFn: () => fetch(`/api/projects/${projectId}/report-templates`).then(r => r.json()),
+  })
+
+  const upload = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('kind', uploadKind)
+      const res = await fetch(`/api/projects/${projectId}/report-templates`, { method: 'POST', body: formData })
+      const body = await res.json()
+      if (!res.ok) throw new Error(body.error || 'Upload failed')
+      return body
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['report-templates', projectId] })
+      toast.success('Template uploaded and validated')
+    },
+    onError: (err: Error) => toast.error(err.message),
+    onSettled: () => { if (fileRef.current) fileRef.current.value = '' },
+  })
+
+  const remove = useMutation({
+    mutationFn: async (templateId: string) => {
+      const res = await fetch(`/api/projects/${projectId}/report-templates/${templateId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Delete failed')
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['report-templates', projectId] })
+      toast.success('Template deleted')
+    },
+    onError: () => toast.error('Failed to delete template'),
+  })
+
+  return (
+    <section className="card p-6">
+      <h3 className="text-lg font-semibold text-slate-900 mb-1">Word Report Templates</h3>
+      <p className="text-sm text-slate-500 mb-4">
+        Upload your company&apos;s .docx template and exports come out in your branding. Start from a
+        starter template — restyle it in Word, keep the {'{tags}'}, and upload it here.
+      </p>
+      <div className="flex flex-wrap gap-3 mb-4">
+        <a href="/report-templates/stakeholder-engagement-starter.docx" className="btn-secondary text-sm" download>
+          <FileText size={16} aria-hidden="true" /> Stakeholder starter template
+        </a>
+        <a href="/report-templates/feedback-report-starter.docx" className="btn-secondary text-sm" download>
+          <FileText size={16} aria-hidden="true" /> Feedback starter template
+        </a>
+      </div>
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <select
+          value={uploadKind}
+          onChange={e => setUploadKind(e.target.value)}
+          className="p-2 border border-slate-300 rounded-lg text-sm"
+          aria-label="Template type"
+        >
+          <option value="stakeholders">Stakeholder engagement</option>
+          <option value="feedback">Feedback report</option>
+        </select>
+        <button
+          onClick={() => fileRef.current?.click()}
+          disabled={upload.isPending}
+          className="btn-secondary text-sm"
+        >
+          <FileUp size={16} aria-hidden="true" />
+          {upload.isPending ? 'Validating…' : 'Upload template (.docx)'}
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".docx"
+          className="hidden"
+          onChange={e => { const f = e.target.files?.[0]; if (f) upload.mutate(f) }}
+        />
+      </div>
+      {(templates || []).length > 0 && (
+        <ul className="divide-y divide-slate-100 border border-slate-200 rounded-lg">
+          {(templates as Array<{ id: string; name: string; kind: string; createdAt: string }>).map((t, i, arr) => {
+            const isActive = arr.findIndex(x => x.kind === t.kind) === i
+            return (
+              <li key={t.id} className="flex items-center justify-between px-4 py-2.5">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-slate-900 truncate">{t.name}</p>
+                  <p className="text-xs text-slate-500">
+                    {TEMPLATE_KIND_LABELS[t.kind] || t.kind} · {new Date(t.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    {isActive && <span className="ml-2 text-green-700 font-medium">Active</span>}
+                  </p>
+                </div>
+                <button
+                  onClick={() => { if (confirm(`Delete template "${t.name}"?`)) remove.mutate(t.id) }}
+                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                  aria-label={`Delete template ${t.name}`}
+                >
+                  <Trash2 size={16} />
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </section>
   )
 }

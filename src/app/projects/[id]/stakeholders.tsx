@@ -182,6 +182,14 @@ export function StakeholdersTab({ projectId, isAdmin }: { projectId: string; isA
     queryFn: () => fetchJson(`/api/projects/${projectId}/stakeholders`),
   })
 
+  // Newest stakeholder-kind Word template (if any) powers the Export Word button
+  const { data: reportTemplates } = useQuery<Array<{ id: string; kind: string }>>({
+    queryKey: ['report-templates', projectId],
+    queryFn: () => fetchJson(`/api/projects/${projectId}/report-templates`),
+    enabled: isAdmin,
+  })
+  const wordTemplate = (reportTemplates || []).find(t => t.kind === 'stakeholders')
+
   const stakeholders = data?.stakeholders ?? []
   const filtered = useMemo(
     () => stakeholders.filter(s => categoryFilter === 'all' || s.category === categoryFilter),
@@ -243,6 +251,12 @@ export function StakeholdersTab({ projectId, isAdmin }: { projectId: string; isA
               <a href={`/api/projects/${projectId}/stakeholders/export`} className="btn-secondary">
                 <Download size={18} aria-hidden="true" />
                 Export CSV
+              </a>
+            )}
+            {stakeholders.length > 0 && wordTemplate && (
+              <a href={`/api/projects/${projectId}/report-templates/${wordTemplate.id}/render`} className="btn-secondary">
+                <Download size={18} aria-hidden="true" />
+                Export Word
               </a>
             )}
             <button

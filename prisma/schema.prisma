@@ -392,6 +392,7 @@ model Project {
   subscribers           Subscriber[]
   campaigns             Campaign[]
   tours                 Tour[]
+  reportTemplates       ReportTemplate[]
 }
 
 model PublicPin {
@@ -555,6 +556,21 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+// Company Word (.docx) template for branded report exports. The file bytes
+// live in the row (templates are small); tags are filled by docxtemplater.
+// kind: "stakeholders" | "feedback" — which data schema the template expects.
+model ReportTemplate {
+  id        String   @id @default(cuid())
+  projectId String
+  name      String
+  kind      String
+  data      Bytes
+  createdAt DateTime @default(now())
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, kind])
 }
 
 model AnalysisResult {

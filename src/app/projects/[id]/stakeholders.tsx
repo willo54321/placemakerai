@@ -248,6 +248,12 @@ export function StakeholdersTab({ projectId, isAdmin }: { projectId: string; isA
         {isAdmin && (
           <div className="flex items-center gap-2 flex-wrap">
             {stakeholders.length > 0 && (
+              <a href={`/api/projects/${projectId}/stakeholders/export?format=xlsx`} className="btn-secondary">
+                <Download size={18} aria-hidden="true" />
+                Export Excel
+              </a>
+            )}
+            {stakeholders.length > 0 && (
               <a href={`/api/projects/${projectId}/stakeholders/export`} className="btn-secondary">
                 <Download size={18} aria-hidden="true" />
                 Export CSV

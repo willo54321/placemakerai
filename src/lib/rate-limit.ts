@@ -5,10 +5,12 @@ import { Redis } from '@upstash/redis'
 /**
  * Rate limiter for public write endpoints.
  *
- * When UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN are set (the Vercel
- * Upstash integration provides both), limits are enforced globally via a
+ * When Upstash REST credentials are set, limits are enforced globally via a
  * shared Redis sliding window — the same bucket regardless of which
- * serverless instance handles the request.
+ * serverless instance handles the request. The Vercel Upstash Marketplace
+ * integration injects them as KV_REST_API_URL / KV_REST_API_TOKEN; a manually
+ * configured UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN pair takes
+ * precedence when both exist.
  *
  * Without those env vars (local dev, or before the integration is added) it
  * falls back to the original per-instance in-memory limiter: still a useful
@@ -18,10 +20,9 @@ import { Redis } from '@upstash/redis'
 type Bucket = { count: number; resetAt: number }
 const buckets = new Map<string, Bucket>()
 
-const redis =
-  process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
-    ? Redis.fromEnv()
-    : null
+const redisUrl = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL
+const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN
+const redis = redisUrl && redisToken ? new Redis({ url: redisUrl, token: redisToken }) : null
 
 // One Ratelimit per (scope, limit, window) combination, created lazily.
 const limiters = new Map<string, Ratelimit>()

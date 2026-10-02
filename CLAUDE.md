@@ -223,8 +223,10 @@ NEXTAUTH_URL=          # Base URL (e.g., https://placemakerai.io)
 RESEND_API_KEY=        # Email delivery (invite/reset emails)
 RESEND_WEBHOOK_SECRET= # Svix signing secret for the inbound email.received webhook (enables inbound threading)
 ANTHROPIC_API_KEY=     # AI analysis (Claude)
-UPSTASH_REDIS_REST_URL=   # Optional: global rate limiting (Vercel Upstash integration)
-UPSTASH_REDIS_REST_TOKEN= # Optional: without these, rate limiting falls back to per-instance memory
+KV_REST_API_URL=          # Global rate limiting — injected by the Vercel Upstash Marketplace
+KV_REST_API_TOKEN=        # integration (Prod+Preview). UPSTASH_REDIS_REST_URL/_TOKEN also
+                          # accepted (and win if both set). Without either pair, rate limiting
+                          # falls back to per-instance memory (local dev does this).
 ```
 
 ## Common Tasks

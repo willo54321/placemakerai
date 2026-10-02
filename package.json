@@ -36,7 +36,7 @@
     "framer-motion": "^13.1.1",
     "html2canvas": "^1.4.1",
     "lucide-react": "^1.46.0",
-    "next": "^16.3.5",
+    "next": "^16.3.8",
     "next-auth": "^4.24.13",
     "node-html-parser": "^7.0.2",
     "pizzip": "^3.3.0",

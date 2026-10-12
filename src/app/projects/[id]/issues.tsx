@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import dynamic from 'next/dynamic'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
@@ -20,6 +21,16 @@ import {
   Code,
 } from 'lucide-react'
 import { ISSUE_CATEGORY_LABELS, type IssueCategory } from '@/lib/issues'
+
+// Google Maps must not render on the server
+const IssuesMap = dynamic(() => import('@/components/IssuesMap').then(mod => ({ default: mod.IssuesMap })), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[420px] flex items-center justify-center bg-slate-50">
+      <div className="w-8 h-8 border-3 border-orange-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  ),
+})
 
 // Icons/colors are presentation-only; labels come from lib/issues so the
 // vocabulary matches the embed and the notification emails.
@@ -77,6 +88,14 @@ export function IssuesTab({ projectId, project, isAdmin }: { projectId: string; 
   const [resolvingPinId, setResolvingPinId] = useState<string | null>(null)
   const [resolveNotes, setResolveNotes] = useState('')
   const [copiedCode, setCopiedCode] = useState(false)
+  const [highlightedPinId, setHighlightedPinId] = useState<string | null>(null)
+
+  // Map marker click → scroll the report card into view and flash it
+  const focusIssue = (pinId: string) => {
+    setHighlightedPinId(pinId)
+    document.getElementById(`issue-${pinId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    window.setTimeout(() => setHighlightedPinId(current => (current === pinId ? null : current)), 2400)
+  }
 
   const updatePin = useMutation({
     mutationFn: async ({ pinId, ...data }: { pinId: string; resolved?: boolean; resolvedNotes?: string }) => {
@@ -227,6 +246,24 @@ export function IssuesTab({ projectId, project, isAdmin }: { projectId: string; 
         </div>
       )}
 
+      {/* Issue locations map — plots whatever the filter below shows */}
+      {visibleIssues.some(pin => (pin.latitude != null && pin.longitude != null) || pin.geometry) && (
+        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+          <div className="px-6 py-4 border-b flex items-center justify-between flex-wrap gap-3">
+            <h3 className="font-semibold">Issue locations</h3>
+            <div className="flex items-center gap-4 text-sm text-slate-600">
+              <span className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-full bg-red-600 border-2 border-white shadow" /> Open
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-full bg-green-600 border-2 border-white shadow" /> Resolved
+              </span>
+            </div>
+          </div>
+          <IssuesMap issues={visibleIssues} onSelect={focusIssue} />
+        </div>
+      )}
+
       {/* Issues list */}
       <div className="bg-white rounded-xl shadow-sm border">
         <div className="px-6 py-4 border-b flex items-center justify-between flex-wrap gap-3">
@@ -272,7 +309,13 @@ export function IssuesTab({ projectId, project, isAdmin }: { projectId: string; 
               const style = categoryStyle(pin.category)
               const IconComponent = style.icon
               return (
-                <div key={pin.id} className={`px-6 py-4 hover:bg-slate-50 ${pin.resolved ? 'bg-green-50/50' : ''}`}>
+                <div
+                  key={pin.id}
+                  id={`issue-${pin.id}`}
+                  className={`px-6 py-4 hover:bg-slate-50 transition-shadow ${pin.resolved ? 'bg-green-50/50' : ''} ${
+                    highlightedPinId === pin.id ? 'ring-2 ring-inset ring-orange-400' : ''
+                  }`}
+                >
                   <div className="flex items-start gap-4">
                     <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: style.bg }}>
                       <IconComponent size={20} style={{ color: style.color }} />

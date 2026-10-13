@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
@@ -14,6 +15,16 @@ import {
   Pentagon,
   Minus,
 } from 'lucide-react'
+
+// Google Maps must not render on the server
+const FeedbackMap = dynamic(() => import('@/components/FeedbackMap').then(mod => ({ default: mod.FeedbackMap })), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[420px] flex items-center justify-center bg-slate-50">
+      <div className="w-8 h-8 border-3 border-green-600 border-t-transparent rounded-full animate-spin" />
+    </div>
+  ),
+})
 
 // Feedback category configuration
 const CATEGORY_CONFIG: Record<string, { label: string; color: string; bg: string; icon: React.ElementType }> = {
@@ -167,6 +178,34 @@ export function FeedbackPinsTab({
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* Response locations — the moderation view of the embed map */}
+      {feedbackPins.some(pin => (pin.latitude != null && pin.longitude != null) || pin.geometry) && (
+        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+          <div className="px-6 py-4 border-b flex items-center justify-between flex-wrap gap-3">
+            <h3 className="font-semibold">Response locations</h3>
+            <div className="flex items-center gap-4 text-sm text-slate-600 flex-wrap">
+              {Object.entries(CATEGORY_CONFIG).map(([key, config]) => (
+                <span key={key} className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-full border-2 border-white shadow" style={{ backgroundColor: config.color }} />
+                  {config.label}
+                </span>
+              ))}
+              <span className="flex items-center gap-1.5 text-amber-600">
+                <span className="w-3 h-3 rounded-full bg-slate-300 border-2 border-amber-500" /> Pending
+              </span>
+            </div>
+          </div>
+          <FeedbackMap
+            pins={feedbackPins}
+            onSelect={(pinId) => {
+              setHighlightedId(pinId)
+              document.getElementById(`pin-row-${pinId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+              window.setTimeout(() => setHighlightedId(current => (current === pinId ? null : current)), 2500)
+            }}
+          />
         </div>
       )}
 

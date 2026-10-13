@@ -2,17 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { GoogleMap, useJsApiLoader, MarkerF, PolygonF, PolylineF, InfoWindowF } from '@react-google-maps/api'
+import { getPinIcon, createPendingPinIcon, getCategoryColor, PIN_COLORS } from '@/lib/map-pin-icons'
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''
 const LIBRARIES: ('drawing' | 'geometry' | 'visualization')[] = ['drawing', 'geometry', 'visualization']
 
-// Matches CATEGORY_CONFIG in the responses list
-const CATEGORY_COLORS: Record<string, string> = {
-  positive: '#16a34a',
-  negative: '#dc2626',
-  question: '#2563eb',
-  comment: '#6b7280',
-}
 const CATEGORY_LABELS: Record<string, string> = {
   positive: 'Positive',
   negative: 'Concern',
@@ -113,7 +107,7 @@ export function FeedbackMap({
     )
   }
 
-  const color = (pin: FeedbackMapPin) => CATEGORY_COLORS[pin.category] || CATEGORY_COLORS.comment
+  const color = (pin: FeedbackMapPin) => PIN_COLORS[pin.category] || PIN_COLORS.comment
   const label = (pin: FeedbackMapPin) => CATEGORY_LABELS[pin.category] || CATEGORY_LABELS.comment
 
   return (
@@ -137,10 +131,8 @@ export function FeedbackMap({
               paths={path}
               onClick={() => setSelected(pin)}
               options={{
-                fillColor: color(pin),
-                fillOpacity: pin.approved ? 0.25 : 0.12,
-                strokeColor: color(pin),
-                strokeOpacity: pin.approved ? 1 : 0.5,
+                fillColor: getCategoryColor(pin.category, pin.approved ? 0.3 : 0.15),
+                strokeColor: getCategoryColor(pin.category, pin.approved ? 1 : 0.6),
                 strokeWeight: 2,
                 clickable: true,
               }}
@@ -155,7 +147,7 @@ export function FeedbackMap({
               key={pin.id}
               path={path}
               onClick={() => setSelected(pin)}
-              options={{ strokeColor: color(pin), strokeOpacity: pin.approved ? 1 : 0.5, strokeWeight: 3, clickable: true }}
+              options={{ strokeColor: getCategoryColor(pin.category, pin.approved ? 1 : 0.6), strokeWeight: 3, clickable: true }}
             />
           )
         }
@@ -166,15 +158,7 @@ export function FeedbackMap({
             position={{ lat: pin.latitude, lng: pin.longitude }}
             title={`${label(pin)}${pin.approved ? '' : ' (pending)'} — ${pin.comment.slice(0, 90)}`}
             onClick={() => setSelected(pin)}
-            opacity={pin.approved ? 1 : 0.55}
-            icon={{
-              path: google.maps.SymbolPath.CIRCLE,
-              scale: 9,
-              fillColor: color(pin),
-              fillOpacity: 1,
-              strokeColor: pin.approved ? '#ffffff' : '#f59e0b',
-              strokeWeight: 2,
-            }}
+            icon={pin.approved ? getPinIcon(pin.category) : createPendingPinIcon()}
           />
         )
       })}

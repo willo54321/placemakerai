@@ -187,15 +187,13 @@ export function FeedbackPinsTab({
           <div className="px-6 py-4 border-b flex items-center justify-between flex-wrap gap-3">
             <h3 className="font-semibold">Response locations</h3>
             <div className="flex items-center gap-4 text-sm text-slate-600 flex-wrap">
-              {Object.entries(CATEGORY_CONFIG).map(([key, config]) => (
-                <span key={key} className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded-full border-2 border-white shadow" style={{ backgroundColor: config.color }} />
-                  {config.label}
+              {/* Swatches match the embed pin colours (PIN_COLORS), not the list styling */}
+              {([['#10B981', 'Positive'], ['#EF4444', 'Concern'], ['#F59E0B', 'Question'], ['#6366F1', 'Comment'], ['#8B5CF6', 'Pending']] as const).map(([color, label]) => (
+                <span key={label} className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-full border-2 border-white shadow" style={{ backgroundColor: color }} />
+                  {label}
                 </span>
               ))}
-              <span className="flex items-center gap-1.5 text-amber-600">
-                <span className="w-3 h-3 rounded-full bg-slate-300 border-2 border-amber-500" /> Pending
-              </span>
             </div>
           </div>
           <FeedbackMap

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { GoogleMap, useJsApiLoader, MarkerF, PolygonF, PolylineF, InfoWindowF } from '@react-google-maps/api'
 import { ISSUE_CATEGORY_LABELS, type IssueCategory } from '@/lib/issues'
+import { getPinIcon, getCategoryColor } from '@/lib/map-pin-icons'
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''
 const LIBRARIES: ('drawing' | 'geometry' | 'visualization')[] = ['drawing', 'geometry', 'visualization']
@@ -133,9 +134,8 @@ export function IssuesMap({
               paths={path}
               onClick={() => setSelected(pin)}
               options={{
-                fillColor: statusColor(pin),
-                fillOpacity: 0.25,
-                strokeColor: statusColor(pin),
+                fillColor: getCategoryColor(pin.category, 0.3),
+                strokeColor: getCategoryColor(pin.category, 1),
                 strokeWeight: 2,
                 clickable: true,
               }}
@@ -150,7 +150,7 @@ export function IssuesMap({
               key={pin.id}
               path={path}
               onClick={() => setSelected(pin)}
-              options={{ strokeColor: statusColor(pin), strokeWeight: 3, clickable: true }}
+              options={{ strokeColor: getCategoryColor(pin.category, 1), strokeWeight: 3, clickable: true }}
             />
           )
         }
@@ -161,14 +161,7 @@ export function IssuesMap({
             position={{ lat: pin.latitude, lng: pin.longitude }}
             title={title(pin)}
             onClick={() => setSelected(pin)}
-            icon={{
-              path: google.maps.SymbolPath.CIRCLE,
-              scale: 9,
-              fillColor: statusColor(pin),
-              fillOpacity: 1,
-              strokeColor: '#ffffff',
-              strokeWeight: 2,
-            }}
+            icon={getPinIcon(pin.category, false, pin.resolved)}
           />
         )
       })}

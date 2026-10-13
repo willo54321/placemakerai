@@ -132,17 +132,25 @@ export function EnquiriesTab({ projectId, isAdmin }: { projectId: string; isAdmi
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(vars.body),
       }),
-    onSuccess: () => {
+    // Optimistically apply to BOTH caches: the thread view's status select
+    // renders from its own ['enquiry', ...] query, so updating only the list
+    // would leave the control showing the old value until a refetch.
+    onMutate: (vars) => {
+      queryClient.setQueryData<{ enquiries: EnquiryRow[] }>(listKey, prev =>
+        prev ? { enquiries: prev.enquiries.map(e => (e.id === vars.id ? ({ ...e, ...vars.body } as EnquiryRow) : e)) } : prev
+      )
+      queryClient.setQueryData<ThreadResponse>(['enquiry', projectId, vars.id], prev =>
+        prev ? { ...prev, enquiry: { ...prev.enquiry, ...vars.body } as ThreadResponse['enquiry'] } : prev
+      )
+    },
+    onSettled: (_data, _err, vars) => {
       queryClient.invalidateQueries({ queryKey: listKey })
+      queryClient.invalidateQueries({ queryKey: ['enquiry', projectId, vars.id] })
     },
     onError: (err: Error) => toast.error(err.message || 'Update failed'),
   })
 
   const markRead = (id: string, read: boolean) => {
-    // Optimistically flip the row so the inbox reflects the open immediately.
-    queryClient.setQueryData<{ enquiries: EnquiryRow[] }>(listKey, prev =>
-      prev ? { enquiries: prev.enquiries.map(e => (e.id === id ? { ...e, read } : e)) } : prev
-    )
     patchMutation.mutate({ id, body: { read } })
   }
 

@@ -474,7 +474,14 @@ function StakeholderDetailPanel({
       fetchJson(`/api/projects/${projectId}/stakeholders/${stakeholderId}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       }),
-    onSuccess: () => {
+    // Optimistic: the stance select and rating dots render from this query,
+    // so without this they visibly snap back until the refetch lands.
+    onMutate: (body) => {
+      queryClient.setQueryData<StakeholderDetail>(detailKey, prev =>
+        prev ? ({ ...prev, ...body } as StakeholderDetail) : prev
+      )
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: detailKey })
       queryClient.invalidateQueries({ queryKey: listKey })
     },

@@ -1,9 +1,10 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { GoogleMap, useJsApiLoader, MarkerF, PolygonF, PolylineF, InfoWindowF } from '@react-google-maps/api'
+import { GoogleMap, useJsApiLoader, MarkerF, PolygonF, PolylineF, OverlayView } from '@react-google-maps/api'
 import { ISSUE_CATEGORY_LABELS, type IssueCategory } from '@/lib/issues'
-import { getPinIcon, getCategoryColor } from '@/lib/map-pin-icons'
+import { getPinIcon, getCategoryColor, PIN_COLORS } from '@/lib/map-pin-icons'
+import { MapPinPopup } from '@/components/MapPinPopup'
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''
 const LIBRARIES: ('drawing' | 'geometry' | 'visualization')[] = ['drawing', 'geometry', 'visualization']
@@ -22,6 +23,7 @@ export interface IssueMapPin {
   category: string
   name: string | null
   createdAt: string
+  photoUrl?: string | null
 }
 
 // GeoJSON positions ([lng, lat]) → Maps paths
@@ -167,35 +169,20 @@ export function IssuesMap({
       })}
 
       {selected && anchorOf(selected) && (
-        <InfoWindowF position={anchorOf(selected)!} onCloseClick={() => setSelected(null)}>
-          <div className="max-w-[280px] text-sm">
-            <div className="flex items-center gap-2 mb-1.5">
-              <span
-                className="text-xs font-semibold px-2 py-0.5 rounded-full text-white"
-                style={{ backgroundColor: statusColor(selected) }}
-              >
-                {selected.resolved ? 'Resolved' : 'Open'}
-              </span>
-              <span className="text-xs font-medium text-slate-600">{categoryLabel(selected.category)}</span>
-            </div>
-            <p className="text-slate-800 whitespace-pre-wrap">
-              {selected.comment.length > 220 ? selected.comment.slice(0, 220) + '…' : selected.comment}
-            </p>
-            <div className="mt-1.5 text-xs text-slate-500">
-              {[selected.name, new Date(selected.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })]
-                .filter(Boolean)
-                .join(' · ')}
-            </div>
-            {onSelect && (
-              <button
-                onClick={() => { setSelected(null); onSelect(selected.id) }}
-                className="mt-2 text-xs font-medium text-orange-700 hover:underline"
-              >
-                View full report in list
-              </button>
-            )}
-          </div>
-        </InfoWindowF>
+        <OverlayView position={anchorOf(selected)!} mapPaneName={OverlayView.FLOAT_PANE}>
+          <MapPinPopup
+            pill={{ label: categoryLabel(selected.category).toUpperCase(), color: PIN_COLORS[selected.category] || PIN_COLORS.other }}
+            statusPill={selected.resolved ? { label: 'RESOLVED', color: '#16a34a' } : { label: 'OPEN', color: '#d97706' }}
+            comment={selected.comment}
+            photoUrl={selected.photoUrl}
+            meta={[selected.name, new Date(selected.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })]
+              .filter(Boolean)
+              .join(' · ')}
+            actionLabel={onSelect ? 'View full report in list' : undefined}
+            onAction={onSelect ? () => { setSelected(null); onSelect(selected.id) } : undefined}
+            onClose={() => setSelected(null)}
+          />
+        </OverlayView>
       )}
     </GoogleMap>
   )

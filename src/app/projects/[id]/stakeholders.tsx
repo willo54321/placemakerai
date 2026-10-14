@@ -1,13 +1,14 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { fetchJson } from '@/lib/fetch-json'
 import { Spinner } from '@/components/Spinner'
 import { toast } from 'sonner'
 import {
   Users, Plus, Building2, Mail, Phone, Trash2, X, Pencil,
-  MessageSquare, CalendarDays, ArrowRight, Inbox, Target, Landmark, Download,
+  MessageSquare, CalendarDays, Target, Landmark, Download,
+  ArrowDownLeft, ArrowUpRight, Sparkles,
 } from 'lucide-react'
 
 // ---- domain vocab -----------------------------------------------------------
@@ -47,6 +48,11 @@ interface Engagement {
   date: string
   outcome: string | null
   nextAction: string | null
+  source: 'manual' | 'email'
+  direction: 'inbound' | 'outbound' | null
+  enquiryId: string | null
+  aiStatus: 'pending' | 'running' | 'done' | 'failed' | null
+  stanceSuggestion: Category | null
 }
 
 interface StakeholderDetail extends StakeholderRow {
@@ -54,7 +60,6 @@ interface StakeholderDetail extends StakeholderRow {
   latitude: number | null
   longitude: number | null
   engagements: Engagement[]
-  relatedEnquiries: Array<{ id: string; subject: string; status: string; createdAt: string }>
 }
 
 function fmtDate(iso: string): string {
@@ -169,10 +174,22 @@ function StakeholderMatrix({
 
 // ---- main tab ---------------------------------------------------------------
 
-export function StakeholdersTab({ projectId, isAdmin }: { projectId: string; isAdmin: boolean }) {
+export function StakeholdersTab({
+  projectId, isAdmin, focusStakeholderId, onFocusHandled, onOpenEnquiry,
+}: {
+  projectId: string
+  isAdmin: boolean
+  focusStakeholderId?: string | null
+  onFocusHandled?: () => void
+  onOpenEnquiry?: (enquiryId: string) => void
+}) {
   const queryClient = useQueryClient()
   const [categoryFilter, setCategoryFilter] = useState<'all' | Category>('all')
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  // The tab mounts fresh on each visit, so a deep link just seeds the selection.
+  const [selectedId, setSelectedId] = useState<string | null>(focusStakeholderId ?? null)
+  useEffect(() => {
+    if (focusStakeholderId) onFocusHandled?.()
+  }, [focusStakeholderId, onFocusHandled])
   const [adding, setAdding] = useState(false)
   const [view, setView] = useState<'register' | 'matrix'>('register')
 
@@ -375,6 +392,7 @@ export function StakeholdersTab({ projectId, isAdmin }: { projectId: string; isA
                 projectId={projectId}
                 stakeholderId={selectedId}
                 isAdmin={isAdmin}
+                onOpenEnquiry={onOpenEnquiry}
                 onDeleted={() => { setSelectedId(null); queryClient.invalidateQueries({ queryKey: listKey }) }}
               />
             ) : (
@@ -452,12 +470,13 @@ function AddStakeholderForm({
 // ---- detail panel -----------------------------------------------------------
 
 function StakeholderDetailPanel({
-  projectId, stakeholderId, isAdmin, onDeleted,
+  projectId, stakeholderId, isAdmin, onDeleted, onOpenEnquiry,
 }: {
   projectId: string
   stakeholderId: string
   isAdmin: boolean
   onDeleted: () => void
+  onOpenEnquiry?: (enquiryId: string) => void
 }) {
   const queryClient = useQueryClient()
   const detailKey = ['stakeholder', projectId, stakeholderId]
@@ -467,6 +486,12 @@ function StakeholderDetailPanel({
   const { data: s, isLoading, error } = useQuery<StakeholderDetail>({
     queryKey: detailKey,
     queryFn: () => fetchJson(`/api/projects/${projectId}/stakeholders/${stakeholderId}`),
+    // Email entries are summarised in the background; poll briefly until done.
+    refetchInterval: query =>
+      query.state.data?.engagements.some(e => e.aiStatus === 'pending' || e.aiStatus === 'running') &&
+      query.state.dataUpdateCount < 20
+        ? 4000
+        : false,
   })
 
   const patch = useMutation({
@@ -552,6 +577,12 @@ function StakeholderDetailPanel({
           <RatingControl label="Influence" value={s.influence} editable={isAdmin} onChange={v => patch.mutate({ influence: v })} />
           <RatingControl label="Interest" value={s.interest} editable={isAdmin} onChange={v => patch.mutate({ interest: v })} />
         </div>
+        <StanceSuggestion
+          engagements={s.engagements}
+          current={s.category}
+          isAdmin={isAdmin}
+          onApply={category => patch.mutate({ category })}
+        />
 
         {editing && isAdmin && (
           <EditDetailsForm
@@ -563,30 +594,14 @@ function StakeholderDetailPanel({
         )}
       </div>
 
-      {/* Body: engagements + related enquiries */}
+      {/* Body: engagement log */}
       <div className="flex-1 overflow-y-auto p-4 space-y-5 max-h-[calc(100vh-24rem)]">
-        {s.relatedEnquiries.length > 0 && (
-          <section>
-            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <Inbox size={13} /> Public enquiries from this email
-            </h4>
-            <ul className="space-y-1">
-              {s.relatedEnquiries.map(e => (
-                <li key={e.id} className="text-sm text-slate-600 flex items-center gap-2">
-                  <ArrowRight size={12} className="text-slate-300" />
-                  <span className="truncate">{e.subject}</span>
-                  <span className="text-xs text-slate-400 shrink-0">· {e.status} · {fmtDate(e.createdAt)}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-
         <EngagementTimeline
           projectId={projectId}
           stakeholderId={stakeholderId}
           engagements={s.engagements}
           isAdmin={isAdmin}
+          onOpenEnquiry={onOpenEnquiry}
           onChanged={() => {
             queryClient.invalidateQueries({ queryKey: detailKey })
             queryClient.invalidateQueries({ queryKey: listKey })
@@ -673,14 +688,41 @@ function EditDetailsForm({
 
 // ---- engagements ------------------------------------------------------------
 
+// The most recent stance the AI read from this stakeholder's own emails, when
+// it differs from the recorded one. Never applied without an admin's click.
+function StanceSuggestion({
+  engagements, current, isAdmin, onApply,
+}: {
+  engagements: Engagement[]
+  current: Category
+  isAdmin: boolean
+  onApply: (category: Category) => void
+}) {
+  const latest = engagements.find(e => e.stanceSuggestion)
+  const suggested = latest?.stanceSuggestion
+  if (!latest || !suggested || suggested === current || !CATEGORY_META[suggested]) return null
+  return (
+    <div className="mt-3 flex items-center gap-2 flex-wrap text-xs text-slate-600 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
+      <Sparkles size={13} className="text-slate-400" aria-hidden="true" />
+      <span>Their email of {fmtDate(latest.date)} reads as <span className="font-medium">{CATEGORY_META[suggested].label.toLowerCase()}</span>.</span>
+      {isAdmin && (
+        <button onClick={() => onApply(suggested)} className="text-green-700 font-medium hover:underline">
+          Set stance to {CATEGORY_META[suggested].label}
+        </button>
+      )}
+    </div>
+  )
+}
+
 function EngagementTimeline({
-  projectId, stakeholderId, engagements, isAdmin, onChanged,
+  projectId, stakeholderId, engagements, isAdmin, onChanged, onOpenEnquiry,
 }: {
   projectId: string
   stakeholderId: string
   engagements: Engagement[]
   isAdmin: boolean
   onChanged: () => void
+  onOpenEnquiry?: (enquiryId: string) => void
 }) {
   const [adding, setAdding] = useState(false)
 
@@ -727,11 +769,24 @@ function EngagementTimeline({
         <ol className="space-y-3 mt-2">
           {engagements.map(e => (
             <li key={e.id} className="relative pl-4 border-l-2 border-slate-100">
-              <span className="absolute -left-[5px] top-1.5 w-2 h-2 rounded-full bg-green-500" />
+              <span className={`absolute -left-[5px] top-1.5 w-2 h-2 rounded-full ${e.source === 'email' ? 'bg-sky-500' : 'bg-green-500'}`} />
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-slate-800">{e.title}</p>
-                  <p className="text-xs text-slate-400 capitalize">{e.type} · {fmtDate(e.date)}</p>
+                  {e.source === 'email' ? (
+                    <p className="text-xs text-slate-400 flex items-center gap-1 flex-wrap">
+                      {e.direction === 'outbound' ? <ArrowUpRight size={12} aria-hidden="true" /> : <ArrowDownLeft size={12} aria-hidden="true" />}
+                      {e.direction === 'outbound' ? 'Email sent' : 'Email received'} · {fmtDate(e.date)}
+                      {(e.aiStatus === 'pending' || e.aiStatus === 'running') && <span>· Summarising…</span>}
+                      {e.enquiryId && onOpenEnquiry && (
+                        <button onClick={() => onOpenEnquiry(e.enquiryId!)} className="text-green-700 hover:underline">
+                          · Open thread
+                        </button>
+                      )}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-slate-400 capitalize">{e.type} · {fmtDate(e.date)}</p>
+                  )}
                 </div>
                 {isAdmin && (
                   <button

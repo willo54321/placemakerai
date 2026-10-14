@@ -1,9 +1,11 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getResend, sendInboundEmailNotification } from '@/lib/email'
 import { getSenderDomain, parseInboundAddress } from '@/lib/email-identity'
 import { verifySvixSignature } from '@/lib/webhook-verify'
 import { logAudit } from '@/lib/audit'
+import { captureEmailEvents } from '@/lib/engagement-ai'
+import { messageEvent, submissionEvent } from '@/lib/stakeholder-email-log'
 
 const BODY_LIMIT = 20000
 const SNIPPET_LIMIT = 400
@@ -177,7 +179,7 @@ export async function POST(request: Request) {
     })
     if (!enquiry) return NextResponse.json({ ok: true, skipped: 'unknown thread' })
 
-    await prisma.enquiryMessage.create({
+    const message = await prisma.enquiryMessage.create({
       data: {
         enquiryId: enquiry.id,
         direction: 'inbound',
@@ -209,6 +211,7 @@ export async function POST(request: Request) {
       subject: enquiry.subject,
       snippet,
     })
+    after(() => captureEmailEvents(enquiry.project.id, [messageEvent(enquiry, message)]))
     return NextResponse.json({ ok: true, threaded: enquiry.id })
   }
 
@@ -256,5 +259,6 @@ export async function POST(request: Request) {
     subject,
     snippet,
   })
+  after(() => captureEmailEvents(project.id, [submissionEvent(enquiry)]))
   return NextResponse.json({ ok: true, enquiry: enquiry.id })
 }

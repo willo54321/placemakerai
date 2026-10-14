@@ -18,7 +18,7 @@ const MODEL = 'claude-opus-4-8'
 // report (taxonomy, campaign characterisation, summary) stay on Opus.
 const CLASSIFIER_MODEL = 'claude-haiku-4-5'
 
-function getAnthropic(): Anthropic {
+export function getAnthropic(): Anthropic {
   if (!process.env.ANTHROPIC_API_KEY) {
     throw new Error('ANTHROPIC_API_KEY is not configured — AI analysis is unavailable')
   }

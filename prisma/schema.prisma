@@ -74,7 +74,7 @@ model Councillor {
 }
 
 model Enquiry {
-  id              String    @id @default(cuid())
+  id              String                  @id @default(cuid())
   projectId       String
   submitterName   String
   submitterEmail  String
@@ -82,29 +82,30 @@ model Enquiry {
   submitterOrg    String?
   subject         String
   message         String
-  category        String    @default("general")
-  gdprConsent     Boolean   @default(false)
+  category        String                  @default("general")
+  gdprConsent     Boolean                 @default(false)
   gdprConsentDate DateTime?
   // Enquiry desk state. status: new | open | closed. assigneeId points at a
   // User (no FK — an assignee losing project access shouldn't orphan the row).
   // threadToken is the reply-routing handle; nullable so existing rows don't
   // need a backfill and it can be minted lazily when the email channel lands.
-  status          String    @default("new")
+  status          String                  @default("new")
   assigneeId      String?
-  read            Boolean   @default(false)
-  threadToken     String?   @unique
+  read            Boolean                 @default(false)
+  threadToken     String?                 @unique
   // How the enquiry arrived: 'form' (embed enquiry form) | 'email' (inbound
   // mail to the project's sending address) | 'outbound' (a thread the team
   // started by emailing someone — not public feedback, so kept out of
   // analysis and activity counts). externalId is the Resend inbound
   // email id for email-origin enquiries — unique so webhook retries can't
   // create duplicates.
-  channel         String    @default("form")
-  externalId      String?   @unique
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  project         Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  channel         String                  @default("form")
+  externalId      String?                 @unique
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  project         Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
   messages        EnquiryMessage[]
+  engagements     StakeholderEngagement[]
 
   @@index([projectId, createdAt])
   @@index([projectId, status])
@@ -117,14 +118,14 @@ model Enquiry {
 model EnquiryMessage {
   id             String   @id @default(cuid())
   enquiryId      String
-  direction      String   // 'inbound' | 'outbound'
+  direction      String // 'inbound' | 'outbound'
   body           String
   authorName     String?
   authorEmail    String?
   // stored | queued | sent | delivered | bounced | failed. Inbound messages
   // are always 'delivered'; outbound advances as the provider reports back.
   deliveryStatus String   @default("stored")
-  attachments    Json?    // [{ name, url, size, mime }]
+  attachments    Json? // [{ name, url, size, mime }]
   // Copied recipients on outbound messages (staff-visible only).
   cc             String[] @default([])
   bcc            String[] @default([])
@@ -173,18 +174,34 @@ model Stakeholder {
 // meeting/call/email/letter/event/other. outcome + nextAction give a light
 // commitment/follow-up record without a separate commitments model.
 model StakeholderEngagement {
-  id            String      @id @default(cuid())
-  stakeholderId String
-  type          String
-  title         String
-  description   String?
-  date          DateTime    @default(now())
-  outcome       String?
-  nextAction    String?
-  createdAt     DateTime    @default(now())
-  stakeholder   Stakeholder @relation(fields: [stakeholderId], references: [id], onDelete: Cascade)
+  id               String      @id @default(cuid())
+  stakeholderId    String
+  type             String
+  title            String
+  description      String?
+  date             DateTime    @default(now())
+  outcome          String?
+  nextAction       String?
+  // Entries logged automatically from the enquiry desk: source 'email', the
+  // thread they belong to, a per-email key (`enq:<enquiryId>` for an
+  // enquiry's original submission, `msg:<messageId>` for each later message)
+  // and which way the email went. Deleting the enquiry removes them.
+  source           String      @default("manual") // manual | email
+  enquiryId        String?
+  sourceKey        String?
+  direction        String? // inbound | outbound
+  // AI summary of an email entry: pending -> running -> done | failed
+  // (null once an admin edits the entry).
+  aiStatus         String?
+  // Stance the AI read from the stakeholder's own email — a suggestion only.
+  stanceSuggestion String? // supporter | neutral | opposed | undecided
+  createdAt        DateTime    @default(now())
+  stakeholder      Stakeholder @relation(fields: [stakeholderId], references: [id], onDelete: Cascade)
+  enquiry          Enquiry?    @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
 
+  @@unique([stakeholderId, sourceKey])
   @@index([stakeholderId])
+  @@index([enquiryId])
 }
 
 // A consented mailing-list contact for a project. Rows are created from the

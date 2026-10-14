@@ -1,11 +1,13 @@
 import { prisma } from '@/lib/db'
 import { authorizeProject } from '@/lib/api-auth'
 import { logAudit } from '@/lib/audit'
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
+import { syncStakeholderEmailHistory } from '@/lib/stakeholder-email-log'
+import { summariseEmailEngagements } from '@/lib/engagement-ai'
 
-// GET - A single stakeholder with its engagement timeline, plus any public
-// enquiries submitted from the same email address (the cross-link into the
-// enquiry desk). Read access (CLIENT) is enough.
+// GET - A single stakeholder with its engagement timeline. Emails involving
+// the stakeholder's address are backfilled into the log first (idempotent),
+// so history from before they were added appears. Read access (CLIENT) is enough.
 export async function GET(
   request: Request,
   props: { params: Promise<{ id: string; stakeholderId: string }> }
@@ -14,26 +16,24 @@ export async function GET(
   const denied = await authorizeProject(params.id, 'CLIENT')
   if (denied) return denied
 
-  const stakeholder = await prisma.stakeholder.findFirst({
+  const found = await prisma.stakeholder.findFirst({
     where: { id: params.stakeholderId, projectId: params.id },
-    include: { engagements: { orderBy: { date: 'desc' } } },
+    select: { id: true, projectId: true, email: true },
   })
-
-  if (!stakeholder) {
+  if (!found) {
     return NextResponse.json({ error: 'Stakeholder not found' }, { status: 404 })
   }
 
-  // Cross-link: public enquiries from this stakeholder's email address.
-  let relatedEnquiries: Array<{ id: string; subject: string; status: string; createdAt: Date }> = []
-  if (stakeholder.email) {
-    relatedEnquiries = await prisma.enquiry.findMany({
-      where: { projectId: params.id, submitterEmail: stakeholder.email },
-      select: { id: true, subject: true, status: true, createdAt: true },
-      orderBy: { createdAt: 'desc' },
-    })
+  await syncStakeholderEmailHistory(found)
+  const stakeholder = await prisma.stakeholder.findUniqueOrThrow({
+    where: { id: found.id },
+    include: { engagements: { orderBy: { date: 'desc' } } },
+  })
+  if (stakeholder.engagements.some(e => e.aiStatus === 'pending')) {
+    after(() => summariseEmailEngagements({ stakeholderId: stakeholder.id }))
   }
 
-  return NextResponse.json({ ...stakeholder, relatedEnquiries })
+  return NextResponse.json(stakeholder)
 }
 
 // Fields a client may update. Any other keys (projectId, id, createdAt) are
@@ -73,6 +73,13 @@ export async function PATCH(
     where: { id: params.stakeholderId },
     data,
   })
+
+  if ('email' in data) {
+    after(async () => {
+      await syncStakeholderEmailHistory(stakeholder)
+      await summariseEmailEngagements({ stakeholderId: stakeholder.id })
+    })
+  }
 
   await logAudit({
     projectId: params.id,

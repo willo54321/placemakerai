@@ -1,7 +1,9 @@
 import { prisma } from '@/lib/db'
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { rateLimitResponse } from '@/lib/rate-limit'
 import { recordMailingConsent } from '@/lib/subscribers'
+import { captureEmailEvents } from '@/lib/engagement-ai'
+import { submissionEvent } from '@/lib/stakeholder-email-log'
 
 // CORS headers for cross-origin form submissions
 const corsHeaders = {
@@ -91,6 +93,8 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       sourceId: enquiry.id,
     })
   }
+
+  after(() => captureEmailEvents(params.id, [submissionEvent(enquiry)]))
 
   return NextResponse.json({
     success: true,

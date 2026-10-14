@@ -1,7 +1,9 @@
 import { prisma } from '@/lib/db'
 import { authorizeProject } from '@/lib/api-auth'
 import { logAudit } from '@/lib/audit'
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
+import { syncStakeholderEmailHistory } from '@/lib/stakeholder-email-log'
+import { summariseEmailEngagements } from '@/lib/engagement-ai'
 
 // GET - The project's stakeholder register. Read access (CLIENT) is enough.
 // Returns each stakeholder with an engagement count and the date of the most
@@ -69,6 +71,11 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       latitude: body.latitude ?? null,
       longitude: body.longitude ?? null,
     },
+  })
+
+  after(async () => {
+    await syncStakeholderEmailHistory(stakeholder)
+    await summariseEmailEngagements({ stakeholderId: stakeholder.id })
   })
 
   await logAudit({

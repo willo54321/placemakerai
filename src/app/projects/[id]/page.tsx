@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useSession } from 'next-auth/react'
 import { ArrowLeft, Users, MapPin, Settings, LayoutDashboard, BarChart3, Globe, Eye, FileText, HelpCircle, Inbox, Mail, Route, HardHat } from 'lucide-react'
 import Link from 'next/link'
-import { useState, Suspense, use } from 'react';
+import { useState, Suspense, use, useCallback } from 'react';
 import dynamic from 'next/dynamic'
 import { OverviewTab } from './overview'
 import { SettingsTab } from './settings'
@@ -125,6 +125,8 @@ type Tab = 'overview' | 'feedback' | 'issues' | 'forms' | 'enquiries' | 'stakeho
 export type FocusItem =
   | { kind: 'pin'; id: string }
   | { kind: 'response'; formId: string; responseId: string }
+  | { kind: 'enquiry'; id: string }
+  | { kind: 'stakeholder'; id: string }
 
 // Tab groups for organized navigation
 type TabGroup = {
@@ -152,6 +154,7 @@ export default function ProjectPage(props: { params: Promise<{ id: string }> }) 
     setFocusItem(focus ?? null)
     setActiveTab(tab)
   }
+  const clearFocus = useCallback(() => setFocusItem(null), [])
 
   // Product tour: shown when the user's flag is on and not yet dismissed
   // this session. "Don't show again" persists the opt-out. forceTour lets
@@ -555,12 +558,25 @@ export default function ProjectPage(props: { params: Promise<{ id: string }> }) 
           )}
           {activeTab === 'enquiries' && (
             <div className="p-6">
-              <EnquiriesTab projectId={params.id} isAdmin={Boolean(isAdmin)} embedEnabled={Boolean(project.embedEnabled)} />
+              <EnquiriesTab
+                projectId={params.id}
+                isAdmin={Boolean(isAdmin)}
+                embedEnabled={Boolean(project.embedEnabled)}
+                focusEnquiryId={focusItem?.kind === 'enquiry' ? focusItem.id : null}
+                onFocusHandled={clearFocus}
+                onOpenStakeholder={(id) => navigateTo('stakeholders', { kind: 'stakeholder', id })}
+              />
             </div>
           )}
           {activeTab === 'stakeholders' && (
             <div className="p-6">
-              <StakeholdersTab projectId={params.id} isAdmin={Boolean(isAdmin)} />
+              <StakeholdersTab
+                projectId={params.id}
+                isAdmin={Boolean(isAdmin)}
+                focusStakeholderId={focusItem?.kind === 'stakeholder' ? focusItem.id : null}
+                onFocusHandled={clearFocus}
+                onOpenEnquiry={(id) => navigateTo('enquiries', { kind: 'enquiry', id })}
+              />
             </div>
           )}
           {activeTab === 'mailing' && (

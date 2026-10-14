@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { authorizeProject } from '@/lib/api-auth'
 import { logAudit } from '@/lib/audit'
+import { organisationDomain } from '@/lib/stakeholder-email-log'
 
 const VALID_STATUSES = ['new', 'open', 'closed'] as const
 type EnquiryStatus = (typeof VALID_STATUSES)[number]
@@ -79,7 +80,40 @@ export async function GET(
     })),
   ]
 
+  // The people on this thread (correspondent, inbound authors, CC'd) and how
+  // each relates to the stakeholder register: an exact address match, or a
+  // suggestion when another stakeholder shares their organisation's domain.
+  const names = new Map<string, string>()
+  if (enquiry.submitterName !== enquiry.submitterEmail) names.set(enquiry.submitterEmail.toLowerCase(), enquiry.submitterName)
+  for (const m of enquiry.messages) {
+    if (m.direction === 'inbound' && m.authorEmail && m.authorName) names.set(m.authorEmail.toLowerCase(), m.authorName)
+  }
+  const addresses = Array.from(new Set(
+    [enquiry.submitterEmail, ...enquiry.messages.flatMap(m => (m.direction === 'inbound' ? [m.authorEmail] : m.cc))]
+      .filter((a): a is string => !!a)
+      .map(a => a.toLowerCase())
+  ))
+  const registered = await prisma.stakeholder.findMany({
+    where: { projectId: params.id, email: { not: null } },
+    select: { id: true, name: true, email: true, organization: true, type: true },
+  })
+  const contacts = addresses.map(address => {
+    const match = registered.find(s => s.email!.toLowerCase() === address)
+    if (match) return { address, name: names.get(address) ?? null, stakeholder: { id: match.id, name: match.name }, sameOrganisation: null }
+    const domain = organisationDomain(address)
+    const colleague = domain
+      ? registered.find(s => s.organization && organisationDomain(s.email!) === domain)
+      : undefined
+    return {
+      address,
+      name: names.get(address) ?? null,
+      stakeholder: null,
+      sameOrganisation: colleague ? { organization: colleague.organization!, type: colleague.type } : null,
+    }
+  })
+
   return NextResponse.json({
+    contacts,
     enquiry: {
       id: enquiry.id,
       submitterName: enquiry.submitterName,

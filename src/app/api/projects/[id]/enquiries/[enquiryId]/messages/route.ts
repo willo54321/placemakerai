@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import crypto from 'crypto'
 import { prisma } from '@/lib/db'
 import { authorizeProject } from '@/lib/api-auth'
@@ -7,6 +7,8 @@ import { sendEnquiryReply } from '@/lib/email'
 import { getProjectReplyAddress, inboundEmailEnabled } from '@/lib/email-identity'
 import { logAudit } from '@/lib/audit'
 import { parseCopiedRecipients, withSignature } from '@/lib/email-compose'
+import { captureEmailEvents } from '@/lib/engagement-ai'
+import { messageEvent } from '@/lib/stakeholder-email-log'
 
 // POST - Send a staff reply to an enquiry. Creates an outbound EnquiryMessage,
 // emails the enquirer (plus any CC/BCC) with the sender's signature appended,
@@ -89,6 +91,8 @@ export async function POST(
       bcc: copied.bcc,
     },
   })
+
+  after(() => captureEmailEvents(params.id, [messageEvent(enquiry, message)]))
 
   // Sending a reply moves the enquiry along and marks it read.
   if (enquiry.status === 'new' || !enquiry.read) {

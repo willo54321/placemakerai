@@ -40,6 +40,8 @@ export async function PATCH(
     if (field in body) data[field] = body[field]
   }
   if (body.date !== undefined) data.date = body.date ? new Date(body.date) : undefined
+  // An admin's wording wins: stop any pending AI summary from overwriting it.
+  if (['title', 'description', 'outcome', 'nextAction'].some(field => field in body)) data.aiStatus = null
 
   const engagement = await prisma.stakeholderEngagement.update({
     where: { id: params.engagementId },

@@ -5,11 +5,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { fetchJson } from '@/lib/fetch-json'
 import { Spinner } from '@/components/Spinner'
 import { EmbedCodePanel } from '@/components/EmbedCodePanel'
+import { ModalShell } from '@/components/ModalShell'
 import { CopyFields, NewEmailModal, SignatureModal, SignaturePreview } from './enquiry-compose'
 import { toast } from 'sonner'
 import {
   Inbox, Mail, Building2, Phone, ArrowDownLeft, ArrowUpRight,
-  CheckCheck, Clock, AlertCircle, CircleDot, Send, PenLine, Plus,
+  CheckCheck, Clock, AlertCircle, CircleDot, Send, PenLine, Plus, Users, UserPlus, X,
 } from 'lucide-react'
 
 type EnquiryStatus = 'new' | 'open' | 'closed'
@@ -60,6 +61,15 @@ interface ThreadResponse {
     createdAt: string
   }
   thread: ThreadEntry[]
+  contacts: ThreadContact[]
+}
+
+// A person on the thread and how they relate to the stakeholder register.
+interface ThreadContact {
+  address: string
+  name: string | null
+  stakeholder: { id: string; name: string } | null
+  sameOrganisation: { organization: string; type: string } | null
 }
 
 const STATUS_META: Record<EnquiryStatus, { label: string; className: string }> = {
@@ -99,11 +109,24 @@ const STATUS_FILTERS: Array<{ id: 'all' | EnquiryStatus; label: string }> = [
   { id: 'closed', label: 'Closed' },
 ]
 
-export function EnquiriesTab({ projectId, isAdmin, embedEnabled }: { projectId: string; isAdmin: boolean; embedEnabled: boolean }) {
+export function EnquiriesTab({
+  projectId, isAdmin, embedEnabled, focusEnquiryId, onFocusHandled, onOpenStakeholder,
+}: {
+  projectId: string
+  isAdmin: boolean
+  embedEnabled: boolean
+  focusEnquiryId?: string | null
+  onFocusHandled?: () => void
+  onOpenStakeholder?: (stakeholderId: string) => void
+}) {
   const queryClient = useQueryClient()
   const [statusFilter, setStatusFilter] = useState<'all' | EnquiryStatus>('all')
   const [unreadOnly, setUnreadOnly] = useState(false)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  // The tab mounts fresh on each visit, so a deep link just seeds the selection.
+  const [selectedId, setSelectedId] = useState<string | null>(focusEnquiryId ?? null)
+  useEffect(() => {
+    if (focusEnquiryId) onFocusHandled?.()
+  }, [focusEnquiryId, onFocusHandled])
   const [composing, setComposing] = useState(false)
   const [editingSignature, setEditingSignature] = useState(false)
 
@@ -125,12 +148,13 @@ export function EnquiriesTab({ projectId, isAdmin, embedEnabled }: { projectId: 
 
   const unreadCount = useMemo(() => enquiries.filter(e => !e.read).length, [enquiries])
 
-  // Keep a valid selection as filters change.
+  // Keep a valid selection as filters change (once the list has loaded, so a
+  // deep-linked selection survives the first render).
   useEffect(() => {
-    if (selectedId && !filtered.some(e => e.id === selectedId)) {
+    if (data && selectedId && !filtered.some(e => e.id === selectedId)) {
       setSelectedId(null)
     }
-  }, [filtered, selectedId])
+  }, [data, filtered, selectedId])
 
   const patchMutation = useMutation({
     mutationFn: (vars: { id: string; body: Record<string, unknown> }) =>
@@ -323,6 +347,7 @@ export function EnquiriesTab({ projectId, isAdmin, embedEnabled }: { projectId: 
                 isAdmin={isAdmin}
                 onStatusChange={(status) => patchMutation.mutate({ id: selectedId, body: { status } })}
                 onEditSignature={() => setEditingSignature(true)}
+                onOpenStakeholder={onOpenStakeholder}
               />
             ) : (
               <div className="h-full min-h-[300px] flex flex-col items-center justify-center text-center p-10">
@@ -338,13 +363,14 @@ export function EnquiriesTab({ projectId, isAdmin, embedEnabled }: { projectId: 
 }
 
 function ThreadView({
-  projectId, enquiryId, isAdmin, onStatusChange, onEditSignature,
+  projectId, enquiryId, isAdmin, onStatusChange, onEditSignature, onOpenStakeholder,
 }: {
   projectId: string
   enquiryId: string
   isAdmin: boolean
   onStatusChange: (status: EnquiryStatus) => void
   onEditSignature: () => void
+  onOpenStakeholder?: (stakeholderId: string) => void
 }) {
   const queryClient = useQueryClient()
   const [reply, setReply] = useState('')
@@ -390,7 +416,7 @@ function ThreadView({
     return <div className="p-6 text-sm text-slate-500">Couldn’t load this enquiry.</div>
   }
 
-  const { enquiry, thread } = data
+  const { enquiry, thread, contacts } = data
 
   return (
     <div className="flex flex-col h-full">
@@ -432,6 +458,14 @@ function ThreadView({
             <StatusBadge status={enquiry.status} />
           )}
         </div>
+        <ThreadContacts
+          projectId={projectId}
+          enquiryId={enquiryId}
+          contacts={contacts}
+          submitter={{ address: enquiry.submitterEmail, organization: enquiry.submitterOrg }}
+          isAdmin={isAdmin}
+          onOpenStakeholder={onOpenStakeholder}
+        />
         {enquiry.channel !== 'outbound' && (
           <div className="mt-2">
             <span className="inline-flex items-center text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 capitalize">
@@ -516,5 +550,196 @@ function ThreadView({
         </div>
       )}
     </div>
+  )
+}
+
+// Stakeholder status of each person on the thread: a link to their record, or
+// an add form prefilled from the email (and with the organisation when a
+// colleague at the same email domain is already registered).
+function ThreadContacts({
+  projectId, enquiryId, contacts, submitter, isAdmin, onOpenStakeholder,
+}: {
+  projectId: string
+  enquiryId: string
+  contacts: ThreadContact[]
+  submitter: { address: string; organization: string | null }
+  isAdmin: boolean
+  onOpenStakeholder?: (stakeholderId: string) => void
+}) {
+  const [adding, setAdding] = useState<ThreadContact | null>(null)
+
+  const shown = contacts.filter(c => c.stakeholder || isAdmin)
+  if (shown.length === 0) return null
+
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5">
+      {shown.map(contact =>
+        contact.stakeholder ? (
+          <button
+            key={contact.address}
+            onClick={() => onOpenStakeholder?.(contact.stakeholder!.id)}
+            disabled={!onOpenStakeholder}
+            className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 hover:bg-sky-100"
+            title={contact.address}
+          >
+            <Users size={12} aria-hidden="true" /> {contact.stakeholder.name}
+          </button>
+        ) : (
+          <button
+            key={contact.address}
+            onClick={() => setAdding(contact)}
+            className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border border-dashed border-slate-300 text-slate-600 hover:bg-slate-50"
+            title={contact.address}
+          >
+            <UserPlus size={12} aria-hidden="true" />
+            Add {contact.name || contact.address} as stakeholder
+            {contact.sameOrganisation && <span className="text-slate-400">· {contact.sameOrganisation.organization}</span>}
+          </button>
+        )
+      )}
+      {adding && (
+        <AddStakeholderModal
+          projectId={projectId}
+          enquiryId={enquiryId}
+          contact={adding}
+          organization={
+            adding.sameOrganisation?.organization ??
+            (adding.address === submitter.address.toLowerCase() ? submitter.organization : null)
+          }
+          onClose={() => setAdding(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+// Quick picks for how someone relates to the project; each sets the
+// stakeholder's role text and register type.
+const RELATIONSHIPS = [
+  { label: 'Site neighbour', type: 'individual' },
+  { label: 'Local resident', type: 'individual' },
+  { label: 'Local business', type: 'business' },
+  { label: 'Community group', type: 'community' },
+  { label: 'Councillor', type: 'authority' },
+  { label: 'Statutory consultee', type: 'authority' },
+] as const
+const STAKEHOLDER_TYPES = ['individual', 'organisation', 'business', 'community', 'authority', 'other'] as const
+const STANCES = [
+  { value: 'neutral', label: 'Neutral' },
+  { value: 'supporter', label: 'Supporter' },
+  { value: 'opposed', label: 'Opposed' },
+  { value: 'undecided', label: 'Undecided' },
+] as const
+
+function AddStakeholderModal({
+  projectId, enquiryId, contact, organization, onClose,
+}: {
+  projectId: string
+  enquiryId: string
+  contact: ThreadContact
+  organization: string | null
+  onClose: () => void
+}) {
+  const queryClient = useQueryClient()
+  const [form, setForm] = useState({
+    name: contact.name ?? '',
+    organization: organization ?? '',
+    role: '',
+    type: contact.sameOrganisation?.type ?? 'individual',
+    category: 'neutral',
+  })
+  const set = (key: keyof typeof form, value: string) => setForm(f => ({ ...f, [key]: value }))
+
+  const add = useMutation({
+    mutationFn: () =>
+      fetchJson(`/api/projects/${projectId}/stakeholders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.name.trim() || contact.address,
+          email: contact.address,
+          organization: form.organization.trim() || null,
+          role: form.role.trim() || null,
+          type: form.type,
+          category: form.category,
+        }),
+      }),
+    onSuccess: () => {
+      toast.success('Stakeholder added — their emails are now in the engagement log')
+      queryClient.invalidateQueries({ queryKey: ['enquiry', projectId, enquiryId] })
+      queryClient.invalidateQueries({ queryKey: ['stakeholders', projectId] })
+      onClose()
+    },
+    onError: (e: Error) => toast.error(e.message || 'Could not add stakeholder'),
+  })
+
+  return (
+    <ModalShell onClose={onClose} label="Add as stakeholder">
+      <form onSubmit={e => { e.preventDefault(); if (!add.isPending) add.mutate() }} className="p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-slate-900">Add as stakeholder</h3>
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600" aria-label="Close">
+            <X size={18} />
+          </button>
+        </div>
+        <p className="text-sm text-slate-500">{contact.address}</p>
+
+        <div>
+          <span className="block text-sm font-medium text-slate-700 mb-1.5">Relationship to the project</span>
+          <div className="flex flex-wrap gap-1.5">
+            {RELATIONSHIPS.map(r => (
+              <button
+                key={r.label}
+                type="button"
+                onClick={() => setForm(f => ({ ...f, role: r.label, type: r.type }))}
+                aria-pressed={form.role === r.label}
+                className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                  form.role === r.label
+                    ? 'bg-green-50 border-green-300 text-green-800'
+                    : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block">
+            <span className="block text-sm font-medium text-slate-700 mb-1">Name</span>
+            <input autoFocus value={form.name} onChange={e => set('name', e.target.value)} className="input" placeholder={contact.address} />
+          </label>
+          <label className="block">
+            <span className="block text-sm font-medium text-slate-700 mb-1">Role</span>
+            <input value={form.role} onChange={e => set('role', e.target.value)} className="input" />
+          </label>
+          <label className="block">
+            <span className="block text-sm font-medium text-slate-700 mb-1">Organisation</span>
+            <input value={form.organization} onChange={e => set('organization', e.target.value)} className="input" />
+          </label>
+          <label className="block">
+            <span className="block text-sm font-medium text-slate-700 mb-1">Type</span>
+            <select value={form.type} onChange={e => set('type', e.target.value)} className="input capitalize">
+              {STAKEHOLDER_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </label>
+          <label className="block">
+            <span className="block text-sm font-medium text-slate-700 mb-1">Stance</span>
+            <select value={form.category} onChange={e => set('category', e.target.value)} className="input">
+              {STANCES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+            </select>
+          </label>
+        </div>
+
+        <div className="flex justify-end gap-2 pt-1">
+          <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
+          <button type="submit" disabled={add.isPending} className="btn-primary flex items-center gap-2">
+            {add.isPending ? <Spinner size="sm" /> : <UserPlus size={16} aria-hidden="true" />}
+            Add stakeholder
+          </button>
+        </div>
+      </form>
+    </ModalShell>
   )
 }

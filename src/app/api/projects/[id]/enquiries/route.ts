@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import crypto from 'crypto'
 import { prisma } from '@/lib/db'
 import { authorizeProject } from '@/lib/api-auth'
@@ -7,6 +7,8 @@ import { sendEnquiryReply } from '@/lib/email'
 import { getProjectReplyAddress, inboundEmailEnabled } from '@/lib/email-identity'
 import { parseCopiedRecipients, withSignature } from '@/lib/email-compose'
 import { logAudit } from '@/lib/audit'
+import { captureEmailEvents } from '@/lib/engagement-ai'
+import { messageEvent } from '@/lib/stakeholder-email-log'
 
 // GET - List a project's enquiries for the desk inbox. Read access (CLIENT) is
 // enough to view; mutations live on the per-enquiry route and require ADMIN.
@@ -127,7 +129,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   const deliveryStatus =
     result.status === 'sent' ? 'sent' : result.status === 'skipped' ? 'stored' : 'failed'
 
-  await prisma.enquiryMessage.create({
+  const message = await prisma.enquiryMessage.create({
     data: {
       enquiryId: enquiry.id,
       direction: 'outbound',
@@ -139,6 +141,8 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       bcc: copied.bcc,
     },
   })
+
+  after(() => captureEmailEvents(params.id, [messageEvent(enquiry, message)]))
 
   await logAudit({
     projectId: params.id,

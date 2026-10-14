@@ -797,7 +797,10 @@ function EngagementTimeline({
                   </button>
                 )}
               </div>
-              {e.description && <p className="text-sm text-slate-600 mt-1 whitespace-pre-wrap">{e.description}</p>}
+              {/* Email entries show the AI summary once it's written, not the raw email. */}
+              {e.description && !(e.aiStatus === 'pending' || e.aiStatus === 'running') && (
+                <p className="text-sm text-slate-600 mt-1 whitespace-pre-wrap">{e.description}</p>
+              )}
               {e.outcome && <p className="text-sm text-slate-500 mt-1"><span className="font-medium">Outcome:</span> {e.outcome}</p>}
               {e.nextAction && <p className="text-sm text-amber-700 mt-1"><span className="font-medium">Next:</span> {e.nextAction}</p>}
             </li>

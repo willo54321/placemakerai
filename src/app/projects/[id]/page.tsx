@@ -555,7 +555,7 @@ export default function ProjectPage(props: { params: Promise<{ id: string }> }) 
           )}
           {activeTab === 'enquiries' && (
             <div className="p-6">
-              <EnquiriesTab projectId={params.id} isAdmin={Boolean(isAdmin)} />
+              <EnquiriesTab projectId={params.id} isAdmin={Boolean(isAdmin)} embedEnabled={Boolean(project.embedEnabled)} />
             </div>
           )}
           {activeTab === 'stakeholders' && (
@@ -565,7 +565,7 @@ export default function ProjectPage(props: { params: Promise<{ id: string }> }) 
           )}
           {activeTab === 'mailing' && (
             <div className="p-6">
-              <MailingListTab projectId={params.id} isAdmin={Boolean(isAdmin)} />
+              <MailingListTab projectId={params.id} isAdmin={Boolean(isAdmin)} embedEnabled={Boolean(project.embedEnabled)} />
             </div>
           )}
           {activeTab === 'analytics' && (

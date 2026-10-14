@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { fetchJson } from '@/lib/fetch-json'
 import { Spinner } from '@/components/Spinner'
+import { EmbedCodePanel } from '@/components/EmbedCodePanel'
 import { toast } from 'sonner'
 import {
   Mail, Plus, Trash2, Send, Download, Pencil, X, Users,
@@ -36,6 +37,7 @@ const SOURCE_LABELS: Record<string, string> = {
   enquiry: 'Enquiry form',
   feedback_form: 'Feedback form',
   subscribe_embed: 'Signup form',
+  issue_report: 'Issue report',
 }
 
 const STATUS_META: Record<Campaign['status'], { label: string; className: string }> = {
@@ -48,7 +50,7 @@ function fmtDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-export function MailingListTab({ projectId, isAdmin }: { projectId: string; isAdmin: boolean }) {
+export function MailingListTab({ projectId, isAdmin, embedEnabled }: { projectId: string; isAdmin: boolean; embedEnabled: boolean }) {
   const queryClient = useQueryClient()
   const [addingSubscriber, setAddingSubscriber] = useState(false)
   const [composing, setComposing] = useState<null | { campaign?: Campaign }>(null)
@@ -137,6 +139,10 @@ export function MailingListTab({ projectId, isAdmin }: { projectId: string; isAd
           </div>
         )}
       </div>
+
+      {isAdmin && (
+        <EmbedCodePanel projectId={projectId} path="subscribe" title="Signup form" height={460} embedEnabled={embedEnabled} />
+      )}
 
       {/* Campaigns */}
       <div className="card p-5">

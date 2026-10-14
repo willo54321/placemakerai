@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { fetchJson } from '@/lib/fetch-json'
 import { Spinner } from '@/components/Spinner'
+import { EmbedCodePanel } from '@/components/EmbedCodePanel'
 import { toast } from 'sonner'
 import {
   Inbox, Mail, Building2, Phone, ArrowDownLeft, ArrowUpRight,
@@ -94,7 +95,7 @@ const STATUS_FILTERS: Array<{ id: 'all' | EnquiryStatus; label: string }> = [
   { id: 'closed', label: 'Closed' },
 ]
 
-export function EnquiriesTab({ projectId, isAdmin }: { projectId: string; isAdmin: boolean }) {
+export function EnquiriesTab({ projectId, isAdmin, embedEnabled }: { projectId: string; isAdmin: boolean; embedEnabled: boolean }) {
   const queryClient = useQueryClient()
   const [statusFilter, setStatusFilter] = useState<'all' | EnquiryStatus>('all')
   const [unreadOnly, setUnreadOnly] = useState(false)
@@ -188,6 +189,10 @@ export function EnquiriesTab({ projectId, isAdmin }: { projectId: string; isAdmi
           )}
         </div>
       </div>
+
+      {isAdmin && (
+        <EmbedCodePanel projectId={projectId} path="enquiry" title="Enquiry form" height={900} embedEnabled={embedEnabled} />
+      )}
 
       {enquiries.length === 0 ? (
         <div className="card p-10 text-center">

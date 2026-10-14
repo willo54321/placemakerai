@@ -12,7 +12,7 @@ export function EmbedCodePanel({
   embedEnabled,
 }: {
   projectId: string
-  path: 'enquiry' | 'subscribe'
+  path: 'subscribe'
   title: string
   height: number
   embedEnabled: boolean

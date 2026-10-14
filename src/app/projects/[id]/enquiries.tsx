@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { fetchJson } from '@/lib/fetch-json'
 import { Spinner } from '@/components/Spinner'
-import { EmbedCodePanel } from '@/components/EmbedCodePanel'
+import { ApiEndpointPanel } from '@/components/ApiEndpointPanel'
 import { ModalShell } from '@/components/ModalShell'
 import { CopyFields, NewEmailModal, SignatureModal, SignaturePreview } from './enquiry-compose'
 import { toast } from 'sonner'
@@ -101,6 +101,19 @@ function DeliveryTick({ status }: { status: string }) {
   if (status === 'bounced' || status === 'failed') return <span className="inline-flex items-center gap-1 text-red-500" title={status}><AlertCircle size={13} /></span>
   return null
 }
+
+// The public enquiry endpoint's contract (src/app/api/embed/[id]/enquiries).
+const ENQUIRY_API_FIELDS = [
+  { name: 'submitterName', required: true, description: 'Full name' },
+  { name: 'submitterEmail', required: true, description: 'Email address — replies go here' },
+  { name: 'subject', required: true, description: 'Short summary' },
+  { name: 'message', required: true, description: 'The enquiry' },
+  { name: 'gdprConsent', required: true, description: 'Must be true — the person ticked your privacy consent box' },
+  { name: 'submitterPhone', description: 'Phone number' },
+  { name: 'submitterOrg', description: 'Organisation' },
+  { name: 'category', description: 'general (default), planning, objection, support or complaint' },
+  { name: 'mailingConsent', description: 'true adds them to the project mailing list — only if they opted in' },
+]
 
 const STATUS_FILTERS: Array<{ id: 'all' | EnquiryStatus; label: string }> = [
   { id: 'all', label: 'All' },
@@ -249,7 +262,21 @@ export function EnquiriesTab({
       {editingSignature && <SignatureModal onClose={() => setEditingSignature(false)} />}
 
       {isAdmin && (
-        <EmbedCodePanel projectId={projectId} path="enquiry" title="Enquiry form" height={900} embedEnabled={embedEnabled} />
+        <ApiEndpointPanel
+          title="Enquiry form API"
+          path={`/api/embed/${projectId}/enquiries`}
+          embedEnabled={embedEnabled}
+          fields={ENQUIRY_API_FIELDS}
+          example={{
+            submitterName: 'Jane Smith',
+            submitterEmail: 'jane@example.com',
+            subject: 'Question about the proposals',
+            message: 'Will there be a new bus stop on Church Road?',
+            category: 'general',
+            gdprConsent: true,
+            mailingConsent: false,
+          }}
+        />
       )}
 
       {enquiries.length === 0 ? (

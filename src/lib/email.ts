@@ -114,6 +114,9 @@ export async function sendSetPasswordEmail({
  * Reply-To is set to the responding admin so the enquirer's reply lands
  * straight in that person's inbox. Returns the delivery outcome so the caller
  * can record it on the EnquiryMessage.
+ *
+ * kind 'new' is a thread the team started (no enquiry to reply to): the body
+ * is sent as written, without the "Hi {name}" greeting or reply footer.
  */
 export async function sendEnquiryReply({
   to,
@@ -122,13 +125,19 @@ export async function sendEnquiryReply({
   body,
   replyTo,
   project,
+  kind = 'reply',
+  cc = [],
+  bcc = [],
 }: {
   to: string
+  cc?: string[]
+  bcc?: string[]
   toName?: string | null
   subject: string
   body: string
   replyTo?: string | null
   project?: ProjectSender | null
+  kind?: 'reply' | 'new'
 }): Promise<{ status: 'sent' | 'skipped' | 'failed'; id?: string | null }> {
   const client = getResend()
   if (!client) {
@@ -140,16 +149,18 @@ export async function sendEnquiryReply({
     const { data, error } = await client.emails.send({
       from: getFromAddress(project),
       to: [to],
+      cc: cc.length ? cc : undefined,
+      bcc: bcc.length ? bcc : undefined,
       replyTo: replyTo || undefined,
       subject,
       text: body,
       html: `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <p style="color: #475569;">Hi ${escapeHtml(toName || 'there')},</p>
+          ${kind === 'reply' ? `<p style="color: #475569;">Hi ${escapeHtml(toName || 'there')},</p>` : ''}
           <p style="color: #1e293b; white-space: pre-wrap; line-height: 1.6;">${escapeHtml(body)}</p>
-          <p style="color: #94a3b8; font-size: 13px; margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
+          ${kind === 'reply' ? `<p style="color: #94a3b8; font-size: 13px; margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
             This is a reply to your enquiry${project?.name ? ` about ${escapeHtml(project.name)}` : ''}. You can reply to this email to continue the conversation.
-          </p>
+          </p>` : ''}
         </div>
       `,
     })

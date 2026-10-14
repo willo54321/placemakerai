@@ -36,6 +36,7 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
         },
         // Bounded: recent enquiries feed the Overview activity stream
         enquiries: {
+          where: { channel: { not: 'outbound' } },
           orderBy: { createdAt: 'desc' },
           take: 15,
           select: { id: true, submitterName: true, subject: true, createdAt: true },

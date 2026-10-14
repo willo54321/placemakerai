@@ -6,10 +6,11 @@ import { requireAuth } from '@/lib/permissions'
 import { sendEnquiryReply } from '@/lib/email'
 import { getProjectReplyAddress, inboundEmailEnabled } from '@/lib/email-identity'
 import { logAudit } from '@/lib/audit'
+import { parseCopiedRecipients, withSignature } from '@/lib/email-compose'
 
 // POST - Send a staff reply to an enquiry. Creates an outbound EnquiryMessage,
-// emails the enquirer (Reply-To = the responding admin), and records the
-// delivery outcome. Requires ADMIN.
+// emails the enquirer (plus any CC/BCC) with the sender's signature appended,
+// and records the delivery outcome. Requires ADMIN.
 export async function POST(
   request: Request,
   props: { params: Promise<{ id: string; enquiryId: string }> }
@@ -35,6 +36,13 @@ export async function POST(
   if (text.length > 10000) {
     return NextResponse.json({ error: 'Reply is too long (10,000 character limit)' }, { status: 400 })
   }
+  const copied = parseCopiedRecipients(raw, enquiry.submitterEmail)
+  if (copied.error) {
+    return NextResponse.json({ error: copied.error }, { status: 400 })
+  }
+
+  const sender = await prisma.user.findUnique({ where: { id: user.id }, select: { emailSignature: true } })
+  const sentBody = withSignature(text, sender?.emailSignature)
 
   const subject = /^re:/i.test(enquiry.subject) ? enquiry.subject : `Re: ${enquiry.subject}`
 
@@ -58,8 +66,10 @@ export async function POST(
   const result = await sendEnquiryReply({
     to: enquiry.submitterEmail,
     toName: enquiry.submitterName,
+    cc: copied.cc,
+    bcc: copied.bcc,
     subject,
-    body: text,
+    body: sentBody,
     replyTo: threadReplyAddress ?? user.email ?? null,
     project: enquiry.project,
   })
@@ -71,10 +81,12 @@ export async function POST(
     data: {
       enquiryId: enquiry.id,
       direction: 'outbound',
-      body: text,
+      body: sentBody,
       authorName: user.name ?? null,
       authorEmail: user.email ?? null,
       deliveryStatus,
+      cc: copied.cc,
+      bcc: copied.bcc,
     },
   })
 
@@ -91,7 +103,7 @@ export async function POST(
     action: 'enquiry.reply',
     targetType: 'enquiry',
     targetId: enquiry.id,
-    detail: { messageId: message.id, deliveryStatus },
+    detail: { messageId: message.id, deliveryStatus, cc: copied.cc.length, bcc: copied.bcc.length },
   })
 
   return NextResponse.json(
@@ -104,6 +116,8 @@ export async function POST(
         authorEmail: message.authorEmail,
         deliveryStatus: message.deliveryStatus,
         attachments: null,
+        cc: message.cc,
+        bcc: message.bcc,
         createdAt: message.createdAt,
         isOriginal: false,
       },

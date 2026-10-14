@@ -5,10 +5,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { fetchJson } from '@/lib/fetch-json'
 import { Spinner } from '@/components/Spinner'
 import { EmbedCodePanel } from '@/components/EmbedCodePanel'
+import { CopyFields, NewEmailModal, SignatureModal, SignaturePreview } from './enquiry-compose'
 import { toast } from 'sonner'
 import {
   Inbox, Mail, Building2, Phone, ArrowDownLeft, ArrowUpRight,
-  CheckCheck, Clock, AlertCircle, CircleDot, Send,
+  CheckCheck, Clock, AlertCircle, CircleDot, Send, PenLine, Plus,
 } from 'lucide-react'
 
 type EnquiryStatus = 'new' | 'open' | 'closed'
@@ -23,7 +24,7 @@ interface EnquiryRow {
   status: EnquiryStatus
   read: boolean
   assigneeId: string | null
-  channel: 'form' | 'email'
+  channel: 'form' | 'email' | 'outbound'
   replyCount: number
   lastActivityAt: string
   createdAt: string
@@ -37,6 +38,8 @@ interface ThreadEntry {
   authorEmail: string | null
   deliveryStatus: string
   attachments: unknown
+  cc: string[]
+  bcc: string[]
   createdAt: string
   isOriginal: boolean
 }
@@ -53,6 +56,7 @@ interface ThreadResponse {
     status: EnquiryStatus
     read: boolean
     assigneeId: string | null
+    channel: 'form' | 'email' | 'outbound'
     createdAt: string
   }
   thread: ThreadEntry[]
@@ -100,6 +104,8 @@ export function EnquiriesTab({ projectId, isAdmin, embedEnabled }: { projectId: 
   const [statusFilter, setStatusFilter] = useState<'all' | EnquiryStatus>('all')
   const [unreadOnly, setUnreadOnly] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [composing, setComposing] = useState(false)
+  const [editingSignature, setEditingSignature] = useState(false)
 
   const listKey = ['enquiries', projectId]
   const { data, isLoading, error } = useQuery<{ enquiries: EnquiryRow[] }>({
@@ -188,7 +194,35 @@ export function EnquiriesTab({ projectId, isAdmin, embedEnabled }: { projectId: 
             <p className="text-sm font-medium text-slate-700 mt-0.5">{unreadCount} unread</p>
           )}
         </div>
+        {isAdmin && (
+          <div className="flex items-center gap-2">
+            <button onClick={() => setEditingSignature(true)} className="btn-secondary flex items-center gap-2">
+              <PenLine size={16} aria-hidden="true" /> Signature
+            </button>
+            <button onClick={() => setComposing(true)} className="btn-primary flex items-center gap-2">
+              <Plus size={16} aria-hidden="true" /> New email
+            </button>
+          </div>
+        )}
       </div>
+
+      {composing && (
+        <NewEmailModal
+          projectId={projectId}
+          onClose={() => setComposing(false)}
+          onEditSignature={() => setEditingSignature(true)}
+          onSent={async (id) => {
+            setComposing(false)
+            setStatusFilter('all')
+            setUnreadOnly(false)
+            // Select only once the refreshed list contains the new thread —
+            // the keep-valid-selection effect would otherwise clear it.
+            await queryClient.invalidateQueries({ queryKey: listKey })
+            setSelectedId(id)
+          }}
+        />
+      )}
+      {editingSignature && <SignatureModal onClose={() => setEditingSignature(false)} />}
 
       {isAdmin && (
         <EmbedCodePanel projectId={projectId} path="enquiry" title="Enquiry form" height={900} embedEnabled={embedEnabled} />
@@ -199,7 +233,7 @@ export function EnquiriesTab({ projectId, isAdmin, embedEnabled }: { projectId: 
           <Inbox size={32} className="mx-auto text-slate-300 mb-3" aria-hidden="true" />
           <p className="text-slate-600 font-medium">No enquiries yet</p>
           <p className="text-sm text-slate-400 mt-1">
-            Submissions from your enquiry embed will appear here.
+            Submissions from your enquiry embed, and emails you send, will appear here.
           </p>
         </div>
       ) : (
@@ -269,6 +303,9 @@ export function EnquiriesTab({ projectId, isAdmin, embedEnabled }: { projectId: 
                       {row.channel === 'email' && (
                         <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-medium">Email</span>
                       )}
+                      {row.channel === 'outbound' && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-medium">Sent by team</span>
+                      )}
                     </div>
                   </button>
                 </li>
@@ -285,6 +322,7 @@ export function EnquiriesTab({ projectId, isAdmin, embedEnabled }: { projectId: 
                 enquiryId={selectedId}
                 isAdmin={isAdmin}
                 onStatusChange={(status) => patchMutation.mutate({ id: selectedId, body: { status } })}
+                onEditSignature={() => setEditingSignature(true)}
               />
             ) : (
               <div className="h-full min-h-[300px] flex flex-col items-center justify-center text-center p-10">
@@ -300,15 +338,19 @@ export function EnquiriesTab({ projectId, isAdmin, embedEnabled }: { projectId: 
 }
 
 function ThreadView({
-  projectId, enquiryId, isAdmin, onStatusChange,
+  projectId, enquiryId, isAdmin, onStatusChange, onEditSignature,
 }: {
   projectId: string
   enquiryId: string
   isAdmin: boolean
   onStatusChange: (status: EnquiryStatus) => void
+  onEditSignature: () => void
 }) {
   const queryClient = useQueryClient()
   const [reply, setReply] = useState('')
+  const [cc, setCc] = useState('')
+  const [bcc, setBcc] = useState('')
+  const [showCopies, setShowCopies] = useState(false)
 
   const { data, isLoading, error } = useQuery<ThreadResponse>({
     queryKey: ['enquiry', projectId, enquiryId],
@@ -320,10 +362,13 @@ function ThreadView({
       fetchJson(`/api/projects/${projectId}/enquiries/${enquiryId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ body }),
+        body: JSON.stringify({ body, cc, bcc }),
       }),
     onSuccess: (res: { delivery?: 'sent' | 'skipped' | 'failed' }) => {
       setReply('')
+      setCc('')
+      setBcc('')
+      setShowCopies(false)
       queryClient.invalidateQueries({ queryKey: ['enquiry', projectId, enquiryId] })
       queryClient.invalidateQueries({ queryKey: ['enquiries', projectId] })
       if (res?.delivery === 'sent') toast.success('Reply sent')
@@ -358,7 +403,10 @@ function ThreadView({
               <span className="inline-flex items-center gap-1">
                 <Mail size={13} aria-hidden="true" />
                 <a href={`mailto:${enquiry.submitterEmail}`} className="hover:text-slate-700 hover:underline">
-                  {enquiry.submitterName} · {enquiry.submitterEmail}
+                  {enquiry.channel === 'outbound' && 'To '}
+                  {enquiry.submitterName === enquiry.submitterEmail
+                    ? enquiry.submitterEmail
+                    : `${enquiry.submitterName} · ${enquiry.submitterEmail}`}
                 </a>
               </span>
               {enquiry.submitterOrg && (
@@ -384,11 +432,13 @@ function ThreadView({
             <StatusBadge status={enquiry.status} />
           )}
         </div>
-        <div className="mt-2">
-          <span className="inline-flex items-center text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 capitalize">
-            {enquiry.category}
-          </span>
-        </div>
+        {enquiry.channel !== 'outbound' && (
+          <div className="mt-2">
+            <span className="inline-flex items-center text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 capitalize">
+              {enquiry.category}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Conversation */}
@@ -405,6 +455,12 @@ function ThreadView({
                   <span className="font-medium">{entry.authorName || (outbound ? 'You' : 'Correspondent')}</span>
                   {entry.isOriginal && <span className="opacity-75">· original enquiry</span>}
                 </div>
+                {(entry.cc?.length > 0 || entry.bcc?.length > 0) && (
+                  <div className={`text-xs mb-1 ${outbound ? 'text-green-50' : 'text-slate-500'}`}>
+                    {entry.cc?.length > 0 && <div>Cc: {entry.cc.join(', ')}</div>}
+                    {entry.bcc?.length > 0 && <div>Bcc: {entry.bcc.join(', ')}</div>}
+                  </div>
+                )}
                 <p className="text-sm whitespace-pre-wrap break-words">{entry.body}</p>
                 <div className={`flex items-center gap-1.5 justify-end mt-1 text-[11px] ${outbound ? 'text-green-100' : 'text-slate-400'}`}>
                   <span>{formatWhen(entry.createdAt)}</span>
@@ -427,8 +483,23 @@ function ThreadView({
             placeholder={`Reply to ${enquiry.submitterName}…`}
             className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-green-500 focus:border-green-500"
           />
-          <div className="mt-2 flex items-center justify-between gap-3">
-            <span className="text-xs text-slate-400 truncate">Emails {enquiry.submitterEmail}; their reply comes to your inbox.</span>
+          {showCopies && (
+            <div className="mt-2">
+              <CopyFields cc={cc} bcc={bcc} onCcChange={setCc} onBccChange={setBcc} />
+            </div>
+          )}
+          <div className="mt-2 flex items-start justify-between gap-3">
+            <div className="min-w-0 space-y-1.5">
+              <div className="flex items-center gap-3 text-xs text-slate-400">
+                <span className="truncate">To {enquiry.submitterEmail}</span>
+                {!showCopies && (
+                  <button type="button" onClick={() => setShowCopies(true)} className="text-slate-500 hover:text-slate-700 hover:underline flex-shrink-0">
+                    Cc / Bcc
+                  </button>
+                )}
+              </div>
+              <SignaturePreview onEdit={onEditSignature} />
+            </div>
             <button
               onClick={submitReply}
               disabled={!reply.trim() || sendReply.isPending}

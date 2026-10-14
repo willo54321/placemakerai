@@ -60,7 +60,7 @@ export async function GET(request: Request, props0: { params: Promise<{ id: stri
     prisma.geoLayer.findMany({ where: { projectId, type: 'plot' }, orderBy: { createdAt: 'asc' } }),
     prisma.publicPin.findMany({ where: { projectId, approved: true } }),
     prisma.feedbackForm.findMany({ where: { projectId }, include: { responses: true } }),
-    prisma.enquiry.findMany({ where: { projectId } }),
+    prisma.enquiry.findMany({ where: { projectId, channel: { not: 'outbound' } } }),
   ])
 
   if (!project) return NextResponse.json({ error: 'Not found' }, { status: 404 })

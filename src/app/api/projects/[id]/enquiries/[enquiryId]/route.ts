@@ -18,6 +18,8 @@ type ThreadEntry = {
   authorEmail: string | null
   deliveryStatus: string
   attachments: unknown
+  cc: string[]
+  bcc: string[]
   createdAt: Date
   isOriginal: boolean
 }
@@ -52,12 +54,16 @@ export async function GET(
     authorEmail: enquiry.submitterEmail,
     deliveryStatus: 'delivered',
     attachments: null,
+    cc: [],
+    bcc: [],
     createdAt: enquiry.createdAt,
     isOriginal: true,
   }
 
+  // A thread the team started has no submission to synthesise: its first
+  // message is the stored outbound email.
   const thread: ThreadEntry[] = [
-    root,
+    ...(enquiry.channel === 'outbound' ? [] : [root]),
     ...enquiry.messages.map(m => ({
       id: m.id,
       direction: m.direction as 'inbound' | 'outbound',
@@ -66,6 +72,8 @@ export async function GET(
       authorEmail: m.authorEmail,
       deliveryStatus: m.deliveryStatus,
       attachments: m.attachments,
+      cc: m.cc,
+      bcc: m.bcc,
       createdAt: m.createdAt,
       isOriginal: false,
     })),
@@ -83,6 +91,7 @@ export async function GET(
       status: enquiry.status,
       read: enquiry.read,
       assigneeId: enquiry.assigneeId,
+      channel: enquiry.channel,
       createdAt: enquiry.createdAt,
     },
     thread,

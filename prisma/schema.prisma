@@ -94,7 +94,9 @@ model Enquiry {
   read            Boolean   @default(false)
   threadToken     String?   @unique
   // How the enquiry arrived: 'form' (embed enquiry form) | 'email' (inbound
-  // mail to the project's sending address). externalId is the Resend inbound
+  // mail to the project's sending address) | 'outbound' (a thread the team
+  // started by emailing someone — not public feedback, so kept out of
+  // analysis and activity counts). externalId is the Resend inbound
   // email id for email-origin enquiries — unique so webhook retries can't
   // create duplicates.
   channel         String    @default("form")
@@ -123,6 +125,9 @@ model EnquiryMessage {
   // are always 'delivered'; outbound advances as the provider reports back.
   deliveryStatus String   @default("stored")
   attachments    Json?    // [{ name, url, size, mime }]
+  // Copied recipients on outbound messages (staff-visible only).
+  cc             String[] @default([])
+  bcc            String[] @default([])
   // Resend inbound email id for inbound messages — unique so webhook retries
   // can't append the same reply twice.
   externalId     String?  @unique
@@ -526,6 +531,8 @@ model User {
   // Show the dashboard product tour on next sign-in; user can opt out via
   // "don't show again", super admins can re-enable per user.
   showTour                Boolean              @default(true)
+  // Plain-text signature appended to the enquiry emails this user sends.
+  emailSignature          String?
   createdAt               DateTime             @default(now())
   updatedAt               DateTime             @updatedAt
   accounts                Account[]

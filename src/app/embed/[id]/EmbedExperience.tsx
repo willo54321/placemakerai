@@ -470,8 +470,12 @@ export function EmbedExperience({
   }
 
   const handleCloseTour = () => {
-    setTourOpen(false)
-    setActiveTourId(null)
+    // On the dedicated tour page there is nothing behind the tour: leaving
+    // resets it to the overview instead of closing the panel.
+    if (!tourMode) {
+      setTourOpen(false)
+      setActiveTourId(null)
+    }
     setTourStopIndex(-1)
     // Fly back to the project's default view rather than snapping
     if (project) {
@@ -887,6 +891,7 @@ export function EmbedExperience({
             keyLayers={visibleOverlays}
             hiddenLayerIds={hiddenOverlayIds}
             onToggleLayer={toggleOverlay}
+            standalone={tourMode}
           />
         )}
 

@@ -54,6 +54,8 @@ interface TourPlayerProps {
   keyLayers?: MapKeyLayer[]
   hiddenLayerIds?: Set<string>
   onToggleLayer?: (id: string) => void
+  /** The tour is the whole page: "Leave tour" resets to the overview, which has nothing to leave. */
+  standalone?: boolean
 }
 
 const RESPONSE_CATEGORIES = [
@@ -117,6 +119,7 @@ export function TourPlayer({
   keyLayers = [],
   hiddenLayerIds = NO_HIDDEN,
   onToggleLayer = () => {},
+  standalone = false,
 }: TourPlayerProps) {
   const stop = tour && stopIndex >= 0 ? tour.stops[stopIndex] : null
   const isLastStop = tour ? stopIndex === tour.stops.length - 1 : false
@@ -223,13 +226,15 @@ export function TourPlayer({
           ) : (
             <span />
           )}
-          <button
-            onClick={onClose}
-            aria-label="Leave tour"
-            className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 transition-colors"
-          >
-            <X size={16} /> Leave tour
-          </button>
+          {!standalone && (
+            <button
+              onClick={onClose}
+              aria-label="Leave tour"
+              className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 transition-colors"
+            >
+              <X size={16} /> Leave tour
+            </button>
+          )}
         </div>
         <div className="flex-1 overflow-y-auto p-5">
           <h2 className="text-xl font-bold text-gray-900">{tour.name}</h2>

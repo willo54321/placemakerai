@@ -24,7 +24,6 @@ import {
   CampaignAnalysis,
   ResponsesExplorer
 } from '@/components/analytics'
-import { AutoInsights } from '@/components/analytics/AutoInsights'
 import { FeedbackBreakdown } from '@/components/analytics/PlotComparison'
 import { EngagementPanels } from '@/components/analytics/EngagementPanels'
 
@@ -909,12 +908,6 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
           <SentimentHeatmap clusters={analysis.geographic.clusters} overlays={mapOverlays} height="400px" />
         </div>
       )}
-
-      {/* Significance-tested patterns: statements + starred heatmap */}
-      <AutoInsights
-        projectId={projectId}
-        onViewTheme={(name) => { setSelectedTheme({ name } as Theme); setView('themes') }}
-      />
 
       </div>
       )}

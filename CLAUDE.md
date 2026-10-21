@@ -196,6 +196,14 @@ export async function GET(request: Request, { params }: { params: { id: string }
 - Visitors drop pins (positive, negative, question, comment) or draw lines/polygons
 - Pin voting; admin approval workflow before pins appear publicly
 - GeoJSON boundary layers and image overlays on the map
+- Masterplan PDF import (2026-10-20): a georeferenced PDF (ArcGIS/QGIS GeoPDF — `/VP` +
+  `/Measure /GEO`) is placed exactly from its embedded coordinates (`src/lib/geopdf.ts`; OSGB36
+  control points get the datum shift via `src/lib/projection.ts`), rendered in the browser with
+  pdf.js with basemap layers (`Image`, grids…) switched off so only the proposals overlay Google
+  Maps (`src/lib/masterplan-pdf.ts`, `MasterplanImportModal.tsx`). Non-georeferenced PDFs/images
+  start over the imported boundary for manual placement. Imported shapefiles/GeoJSON are styled
+  automatically server-side (`src/lib/layer-style.ts`: red-line → unfilled red outline; categorical
+  attribute → colour by value). shpjs already reprojects BNG correctly (proj4 knows D_OSGB_1936).
 - Enquiry form embed: `/embed/{projectId}/enquiry` (submissions stored for AI analysis)
 - Guided tours: authored per project (Guided Tours tab), played on the map embed or the
   dedicated `/embed/{projectId}/tour` iframe; per-stop responses are moderated PublicPins

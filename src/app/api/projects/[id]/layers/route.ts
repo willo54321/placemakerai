@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db'
 import { authorizeProject } from '@/lib/api-auth'
 import { NextResponse } from 'next/server'
+import { autoLayerStyle, DEFAULT_LAYER_STYLE } from '@/lib/layer-style'
 
 // GET all geo layers for a project
 export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
@@ -63,12 +64,11 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       name: body.name,
       type: body.type || 'boundary',
       geojson: geojson,
-      style: body.style || {
-        fillColor: '#3B82F6',
-        strokeColor: '#1E40AF',
-        fillOpacity: 0.3,
-        strokeWidth: 2
-      },
+      // Unstyled imports get a style from their content: red outline for a
+      // site boundary, colour by category for land-use style layers.
+      style: body.style || (geojson.type === 'FeatureCollection'
+        ? { ...autoLayerStyle(body.name, geojson) }
+        : { ...DEFAULT_LAYER_STYLE }),
       visible: body.visible ?? true
     }
   })

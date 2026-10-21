@@ -6,6 +6,7 @@ import { X } from 'lucide-react'
 import { RotatableOverlay, calculateRotationAngle, snapAngle } from './RotatableOverlay'
 import { startFlyTo, type FlyToTarget } from '@/lib/fly-to'
 import { TOUR_STOP_ICON_PATHS } from '@/lib/tour-icons'
+import { featureColor, type LayerStyle } from '@/lib/layer-style'
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''
 // 'visualization' powers the sentiment heatmap; loader options must be
@@ -48,12 +49,7 @@ export interface GeoLayer {
   name: string
   type: string
   geojson: GeoJSON.FeatureCollection
-  style: {
-    fillColor: string
-    strokeColor: string
-    fillOpacity: number
-    strokeWidth: number
-  }
+  style: LayerStyle
   visible: boolean
 }
 
@@ -627,88 +623,34 @@ const InteractiveMap = forwardRef<InteractiveMapRef, InteractiveMapProps>(({
   // because Point features build a google.maps icon.
   const geoLayerElements = useMemo(() => {
     if (!isLoaded) return null
+    const ringPath = (ring: number[][]) => ring.map(coord => ({ lat: coord[1], lng: coord[0] }))
     return geoLayers.filter(layer => layer.visible).map(layer => {
       const features = layer.geojson?.features || []
-      const fillColor = layer.style?.fillColor || '#3B82F6'
-      const fillOpacity = layer.style?.fillOpacity || 0.3
-      const strokeColor = layer.style?.strokeColor || '#1E40AF'
-      const strokeWeight = layer.style?.strokeWidth || 2
+      // ?? not ||: an outline-only boundary has fillOpacity 0.
+      const fillOpacity = layer.style?.fillOpacity ?? 0.3
+      const strokeWeight = layer.style?.strokeWidth ?? 2
       return features.map((feature, featureIndex) => {
         const geometry = feature.geometry
         if (!geometry) return null
+        const { fill: fillColor, stroke: strokeColor } = featureColor(layer.style, feature.properties)
+        const polygonOptions = { fillColor, fillOpacity, strokeColor, strokeWeight, strokeOpacity: 0.8, clickable: false }
+        const lineOptions = { strokeColor, strokeWeight, strokeOpacity: 0.8, clickable: false }
 
+        // Every ring is passed so holes render as holes.
         if (geometry.type === 'Polygon') {
-          const paths = geometry.coordinates[0].map((coord: number[]) => ({
-            lat: coord[1], lng: coord[0]
-          }))
           return (
-            <PolygonF
-              key={`${layer.id}-${featureIndex}`}
-              paths={paths}
-              options={{
-                fillColor,
-                fillOpacity,
-                strokeColor,
-                strokeWeight,
-                strokeOpacity: 0.8,
-                clickable: false
-              }}
-            />
+            <PolygonF key={`${layer.id}-${featureIndex}`} paths={geometry.coordinates.map(ringPath)} options={polygonOptions} />
           )
         } else if (geometry.type === 'MultiPolygon') {
-          return geometry.coordinates.map((polygonCoords: number[][][], polyIndex: number) => {
-            const paths = polygonCoords[0].map((coord: number[]) => ({
-              lat: coord[1], lng: coord[0]
-            }))
-            return (
-              <PolygonF
-                key={`${layer.id}-${featureIndex}-${polyIndex}`}
-                paths={paths}
-                options={{
-                  fillColor,
-                  fillOpacity,
-                  strokeColor,
-                  strokeWeight,
-                  strokeOpacity: 0.8,
-                  clickable: false
-                }}
-              />
-            )
-          })
+          return geometry.coordinates.map((polygonCoords: number[][][], polyIndex: number) => (
+            <PolygonF key={`${layer.id}-${featureIndex}-${polyIndex}`} paths={polygonCoords.map(ringPath)} options={polygonOptions} />
+          ))
         } else if (geometry.type === 'LineString') {
-          const path = geometry.coordinates.map((coord: number[]) => ({
-            lat: coord[1], lng: coord[0]
-          }))
-          return (
-            <PolylineF
-              key={`${layer.id}-${featureIndex}`}
-              path={path}
-              options={{
-                strokeColor,
-                strokeWeight,
-                strokeOpacity: 0.8,
-                clickable: false
-              }}
-            />
-          )
+          return <PolylineF key={`${layer.id}-${featureIndex}`} path={ringPath(geometry.coordinates)} options={lineOptions} />
         } else if (geometry.type === 'MultiLineString') {
-          return geometry.coordinates.map((lineCoords: number[][], lineIndex: number) => {
-            const path = lineCoords.map((coord: number[]) => ({
-              lat: coord[1], lng: coord[0]
-            }))
-            return (
-              <PolylineF
-                key={`${layer.id}-${featureIndex}-${lineIndex}`}
-                path={path}
-                options={{
-                  strokeColor,
-                  strokeWeight,
-                  strokeOpacity: 0.8,
-                  clickable: false
-                }}
-              />
-            )
-          })
+          return geometry.coordinates.map((lineCoords: number[][], lineIndex: number) => (
+            <PolylineF key={`${layer.id}-${featureIndex}-${lineIndex}`} path={ringPath(lineCoords)} options={lineOptions} />
+          ))
         } else if (geometry.type === 'Point') {
           return (
             <MarkerF

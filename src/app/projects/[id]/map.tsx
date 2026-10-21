@@ -23,6 +23,8 @@ const InteractiveMap = dynamic(
 // Import utilities from separate file to avoid SSR issues with Google Maps
 import { calculateDrawingMetrics } from '@/lib/map-utils'
 import type { ImageOverlay } from '@/components/InteractiveMap'
+import { MasterplanImportModal, type ImportedOverlay } from './MasterplanImportModal'
+import type { LayerStyle } from '@/lib/layer-style'
 
 interface MapMarker {
   id: string
@@ -84,12 +86,7 @@ interface GeoLayer {
   name: string
   type: string
   geojson: any
-  style: {
-    fillColor: string
-    strokeColor: string
-    fillOpacity: number
-    strokeWidth: number
-  }
+  style: LayerStyle
   visible: boolean
   createdAt: string
 }
@@ -410,16 +407,11 @@ export function MapTab({ projectId, project }: { projectId: string; project: Pro
 
       // Create the layer
       const layerName = file.name.replace(/\.(geojson|json|zip|shp)$/i, '')
+      // No style: the server picks one from the layer's content.
       await createGeoLayer.mutateAsync({
         name: layerName,
         type: 'boundary',
         geojson,
-        style: {
-          fillColor: '#3B82F6',
-          strokeColor: '#1E40AF',
-          fillOpacity: 0.3,
-          strokeWidth: 2
-        }
       })
 
     } catch (err: any) {
@@ -501,6 +493,48 @@ export function MapTab({ projectId, project }: { projectId: string; project: Pro
   }
 
   const [isUploading, setIsUploading] = useState(false)
+  const [masterplanFile, setMasterplanFile] = useState<File | null>(null)
+
+  // Starting position for a plan without coordinates: over the imported
+  // boundary layers when there are any (that's where it belongs), otherwise
+  // the map centre — at the plan's own aspect ratio, for dragging into place.
+  const unplacedOverlayBounds = (aspect: number): [[number, number], [number, number]] => {
+    let south = Infinity, west = Infinity, north = -Infinity, east = -Infinity
+    const visit = (coords: unknown): void => {
+      if (Array.isArray(coords) && typeof coords[0] === 'number') {
+        const [lng, lat] = coords as number[]
+        south = Math.min(south, lat); north = Math.max(north, lat)
+        west = Math.min(west, lng); east = Math.max(east, lng)
+      } else if (Array.isArray(coords)) coords.forEach(visit)
+    }
+    geoLayers.filter(l => l.visible).forEach(l => l.geojson?.features?.forEach((f: any) => visit(f.geometry?.coordinates)))
+    const [lat, lng] = Number.isFinite(south) ? [(south + north) / 2, (west + east) / 2] : mapCenter
+    const cosLat = Math.cos((lat * Math.PI) / 180)
+    // Height in degrees latitude; width follows the aspect ratio in ground distance.
+    const height = Number.isFinite(south) ? Math.max(north - south, ((east - west) * cosLat) / aspect) * 1.1 : 0.02
+    const width = (height * aspect) / cosLat
+    return [[lat - height / 2, lng - width / 2], [lat + height / 2, lng + width / 2]]
+  }
+
+  const handleMasterplanImported = (imported: ImportedOverlay) => {
+    const tempId = Date.now().toString()
+    const overlay: ImageOverlay = {
+      id: tempId,
+      name: imported.name,
+      imageUrl: imported.imageUrl,
+      bounds: imported.bounds,
+      // Proposals on a transparent background read well near-opaque.
+      opacity: imported.georeferenced ? 0.9 : 0.7,
+      rotation: imported.rotation,
+      visible: true,
+    }
+    setOverlays(prev => [...prev, overlay])
+    setSelectedOverlayId(tempId)
+    createOverlay.mutate({ ...overlay, tempId } as any)
+    setMasterplanFile(null)
+    mapRef.current?.fitToOverlay(overlay.bounds)
+    toast.success(imported.georeferenced ? 'Masterplan placed from its map coordinates' : 'Masterplan added — drag it into position')
+  }
 
   const handleOverlayUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
@@ -508,9 +542,15 @@ export function MapTab({ projectId, project }: { projectId: string; project: Pro
 
     setOverlayError(null)
 
-    // Validate all files first
+    // Validate all files first. A PDF goes through the masterplan importer
+    // (one at a time); images upload directly as before.
     const validFiles: File[] = []
+    let pdfFile: File | null = null
     for (const file of Array.from(files)) {
+      if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)) {
+        pdfFile ??= file
+        continue
+      }
       if (file.size > 50 * 1024 * 1024) {
         setOverlayError(`${file.name} is too large. Maximum size is 50MB.`)
         e.target.value = ''
@@ -522,6 +562,12 @@ export function MapTab({ projectId, project }: { projectId: string; project: Pro
         return
       }
       validFiles.push(file)
+    }
+
+    if (pdfFile) setMasterplanFile(pdfFile)
+    if (validFiles.length === 0) {
+      e.target.value = ''
+      return
     }
 
     setIsUploading(true)
@@ -998,10 +1044,10 @@ export function MapTab({ projectId, project }: { projectId: string; project: Pro
                           ) : (
                             <>
                               <Upload size={18} className="text-gray-400" />
-                              <span className="text-sm text-gray-600">Add Overlay (up to 50MB)</span>
+                              <span className="text-sm text-gray-600">Add image or masterplan PDF</span>
                             </>
                           )}
-                          <input type="file" accept="image/*" multiple onChange={handleOverlayUpload} className="hidden" disabled={isUploading || createOverlay.isPending} />
+                          <input type="file" accept="image/*,application/pdf,.pdf" multiple onChange={handleOverlayUpload} className="hidden" disabled={isUploading || createOverlay.isPending} />
                         </label>
                         {overlayError && (
                           <p className="text-xs text-red-600 mt-2 text-center">{overlayError}</p>
@@ -1191,6 +1237,19 @@ export function MapTab({ projectId, project }: { projectId: string; project: Pro
                                       <span className="text-xs text-gray-500">Type: </span>
                                       <span className="text-xs font-medium text-gray-700">{layerType.label}</span>
                                     </div>
+                                    {layer.style?.colorBy && (
+                                      <div>
+                                        <p className="text-xs text-gray-500 mb-1">Coloured by {layer.style.colorBy.property}</p>
+                                        <ul className="space-y-0.5">
+                                          {Object.entries(layer.style.colorBy.colors).map(([value, color]) => (
+                                            <li key={value} className="flex items-center gap-1.5 text-xs text-gray-700">
+                                              <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: color }} />
+                                              <span className="truncate">{value}</span>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
                                     <div className="flex gap-2">
                                       <button
                                         onClick={(e) => { e.stopPropagation(); deleteGeoLayer.mutate(layer.id) }}
@@ -1215,7 +1274,7 @@ export function MapTab({ projectId, project }: { projectId: string; project: Pro
                 <div className="flex-1 flex flex-col items-center py-4 gap-3">
                   <label className={`p-2 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded cursor-pointer transition-colors ${isUploading ? 'opacity-50 pointer-events-none' : ''}`} title="Add Overlay (up to 50MB)">
                     {isUploading ? <span className="animate-spin w-5 h-5 border-2 border-brand-500 border-t-transparent rounded-full inline-block" /> : <Upload size={20} />}
-                    <input type="file" accept="image/*" multiple onChange={handleOverlayUpload} className="hidden" disabled={isUploading} />
+                    <input type="file" accept="image/*,application/pdf,.pdf" multiple onChange={handleOverlayUpload} className="hidden" disabled={isUploading} />
                   </label>
                   <label className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded cursor-pointer transition-colors" title="Import Geo Data">
                     <FileUp size={20} />
@@ -1300,6 +1359,14 @@ export function MapTab({ projectId, project }: { projectId: string; project: Pro
               </div>
             </div>
           )}
+      {masterplanFile && (
+        <MasterplanImportModal
+          file={masterplanFile}
+          onClose={() => setMasterplanFile(null)}
+          onImported={handleMasterplanImported}
+          fallbackBounds={unplacedOverlayBounds}
+        />
+      )}
     </div>
   )
 }

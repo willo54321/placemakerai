@@ -3,6 +3,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { X, ChevronLeft, ChevronRight, Play, ThumbsUp, ThumbsDown, MessageCircle, CheckCircle, AlertCircle } from 'lucide-react'
 import { TOUR_STOP_ICON_PATHS } from '@/lib/tour-icons'
+import { MapKey, type MapKeyLayer } from './MapKey'
+
+const NO_HIDDEN = new Set<string>()
 
 export interface TourStopHighlight {
   type: 'Polygon'
@@ -47,6 +50,10 @@ interface TourPlayerProps {
   responsesByStop: Map<string, TourResponse[]>
   canRespond: boolean
   onSubmitResponse: (stop: TourStopData, data: { category: string; comment: string; name: string }) => Promise<void>
+  /** Plan layers on the map at this point of the tour, for the key's toggles. */
+  keyLayers?: MapKeyLayer[]
+  hiddenLayerIds?: Set<string>
+  onToggleLayer?: (id: string) => void
 }
 
 const RESPONSE_CATEGORIES = [
@@ -107,6 +114,9 @@ export function TourPlayer({
   responsesByStop,
   canRespond,
   onSubmitResponse,
+  keyLayers = [],
+  hiddenLayerIds = NO_HIDDEN,
+  onToggleLayer = () => {},
 }: TourPlayerProps) {
   const stop = tour && stopIndex >= 0 ? tour.stops[stopIndex] : null
   const isLastStop = tour ? stopIndex === tour.stops.length - 1 : false
@@ -254,6 +264,7 @@ export function TourPlayer({
               ))}
             </div>
           </div>
+          <MapKey layers={keyLayers} hiddenIds={hiddenLayerIds} onToggle={onToggleLayer} className="mt-6 border-t border-gray-100 pt-4" />
         </div>
       </div>
     )
@@ -444,6 +455,7 @@ export function TourPlayer({
               </div>
             )}
           </div>
+          <MapKey layers={keyLayers} hiddenIds={hiddenLayerIds} onToggle={onToggleLayer} className="mt-5 border-t border-gray-100 pt-4" />
         </div>
       </div>
 

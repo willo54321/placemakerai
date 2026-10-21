@@ -2,8 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useJsApiLoader } from '@react-google-maps/api'
-import { MessageCircle, ThumbsUp, ThumbsDown, X, Send, MapPin, ChevronLeft, ChevronRight, Lightbulb, Pentagon, CheckCircle, AlertCircle, Layers, HardHat, Camera, Volume2, Wind, Car, Home, ShieldAlert, Clock, MoreHorizontal, Eye, EyeOff, ChevronDown } from 'lucide-react'
-import type { MapArea } from '@/lib/map-areas'
+import { MessageCircle, ThumbsUp, ThumbsDown, X, Send, MapPin, ChevronLeft, ChevronRight, Lightbulb, Pentagon, CheckCircle, AlertCircle, Layers, HardHat, Camera, Volume2, Wind, Car, Home, ShieldAlert, Clock, MoreHorizontal } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { TourPlayer, StartTourButton } from './TourPlayer'
 import type { TourData, TourStopData, TourResponse } from './TourPlayer'
@@ -87,7 +86,6 @@ interface ProjectData {
   allowPins: boolean
   allowDrawing: boolean
   overlays: Overlay[]
-  areas?: MapArea[]
   pins: PublicPin[]
   zones?: Zone[]
   tours: TourData[]
@@ -202,15 +200,12 @@ export function EmbedExperience({
   const [overlayOpacity, setOverlayOpacity] = useState<number | null>(null)
   // Plan layers the visitor has switched off in the map key
   const [hiddenOverlayIds, setHiddenOverlayIds] = useState<Set<string>>(new Set())
-  const [keyOpen, setKeyOpen] = useState(false)
   const toggleOverlay = (id: string) => setHiddenOverlayIds(prev => {
     const next = new Set(prev)
     if (next.has(id)) next.delete(id)
     else next.add(id)
     return next
   })
-  // Quick-jump areas: 'whole' is the project's default view
-  const [activeAreaId, setActiveAreaId] = useState<string>('whole')
 
   // Collapse the sidebar by default on small screens (narrow iframes)
   useEffect(() => {
@@ -550,18 +545,6 @@ export function EmbedExperience({
     return tourOpen ? shown : shown.map(o => ({ ...o, opacity: effectiveOverlayOpacity }))
   }, [visibleOverlays, effectiveOverlayOpacity, tourOpen, hiddenOverlayIds])
 
-  const areas = project?.areas ?? []
-  const flyToArea = (areaId: string) => {
-    setActiveAreaId(areaId)
-    if (areaId === 'whole') {
-      if (project?.latitude != null && project?.longitude != null) {
-        setTourCamera({ center: [project.latitude, project.longitude], zoom: project.mapZoom ?? 14 })
-      }
-      return
-    }
-    const area = areas.find(a => a.id === areaId)
-    if (area) setTourCamera({ center: [area.lat, area.lng], zoom: area.zoom })
-  }
 
   const tourActive = tourOpen || tourMode
 
@@ -738,35 +721,6 @@ export function EmbedExperience({
           </div>
         )}
 
-        {/* Quick-jump areas - Top Centre */}
-        {areas.length > 0 && !drawMode && !tourOpen && !issuesMode && (
-          <div
-            className={`absolute top-4 z-10 -translate-x-1/2 overflow-x-auto ${sidebarCollapsed ? '' : 'hidden md:block'}`}
-            style={{
-              left: sidebarCollapsed ? '50%' : 'calc(50% + 10rem)',
-              maxWidth: sidebarCollapsed ? 'calc(100vw - 12rem)' : 'calc(100vw - 34rem)',
-            }}
-          >
-            <div className="flex gap-1 bg-white/95 backdrop-blur rounded-full shadow-lg p-1 w-max" role="tablist" aria-label="Map areas">
-              {[{ id: 'whole', name: 'Whole project' }, ...areas].map(area => {
-                const active = activeAreaId === area.id
-                return (
-                  <button
-                    key={area.id}
-                    role="tab"
-                    aria-selected={active}
-                    onClick={() => flyToArea(area.id)}
-                    className={`px-3.5 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${active ? 'text-white' : 'text-gray-700 hover:bg-gray-100'}`}
-                    style={active ? { backgroundColor: primaryColor } : undefined}
-                  >
-                    {area.name}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        )}
-
         {/* Instruction Banner - Top Center (when drawing) */}
         {drawMode && !showForm && (
           <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 bg-brand-600 text-white pl-6 pr-3 py-3 rounded-lg shadow-lg flex items-center gap-3 max-w-[calc(100vw-2rem)]">
@@ -876,48 +830,6 @@ export function EmbedExperience({
                     )
                   })}
                 </div>
-                {project.overlays.length > 0 && (
-                  <div className="mt-5 border-t border-gray-100 pt-4">
-                    <button
-                      type="button"
-                      onClick={() => setKeyOpen(o => !o)}
-                      aria-expanded={keyOpen}
-                      className="w-full flex items-center justify-between text-left"
-                    >
-                      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
-                        Map key
-                        <span className="ml-2 normal-case tracking-normal font-normal text-gray-400">
-                          {hiddenOverlayIds.size > 0 ? `${project.overlays.length - hiddenOverlayIds.size} of ${project.overlays.length} shown` : `${project.overlays.length} layers`}
-                        </span>
-                      </span>
-                      <ChevronDown size={16} className={`text-gray-400 transition-transform ${keyOpen ? 'rotate-180' : ''}`} />
-                    </button>
-                    {keyOpen && (
-                      <div className="space-y-1.5 mt-3">
-                        {/* Top-most layer first, as a plan's own key lists them */}
-                        {project.overlays.slice().reverse().map(overlay => {
-                          const shown = !hiddenOverlayIds.has(overlay.id)
-                          return (
-                            <button
-                              key={overlay.id}
-                              type="button"
-                              aria-pressed={shown}
-                              onClick={() => toggleOverlay(overlay.id)}
-                              className="w-full flex items-center gap-3 px-3 py-2 rounded-lg border border-gray-100 hover:border-gray-200 text-left transition-colors"
-                            >
-                              <span
-                                className="w-4 h-4 rounded-sm shrink-0 border border-black/10 transition-opacity"
-                                style={{ backgroundColor: overlay.color ?? '#94a3b8', opacity: shown ? 1 : 0.25 }}
-                              />
-                              <span className={`flex-1 text-sm ${shown ? 'text-gray-900' : 'text-gray-400'}`}>{overlay.name}</span>
-                              {shown ? <Eye size={14} className="text-gray-400" /> : <EyeOff size={14} className="text-gray-300" />}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )}
                 </>
                 )}
               </div>
@@ -986,6 +898,9 @@ export function EmbedExperience({
             responsesByStop={tourResponsesByStop}
             canRespond={!project.embedReferenceOnly}
             onSubmitResponse={handleTourResponse}
+            keyLayers={visibleOverlays}
+            hiddenLayerIds={hiddenOverlayIds}
+            onToggleLayer={toggleOverlay}
           />
         )}
 

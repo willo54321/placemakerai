@@ -217,8 +217,9 @@ export async function GET(request: Request, { params }: { params: { id: string }
   layer (`createLayerSplitter` in `src/lib/masterplan-pdf.ts` isolates each layer by *difference*
   rendering, because ArcGIS tags content with both its layer and a data-frame group so a layer
   shown alone draws nothing; `ImageOverlay.color` holds the sampled key swatch; images are WebP).
-  The public embed lists overlays as a toggleable **Map key** and offers **area quick-jump pills**
-  from `Project.mapAreas` (`src/lib/map-areas.ts`), captured from the editor's Areas tab.
+  The **tour player** lists the layers as a collapsible, toggleable **Map key** (`MapKey.tsx`);
+  the feedback map itself stays as it was (user decision 2026-10-21). `Project.mapAreas` /
+  `src/lib/map-areas.ts` exist (API + schema) but have no UI yet.
 - Enquiry form embed: `/embed/{projectId}/enquiry` (submissions stored for AI analysis)
 - Guided tours: authored per project (Guided Tours tab), played on the map embed or the
   dedicated `/embed/{projectId}/tour` iframe; per-stop responses are moderated PublicPins

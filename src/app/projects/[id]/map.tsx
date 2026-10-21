@@ -1,8 +1,8 @@
 'use client'
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2, X, Pentagon, Minus, Eye, EyeOff, Upload, Save, ChevronLeft, ChevronRight, Image, ZoomIn, Code, MessageCircle, Globe, Copy, Check, ThumbsUp, ThumbsDown, HelpCircle, ExternalLink, Clock, CheckCircle, XCircle, FileUp, Layers, MapPinned, Palette, Type, MapIcon, HardHat, Navigation, Crosshair } from 'lucide-react'
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { Plus, Trash2, X, Pentagon, Minus, Eye, EyeOff, Upload, Save, ChevronLeft, ChevronRight, Image, ZoomIn, Code, MessageCircle, Globe, Copy, Check, ThumbsUp, ThumbsDown, HelpCircle, ExternalLink, Clock, CheckCircle, XCircle, FileUp, Layers, MapPinned, Palette, Type, MapIcon, HardHat } from 'lucide-react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import dynamic from 'next/dynamic'
 import { toast } from 'sonner'
 import { fetchJson } from '@/lib/fetch-json'
@@ -25,8 +25,6 @@ import { calculateDrawingMetrics } from '@/lib/map-utils'
 import type { ImageOverlay } from '@/components/InteractiveMap'
 import { MasterplanImportModal, type ImportedOverlay } from './MasterplanImportModal'
 import type { LayerStyle } from '@/lib/layer-style'
-import { readMapAreas, MAX_MAP_AREAS, type MapArea } from '@/lib/map-areas'
-import type { FlyToTarget } from '@/lib/fly-to'
 
 interface MapMarker {
   id: string
@@ -112,7 +110,6 @@ interface Project {
   latitude: number | null
   longitude: number | null
   mapZoom: number | null
-  mapAreas?: unknown
   mapMarkers: MapMarker[]
   publicPins: PublicPin[]
   imageOverlays: DBImageOverlay[]
@@ -313,28 +310,8 @@ export function MapTab({ projectId, project }: { projectId: string; project: Pro
   })
 
   // Geo layers state
-  const [sidebarMode, setSidebarMode] = useState<'overlays' | 'layers' | 'areas'>('overlays')
+  const [sidebarMode, setSidebarMode] = useState<'overlays' | 'layers'>('overlays')
 
-  // Named views offered to visitors as quick jumps; captured from the current camera.
-  const mapAreas = useMemo(() => readMapAreas(project.mapAreas), [project.mapAreas])
-  const [newAreaName, setNewAreaName] = useState('')
-  const [editorFlyTo, setEditorFlyTo] = useState<FlyToTarget | null>(null)
-  const saveAreas = useMutation({
-    mutationFn: (areas: MapArea[]) =>
-      fetchJson(`/api/projects/${projectId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mapAreas: areas }),
-      }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['project', projectId] }),
-    onError: (e: Error) => toast.error(e.message || 'Could not save areas'),
-  })
-  const addArea = () => {
-    const name = newAreaName.trim()
-    if (!name) return
-    saveAreas.mutate([...mapAreas, { id: `area-${Date.now().toString(36)}`, name, lat: mapCenter[0], lng: mapCenter[1], zoom: mapZoom }])
-    setNewAreaName('')
-  }
   const renameOverlay = (overlayId: string, name: string) => {
     setOverlays(prev => prev.map(o => (o.id === overlayId ? { ...o, name } : o)))
     updateOverlay.mutate({ id: overlayId, name })
@@ -1021,7 +998,6 @@ export function MapTab({ projectId, project }: { projectId: string; project: Pro
                 setMapCenter(center)
                 setMapZoom(zoom)
               }}
-              flyTo={editorFlyTo}
               onOverlayClick={handleOverlayClick}
               onOverlayBoundsChange={updateOverlayBounds}
               onOverlayRotationChange={updateOverlayRotation}
@@ -1072,80 +1048,7 @@ export function MapTab({ projectId, project }: { projectId: string; project: Pro
                       <span>Geo Data</span>
                       <span className="text-xs bg-gray-200 px-1.5 py-0.5 rounded">{geoLayers.length}</span>
                     </button>
-                    <button
-                      onClick={() => setSidebarMode('areas')}
-                      className={`flex-1 flex items-center justify-center gap-1.5 px-1 py-2.5 text-sm font-medium whitespace-nowrap transition-colors ${
-                        sidebarMode === 'areas'
-                          ? 'text-brand-600 border-b-2 border-brand-600 bg-brand-50'
-                          : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      <Navigation size={16} />
-                      <span>Areas</span>
-                      <span className="text-xs bg-gray-200 px-1.5 py-0.5 rounded">{mapAreas.length}</span>
-                    </button>
                   </div>
-
-                  {/* Areas: named views visitors can jump to on the public map */}
-                  {sidebarMode === 'areas' && (
-                    <div className="flex-1 flex flex-col min-h-0">
-                      <form
-                        className="p-3 border-b border-gray-200 flex gap-2"
-                        onSubmit={e => { e.preventDefault(); addArea() }}
-                      >
-                        <input
-                          type="text"
-                          value={newAreaName}
-                          onChange={e => setNewAreaName(e.target.value)}
-                          placeholder="Name this view"
-                          maxLength={60}
-                          className="flex-1 min-w-0 text-sm rounded-lg border border-gray-200 px-3 py-2"
-                        />
-                        <button
-                          type="submit"
-                          disabled={!newAreaName.trim() || mapAreas.length >= MAX_MAP_AREAS || saveAreas.isPending}
-                          className="btn-primary text-sm py-2 px-3 whitespace-nowrap"
-                          title="Save the map’s current position and zoom"
-                        >
-                          <Crosshair size={16} aria-hidden="true" />
-                          Add current view
-                        </button>
-                      </form>
-                      <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                        {mapAreas.length === 0 ? (
-                          <p className="text-sm text-gray-400 text-center py-8">Pan and zoom to an area of the plan, then add the current view.</p>
-                        ) : mapAreas.map(area => (
-                          <div key={area.id} className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2">
-                            <button
-                              type="button"
-                              onClick={() => setEditorFlyTo({ lat: area.lat, lng: area.lng, zoom: area.zoom })}
-                              className="flex-1 min-w-0 text-left"
-                              title="Go to this view"
-                            >
-                              <p className="font-medium text-sm text-gray-800 truncate">{area.name}</p>
-                              <p className="text-xs text-gray-400">Zoom {area.zoom}</p>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => saveAreas.mutate(mapAreas.map(a => (a.id === area.id ? { ...a, lat: mapCenter[0], lng: mapCenter[1], zoom: mapZoom } : a)))}
-                              className="p-1.5 rounded text-gray-400 hover:text-brand-600 hover:bg-brand-50"
-                              title="Replace with the current view"
-                            >
-                              <Crosshair size={15} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => saveAreas.mutate(mapAreas.filter(a => a.id !== area.id))}
-                              className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50"
-                              title="Remove"
-                            >
-                              <Trash2 size={15} />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
 
                   {/* Overlays Panel */}
                   {sidebarMode === 'overlays' && (

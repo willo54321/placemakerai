@@ -320,6 +320,9 @@ model ImageOverlay {
   opacity   Float    @default(0.7)
   rotation  Float    @default(0)
   visible   Boolean  @default(true)
+  // Key swatch (hex) for overlays imported as individual plan layers; null
+  // for a plain image, which the key lists without a colour.
+  color     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -397,6 +400,9 @@ model Project {
   createdAt             DateTime         @default(now())
   updatedAt             DateTime         @updatedAt
   mapZoom               Int?             @default(10)
+  // Named camera views offered as quick jumps on the public map:
+  // [{ id, name, lat, lng, zoom }] (see src/lib/map-areas.ts).
+  mapAreas              Json?
   embedEnabled          Boolean          @default(false)
   allowPins             Boolean          @default(true) // Allow visitors to drop pins/comments
   allowDrawing          Boolean          @default(false) // Allow visitors to draw shapes

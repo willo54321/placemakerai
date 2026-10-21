@@ -30,6 +30,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
         opacity: body.opacity ?? 0.7,
         rotation: body.rotation ?? 0,
         visible: body.visible ?? true,
+        color: typeof body.color === 'string' && /^#[0-9a-f]{6}$/i.test(body.color) ? body.color : null,
       }
     })
 
@@ -42,6 +43,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       opacity: overlay.opacity,
       rotation: overlay.rotation,
       visible: overlay.visible,
+      color: overlay.color,
     })
   } catch (error) {
     console.error('Error creating overlay:', error)

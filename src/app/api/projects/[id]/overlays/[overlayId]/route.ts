@@ -19,6 +19,7 @@ export async function PATCH(
   if (body.opacity !== undefined) updateData.opacity = body.opacity
   if (body.rotation !== undefined) updateData.rotation = body.rotation
   if (body.visible !== undefined) updateData.visible = body.visible
+  if ('color' in body) updateData.color = typeof body.color === 'string' && /^#[0-9a-f]{6}$/i.test(body.color) ? body.color : null
   if (body.bounds !== undefined) {
     updateData.southLat = body.bounds[0][0]
     updateData.westLng = body.bounds[0][1]

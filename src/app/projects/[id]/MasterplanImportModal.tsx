@@ -5,7 +5,8 @@ import { X, MapPinned, AlertCircle } from 'lucide-react'
 import { ModalShell } from '@/components/ModalShell'
 import { Spinner } from '@/components/Spinner'
 import { frameCorners, overlayFromCorners, type GeoFrame } from '@/lib/geopdf'
-import { loadMasterplanPdf, pageFrames, renderMasterplan, type MasterplanPdf } from '@/lib/masterplan-pdf'
+import { createLayerSplitter, loadMasterplanPdf, pageFrames, renderMasterplan, type MasterplanPdf } from '@/lib/masterplan-pdf'
+import { cleanLayerName } from '@/lib/layer-key'
 
 export interface ImportedOverlay {
   name: string
@@ -13,17 +14,42 @@ export interface ImportedOverlay {
   bounds: [[number, number], [number, number]]
   rotation: number
   georeferenced: boolean
+  /** Key swatch when imported as an individual plan layer. */
+  color: string | null
 }
 
-// Turns a masterplan PDF into a map overlay. A georeferenced PDF (ArcGIS/QGIS
+type Mode = 'single' | 'layers'
+
+// Drawing furniture GIS exports put in their own groups; off by default when
+// importing as layers (still listed, so they can be switched back on).
+const FURNITURE_RE = /^(other( \d+)?|<default>|measured grid|grid|image|text - .*label)$/i
+/** Fewer drawn pixels than this is edge noise, not a layer. */
+const MIN_LAYER_PIXELS = 60
+
+/** Longest side for per-layer images: visitors load one per layer, so smaller than a single plan. */
+const LAYER_PIXELS = 2600
+
+async function upload(blob: Blob, name: string): Promise<string> {
+  const formData = new FormData()
+  const ext = blob.type === 'image/webp' ? 'webp' : 'png'
+  formData.append('file', new File([blob], `${name}.${ext}`, { type: blob.type || 'image/png' }))
+  const res = await fetch('/api/upload', { method: 'POST', body: formData })
+  const body = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(body.error || 'Upload failed')
+  return body.url
+}
+
+// Turns a masterplan PDF into map overlays. A georeferenced PDF (ArcGIS/QGIS
 // export) is placed exactly from its embedded coordinates; anything else is
-// placed by `fallbackBounds` for the admin to position by hand as before.
+// placed by `fallbackBounds` for the admin to position by hand. A PDF with
+// drawing layers can be imported as one overlay per layer, each with a key
+// swatch, so visitors can switch parts of the plan on and off.
 export function MasterplanImportModal({
   file, onClose, onImported, fallbackBounds,
 }: {
   file: File
   onClose: () => void
-  onImported: (overlay: ImportedOverlay) => void
+  onImported: (overlays: ImportedOverlay[]) => void
   /** Initial placement for a PDF without coordinates, given its width/height ratio. */
   fallbackBounds: (aspect: number) => [[number, number], [number, number]]
 }) {
@@ -33,8 +59,10 @@ export function MasterplanImportModal({
   const [frame, setFrame] = useState<GeoFrame | null>(null)
   const [framesLoaded, setFramesLoaded] = useState(false)
   const [visible, setVisible] = useState<Set<string>>(new Set())
+  const [mode, setMode] = useState<Mode>('single')
   const [preview, setPreview] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
+  const [progress, setProgress] = useState<{ done: number; total: number; name: string } | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -43,7 +71,10 @@ export function MasterplanImportModal({
       .then(loaded => {
         if (cancelled) return
         setPdf(loaded)
-        setVisible(new Set(loaded.layers.filter(l => l.visible).map(l => l.id)))
+        // A layered GIS export is the case a toggleable key is for
+        const layers = loaded.layers.length >= 2
+        setMode(layers ? 'layers' : 'single')
+        setVisible(new Set(loaded.layers.filter(l => l.visible && !(layers && FURNITURE_RE.test(l.name.trim()))).map(l => l.id)))
       })
       .catch(err => { if (!cancelled) setLoadError(err instanceof Error ? err.message : 'Could not read this PDF') })
     return () => { cancelled = true }
@@ -96,28 +127,48 @@ export function MasterplanImportModal({
     })
   }
 
+  const selectedLayers = pdf ? pdf.layers.filter(l => visible.has(l.id)) : []
+  const layerMode = mode === 'layers' && selectedLayers.length > 0
+
   const addToMap = async () => {
     if (!pdf) return
     setImporting(true)
     setImportError(null)
+    const planName = file.name.replace(/\.pdf$/i, '')
+    const place = (width: number, height: number) => ({
+      bounds: placement?.bounds ?? fallbackBounds(width / height),
+      rotation: placement?.rotation ?? 0,
+      georeferenced: Boolean(placement),
+    })
     try {
-      const { blob, width, height } = await renderMasterplan(pdf, { pageNumber, visibleLayerIds: visible, frame: placement ? frame : null })
-      const name = file.name.replace(/\.pdf$/i, '')
-      const formData = new FormData()
-      formData.append('file', new File([blob], `${name}.png`, { type: 'image/png' }))
-      const res = await fetch('/api/upload', { method: 'POST', body: formData })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(body.error || 'Upload failed')
-      onImported({
-        name,
-        imageUrl: body.url,
-        bounds: placement?.bounds ?? fallbackBounds(width / height),
-        rotation: placement?.rotation ?? 0,
-        georeferenced: Boolean(placement),
-      })
+      if (!layerMode) {
+        const { blob, width, height } = await renderMasterplan(pdf, { pageNumber, visibleLayerIds: visible, frame: placement ? frame : null })
+        const imageUrl = await upload(blob, planName)
+        onImported([{ name: planName, imageUrl, color: null, ...place(width, height) }])
+        return
+      }
+      // One overlay per layer, all sharing the frame's placement, created
+      // bottom-to-top (the PDF lists the top layer first) so later layers draw
+      // over earlier ones as in the plan. Empty layers and container groups
+      // are skipped.
+      const overlays: ImportedOverlay[] = []
+      const splitter = await createLayerSplitter(pdf, { pageNumber, visibleLayerIds: visible, frame: placement ? frame : null, maxPixels: LAYER_PIXELS })
+      const ordered = [...selectedLayers].reverse()
+      for (let i = 0; i < ordered.length; i++) {
+        const layer = ordered[i]
+        const name = cleanLayerName(layer.name)
+        setProgress({ done: i, total: ordered.length, name })
+        const { blob, width, height, color, container, drawnPixels } = await splitter.renderLayer(layer.id)
+        if (drawnPixels < MIN_LAYER_PIXELS || container) continue
+        const imageUrl = await upload(blob, `${planName} - ${name}`)
+        overlays.push({ name, imageUrl, color, ...place(width, height) })
+      }
+      if (overlays.length === 0) throw new Error('None of the selected layers draw anything on this page')
+      onImported(overlays)
     } catch (err) {
       setImportError(err instanceof Error ? err.message : 'Could not add this plan')
       setImporting(false)
+      setProgress(null)
     }
   }
 
@@ -178,6 +229,23 @@ export function MasterplanImportModal({
               )}
             </div>
 
+            {pdf.layers.length >= 2 && (
+              <div className="flex rounded-lg border border-slate-200 p-0.5 text-sm" role="radiogroup" aria-label="Import as">
+                {([['layers', 'Layers you can switch on and off'], ['single', 'One image']] as const).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    role="radio"
+                    aria-checked={mode === id}
+                    onClick={() => setMode(id)}
+                    className={`flex-1 rounded-md px-3 py-1.5 transition-colors ${mode === id ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {pdf.layers.length > 0 && (
               <fieldset>
                 <legend className="text-sm font-medium text-slate-700 mb-1.5">Layers</legend>
@@ -190,7 +258,7 @@ export function MasterplanImportModal({
                         onChange={() => toggleLayer(layer.id)}
                         className="rounded border-slate-300 text-green-600 focus:ring-green-500"
                       />
-                      <span className="truncate">{layer.name}</span>
+                      <span className="truncate">{mode === 'layers' ? cleanLayerName(layer.name) : layer.name}</span>
                     </label>
                   ))}
                 </div>
@@ -198,12 +266,15 @@ export function MasterplanImportModal({
             )}
 
             {importError && <p className="text-sm text-red-600">{importError}</p>}
+            {progress && (
+              <p className="text-sm text-slate-500">Rendering {progress.done + 1} of {progress.total}: {progress.name}</p>
+            )}
 
             <div className="flex justify-end gap-2 pt-1">
               <button type="button" onClick={onClose} disabled={importing} className="btn-secondary">Cancel</button>
               <button type="button" onClick={addToMap} disabled={importing || !framesLoaded} className="btn-primary flex items-center gap-2">
                 {importing && <Spinner size="sm" />}
-                Add to map
+                {layerMode ? `Add ${selectedLayers.length} layer${selectedLayers.length === 1 ? '' : 's'} to map` : 'Add to map'}
               </button>
             </div>
           </>

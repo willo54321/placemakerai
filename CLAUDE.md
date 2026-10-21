@@ -213,6 +213,12 @@ export async function GET(request: Request, { params }: { params: { id: string }
   start over the imported boundary for manual placement. Imported shapefiles/GeoJSON are styled
   automatically server-side (`src/lib/layer-style.ts`: red-line → unfilled red outline; categorical
   attribute → colour by value). shpjs already reprojects BNG correctly (proj4 knows D_OSGB_1936).
+- Map key + areas (2026-10-21): a layered GIS PDF can be imported as one overlay per drawing
+  layer (`createLayerSplitter` in `src/lib/masterplan-pdf.ts` isolates each layer by *difference*
+  rendering, because ArcGIS tags content with both its layer and a data-frame group so a layer
+  shown alone draws nothing; `ImageOverlay.color` holds the sampled key swatch; images are WebP).
+  The public embed lists overlays as a toggleable **Map key** and offers **area quick-jump pills**
+  from `Project.mapAreas` (`src/lib/map-areas.ts`), captured from the editor's Areas tab.
 - Enquiry form embed: `/embed/{projectId}/enquiry` (submissions stored for AI analysis)
 - Guided tours: authored per project (Guided Tours tab), played on the map embed or the
   dedicated `/embed/{projectId}/tour` iframe; per-stop responses are moderated PublicPins

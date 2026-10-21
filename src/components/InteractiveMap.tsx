@@ -43,6 +43,8 @@ export interface ImageOverlay {
   opacity: number
   rotation: number
   visible: boolean
+  /** Key swatch for a plan layer; null for a plain image. */
+  color?: string | null
 }
 
 export interface GeoLayer {

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db'
 import { NextResponse } from 'next/server'
+import { readMapAreas } from '@/lib/map-areas'
 
 // Public API - no auth required
 // Returns project data for embedding (if embedEnabled)
@@ -70,8 +71,10 @@ export async function GET(request: Request, props0: { params: Promise<{ id: stri
       imageUrl: o.imageUrl,
       bounds: [[o.southLat, o.westLng], [o.northLat, o.eastLng]],
       opacity: o.opacity,
-      rotation: o.rotation
+      rotation: o.rotation,
+      color: o.color,
     })),
+    areas: readMapAreas(project.mapAreas),
     // No name/email here: submitter identity never appears on public surfaces.
     pins: project.publicPins.map(p => ({
       id: p.id,

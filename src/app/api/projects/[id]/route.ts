@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db'
 import { NextResponse } from 'next/server'
+import { parseMapAreas } from '@/lib/map-areas'
 import { getAuth } from '@/lib/auth'
 import { canAccessProject } from '@/lib/permissions'
 import { logAudit } from '@/lib/audit'
@@ -117,6 +118,11 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
         typeof body.issueNotifyEmails === 'string' && body.issueNotifyEmails.trim()
           ? body.issueNotifyEmails.slice(0, 2000)
           : null
+    }
+    if ('mapAreas' in body) {
+      const parsed = parseMapAreas(body.mapAreas ?? [])
+      if ('error' in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 })
+      updateData.mapAreas = parsed.areas
     }
     if ('emailLocalPart' in body) {
       const raw = body.emailLocalPart

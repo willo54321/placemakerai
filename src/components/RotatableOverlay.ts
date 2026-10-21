@@ -54,10 +54,16 @@ export class RotatableOverlay implements IRotatableOverlay {
     class InternalOverlay extends google.maps.OverlayView {
       private div: HTMLDivElement | null = null
       private image: HTMLImageElement | null = null
+      // Layout size the element was last given; everything else is a transform
+      private baseWidth = 0
+      private baseHeight = 0
 
       onAdd(): void {
         this.div = document.createElement('div')
         this.div.style.position = 'absolute'
+        this.div.style.left = '0'
+        this.div.style.top = '0'
+        this.div.style.transformOrigin = '0 0'
         this.div.style.pointerEvents = (options.clickable ?? true) ? 'auto' : 'none'
         this.div.style.cursor = (options.clickable ?? true) ? 'pointer' : 'default'
         // Safari fixes for transform rendering
@@ -93,6 +99,12 @@ export class RotatableOverlay implements IRotatableOverlay {
         }
       }
 
+      // Positioned, scaled and rotated with a single transform. Changing an
+      // image's width/height makes the browser re-rasterise the bitmap, which
+      // with several large plan layers drops most frames of a camera flight;
+      // a transform is applied by the compositor. The layout size is only
+      // reset when the zoom has drifted far from it, to keep the scaled
+      // bitmap sharp.
       draw(): void {
         if (!this.div || !this.image) return
 
@@ -110,20 +122,24 @@ export class RotatableOverlay implements IRotatableOverlay {
 
         const width = ne.x - sw.x
         const height = sw.y - ne.y
+        if (width <= 0 || height <= 0) return
 
-        // Position container from top-left corner
-        this.div.style.left = sw.x + 'px'
-        this.div.style.top = ne.y + 'px'
-        this.div.style.width = width + 'px'
-        this.div.style.height = height + 'px'
+        const drift = this.baseWidth > 0 ? Math.abs(Math.log2(width / this.baseWidth)) : Infinity
+        if (drift > 2) {
+          this.baseWidth = width
+          this.baseHeight = height
+          this.div.style.width = width + 'px'
+          this.div.style.height = height + 'px'
+          this.image.style.width = width + 'px'
+          this.image.style.height = height + 'px'
+        }
 
-        // Set explicit pixel dimensions on image (fixes Safari distortion)
-        this.image.style.width = width + 'px'
-        this.image.style.height = height + 'px'
-
-        // Set transform-origin to center in pixels for Safari compatibility
-        this.div.style.transformOrigin = `${width / 2}px ${height / 2}px`
-        this.div.style.transform = `rotate(${self._rotation}deg)`
+        const cx = (sw.x + ne.x) / 2
+        const cy = (sw.y + ne.y) / 2
+        const sx = width / this.baseWidth
+        const sy = height / this.baseHeight
+        this.div.style.transform =
+          `translate(${cx}px, ${cy}px) rotate(${self._rotation}deg) scale(${sx}, ${sy}) translate(${-this.baseWidth / 2}px, ${-this.baseHeight / 2}px)`
       }
 
       onRemove(): void {
@@ -140,10 +156,8 @@ export class RotatableOverlay implements IRotatableOverlay {
         }
       }
 
-      updateRotation(rotation: number): void {
-        if (this.div) {
-          this.div.style.transform = `rotate(${rotation}deg)`
-        }
+      updateRotation(): void {
+        this.draw()
       }
 
       updateImageUrl(imageUrl: string): void {
@@ -175,7 +189,7 @@ export class RotatableOverlay implements IRotatableOverlay {
   setRotation(rotation: number): void {
     this._rotation = rotation
     if (this.overlay) {
-      (this.overlay as any).updateRotation(rotation)
+      (this.overlay as any).updateRotation()
     }
   }
 

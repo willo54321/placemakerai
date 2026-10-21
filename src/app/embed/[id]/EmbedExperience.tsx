@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useJsApiLoader } from '@react-google-maps/api'
 import { MessageCircle, ThumbsUp, ThumbsDown, X, Send, MapPin, ChevronLeft, ChevronRight, Lightbulb, Pentagon, CheckCircle, AlertCircle, Layers, HardHat, Camera, Volume2, Wind, Car, Home, ShieldAlert, Clock, MoreHorizontal } from 'lucide-react'
 import dynamic from 'next/dynamic'
-import { TourPlayer, StartTourButton } from './TourPlayer'
+import { TourPlayer } from './TourPlayer'
 import type { TourData, TourStopData, TourResponse } from './TourPlayer'
 import { ISSUE_CATEGORY_LABELS } from '@/lib/issues'
 
@@ -852,7 +852,7 @@ export function EmbedExperience({
 
         {/* Overlay opacity - Bottom Left (visitor-adjustable, sits above the tour button) */}
         {!tourActive && visibleOverlays.length > 0 && (
-          <div className={`absolute left-4 z-10 ${tours.length > 0 ? 'bottom-20' : 'bottom-4'}`}>
+          <div className="absolute left-4 z-10 bottom-4">
             <div
               className="bg-white/95 backdrop-blur rounded-xl shadow-lg px-3 py-2 flex items-center gap-2.5 max-w-[calc(100vw-2rem)]"
               title="Adjust overlay transparency"
@@ -876,13 +876,6 @@ export function EmbedExperience({
                 {Math.round(effectiveOverlayOpacity * 100)}%
               </span>
             </div>
-          </div>
-        )}
-
-        {/* Tour entry - Bottom Left */}
-        {tours.length > 0 && !tourOpen && (
-          <div className="absolute bottom-4 left-4 z-10">
-            <StartTourButton onClick={handleStartTour} multiple={tours.length > 1} />
           </div>
         )}
 

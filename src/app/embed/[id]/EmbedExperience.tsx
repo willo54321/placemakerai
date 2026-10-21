@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useJsApiLoader } from '@react-google-maps/api'
-import { MessageCircle, ThumbsUp, ThumbsDown, X, Send, MapPin, ChevronLeft, ChevronRight, Lightbulb, Pentagon, CheckCircle, AlertCircle, Layers, HardHat, Camera, Volume2, Wind, Car, Home, ShieldAlert, Clock, MoreHorizontal, Eye, EyeOff } from 'lucide-react'
+import { MessageCircle, ThumbsUp, ThumbsDown, X, Send, MapPin, ChevronLeft, ChevronRight, Lightbulb, Pentagon, CheckCircle, AlertCircle, Layers, HardHat, Camera, Volume2, Wind, Car, Home, ShieldAlert, Clock, MoreHorizontal, Eye, EyeOff, ChevronDown } from 'lucide-react'
 import type { MapArea } from '@/lib/map-areas'
 import dynamic from 'next/dynamic'
 import { TourPlayer, StartTourButton } from './TourPlayer'
@@ -202,6 +202,7 @@ export function EmbedExperience({
   const [overlayOpacity, setOverlayOpacity] = useState<number | null>(null)
   // Plan layers the visitor has switched off in the map key
   const [hiddenOverlayIds, setHiddenOverlayIds] = useState<Set<string>>(new Set())
+  const [keyOpen, setKeyOpen] = useState(false)
   const toggleOverlay = (id: string) => setHiddenOverlayIds(prev => {
     const next = new Set(prev)
     if (next.has(id)) next.delete(id)
@@ -834,35 +835,6 @@ export function EmbedExperience({
                   </div>
                 ) : (
                 <>
-                {project.overlays.length > 0 && (
-                  <>
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
-                      Map key
-                    </p>
-                    <div className="space-y-1.5 mb-5">
-                      {/* Top-most layer first, as a plan's own key lists them */}
-                      {project.overlays.slice().reverse().map(overlay => {
-                        const shown = !hiddenOverlayIds.has(overlay.id)
-                        return (
-                          <button
-                            key={overlay.id}
-                            type="button"
-                            aria-pressed={shown}
-                            onClick={() => toggleOverlay(overlay.id)}
-                            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg border border-gray-100 hover:border-gray-200 text-left transition-colors"
-                          >
-                            <span
-                              className="w-4 h-4 rounded-sm shrink-0 border border-black/10 transition-opacity"
-                              style={{ backgroundColor: overlay.color ?? '#94a3b8', opacity: shown ? 1 : 0.25 }}
-                            />
-                            <span className={`flex-1 text-sm ${shown ? 'text-gray-900' : 'text-gray-400'}`}>{overlay.name}</span>
-                            {shown ? <Eye size={14} className="text-gray-400" /> : <EyeOff size={14} className="text-gray-300" />}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </>
-                )}
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
                   Categories
                 </p>
@@ -904,6 +876,48 @@ export function EmbedExperience({
                     )
                   })}
                 </div>
+                {project.overlays.length > 0 && (
+                  <div className="mt-5 border-t border-gray-100 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => setKeyOpen(o => !o)}
+                      aria-expanded={keyOpen}
+                      className="w-full flex items-center justify-between text-left"
+                    >
+                      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                        Map key
+                        <span className="ml-2 normal-case tracking-normal font-normal text-gray-400">
+                          {hiddenOverlayIds.size > 0 ? `${project.overlays.length - hiddenOverlayIds.size} of ${project.overlays.length} shown` : `${project.overlays.length} layers`}
+                        </span>
+                      </span>
+                      <ChevronDown size={16} className={`text-gray-400 transition-transform ${keyOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    {keyOpen && (
+                      <div className="space-y-1.5 mt-3">
+                        {/* Top-most layer first, as a plan's own key lists them */}
+                        {project.overlays.slice().reverse().map(overlay => {
+                          const shown = !hiddenOverlayIds.has(overlay.id)
+                          return (
+                            <button
+                              key={overlay.id}
+                              type="button"
+                              aria-pressed={shown}
+                              onClick={() => toggleOverlay(overlay.id)}
+                              className="w-full flex items-center gap-3 px-3 py-2 rounded-lg border border-gray-100 hover:border-gray-200 text-left transition-colors"
+                            >
+                              <span
+                                className="w-4 h-4 rounded-sm shrink-0 border border-black/10 transition-opacity"
+                                style={{ backgroundColor: overlay.color ?? '#94a3b8', opacity: shown ? 1 : 0.25 }}
+                              />
+                              <span className={`flex-1 text-sm ${shown ? 'text-gray-900' : 'text-gray-400'}`}>{overlay.name}</span>
+                              {shown ? <Eye size={14} className="text-gray-400" /> : <EyeOff size={14} className="text-gray-300" />}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
                 </>
                 )}
               </div>

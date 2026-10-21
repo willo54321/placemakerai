@@ -32,6 +32,15 @@ otherwise Reply-To stays the sending admin. Email-origin enquiries get `channel:
 webhook retries dedup on `externalId`; auto-replies are skipped; project admins get a
 notification email. Requires MX on placemakerai.io pointing at Resend (DNS is on Vercel).
 
+**CC logging (2026-10-20):** teams that work from their own inbox can CC/BCC the bare project
+address to log correspondence without using the Placemaker inbox. A team member's email (sender
+has project access or is a super admin) with external recipients, or anyone's email with the
+project only on CC/BCC, becomes a `channel: 'copied'` thread (read, no admin alert, excluded from
+analysis/counts like `'outbound'`); external To/CC are stored on `EnquiryMessage.to`/`cc` and every
+stakeholder on the email gets it in their engagement log. Reply-alls thread by In-Reply-To/References
+against the stored `messageId` (on Enquiry and EnquiryMessage). Routing rules: `classifyNewThread`
+in `src/lib/inbound-email.ts`.
+
 **Re-added 2026-09-10 — Guided tours** (explicit user decision; redesigned rather than restored
 from the pre-descope version): admins author map tours — ordered stops, each with a title, story
 text, optional image (Vercel Blob upload) / YouTube-or-Vimeo video, a camera position captured

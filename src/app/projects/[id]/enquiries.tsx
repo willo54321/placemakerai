@@ -25,7 +25,7 @@ interface EnquiryRow {
   status: EnquiryStatus
   read: boolean
   assigneeId: string | null
-  channel: 'form' | 'email' | 'outbound'
+  channel: 'form' | 'email' | 'outbound' | 'copied'
   replyCount: number
   lastActivityAt: string
   createdAt: string
@@ -39,6 +39,7 @@ interface ThreadEntry {
   authorEmail: string | null
   deliveryStatus: string
   attachments: unknown
+  to: string[]
   cc: string[]
   bcc: string[]
   createdAt: string
@@ -57,7 +58,7 @@ interface ThreadResponse {
     status: EnquiryStatus
     read: boolean
     assigneeId: string | null
-    channel: 'form' | 'email' | 'outbound'
+    channel: 'form' | 'email' | 'outbound' | 'copied'
     createdAt: string
   }
   thread: ThreadEntry[]
@@ -284,7 +285,7 @@ export function EnquiriesTab({
           <Inbox size={32} className="mx-auto text-slate-300 mb-3" aria-hidden="true" />
           <p className="text-slate-600 font-medium">No enquiries yet</p>
           <p className="text-sm text-slate-400 mt-1">
-            Submissions from your enquiry embed, and emails you send, will appear here.
+            Submissions from your enquiry embed, emails you send, and emails copied to the project address will appear here.
           </p>
         </div>
       ) : (
@@ -356,6 +357,9 @@ export function EnquiriesTab({
                       )}
                       {row.channel === 'outbound' && (
                         <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-medium">Sent by team</span>
+                      )}
+                      {row.channel === 'copied' && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-medium">Copied in</span>
                       )}
                     </div>
                   </button>
@@ -457,6 +461,7 @@ function ThreadView({
                 <Mail size={13} aria-hidden="true" />
                 <a href={`mailto:${enquiry.submitterEmail}`} className="hover:text-slate-700 hover:underline">
                   {enquiry.channel === 'outbound' && 'To '}
+                  {enquiry.channel === 'copied' && 'With '}
                   {enquiry.submitterName === enquiry.submitterEmail
                     ? enquiry.submitterEmail
                     : `${enquiry.submitterName} · ${enquiry.submitterEmail}`}
@@ -493,7 +498,7 @@ function ThreadView({
           isAdmin={isAdmin}
           onOpenStakeholder={onOpenStakeholder}
         />
-        {enquiry.channel !== 'outbound' && (
+        {enquiry.channel !== 'outbound' && enquiry.channel !== 'copied' && (
           <div className="mt-2">
             <span className="inline-flex items-center text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 capitalize">
               {enquiry.category}
@@ -516,8 +521,9 @@ function ThreadView({
                   <span className="font-medium">{entry.authorName || (outbound ? 'You' : 'Correspondent')}</span>
                   {entry.isOriginal && <span className="opacity-75">· original enquiry</span>}
                 </div>
-                {(entry.cc?.length > 0 || entry.bcc?.length > 0) && (
+                {(entry.to?.length > 0 || entry.cc?.length > 0 || entry.bcc?.length > 0) && (
                   <div className={`text-xs mb-1 ${outbound ? 'text-green-50' : 'text-slate-500'}`}>
+                    {entry.to?.length > 0 && <div>To: {entry.to.join(', ')}</div>}
                     {entry.cc?.length > 0 && <div>Cc: {entry.cc.join(', ')}</div>}
                     {entry.bcc?.length > 0 && <div>Bcc: {entry.bcc.join(', ')}</div>}
                   </div>

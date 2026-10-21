@@ -80,10 +80,10 @@ export async function collectFeedback(projectId: string): Promise<FeedbackItem[]
 
   // Get public enquiries (submitted via the embed enquiry form). Their
   // subject + message is analysable free text, so they join the same corpus
-  // as pins and form responses. Threads the team started are outbound mail,
-  // not public feedback.
+  // as pins and form responses. Threads the team started, and correspondence
+  // the project address was only copied on, aren't public feedback.
   const enquiries = await prisma.enquiry.findMany({
-    where: { projectId, channel: { not: 'outbound' } },
+    where: { projectId, channel: { notIn: ['outbound', 'copied'] } },
     orderBy: { createdAt: 'desc' },
   })
 

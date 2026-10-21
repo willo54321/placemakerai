@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 import {
   Users, Plus, Building2, Mail, Phone, Trash2, X, Pencil,
   MessageSquare, CalendarDays, Target, Landmark, Download,
-  ArrowDownLeft, ArrowUpRight, Sparkles,
+  ArrowDownLeft, ArrowUpRight, Sparkles, Copy,
 } from 'lucide-react'
 
 // ---- domain vocab -----------------------------------------------------------
@@ -194,7 +194,7 @@ export function StakeholdersTab({
   const [view, setView] = useState<'register' | 'matrix'>('register')
 
   const listKey = ['stakeholders', projectId]
-  const { data, isLoading, error } = useQuery<{ stakeholders: StakeholderRow[] }>({
+  const { data, isLoading, error } = useQuery<{ stakeholders: StakeholderRow[]; logAddress: string | null }>({
     queryKey: listKey,
     queryFn: () => fetchJson(`/api/projects/${projectId}/stakeholders`),
   })
@@ -297,6 +297,10 @@ export function StakeholdersTab({
           </div>
         )}
       </div>
+
+      {data?.logAddress && (
+        <LogAddressHint address={data.logAddress} />
+      )}
 
       {stakeholders.length > 0 && (
         <div className="flex items-center gap-1 border-b border-slate-200" role="tablist" aria-label="Stakeholder views">
@@ -405,6 +409,32 @@ export function StakeholdersTab({
         </div>
       )}
     </div>
+  )
+}
+
+// The project address: CC'd or BCC'd from anyone's own mail client, emails
+// land in the inbox as copied threads and log against every stakeholder on them.
+function LogAddressHint({ address }: { address: string }) {
+  const copy = () => {
+    navigator.clipboard.writeText(address)
+      .then(() => toast.success('Address copied'))
+      .catch(() => toast.error('Could not copy'))
+  }
+  return (
+    <p className="flex items-center gap-1.5 flex-wrap text-sm text-slate-500">
+      <Mail size={14} aria-hidden="true" />
+      CC or BCC
+      <button
+        type="button"
+        onClick={copy}
+        className="inline-flex items-center gap-1 font-mono text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+        title="Copy address"
+      >
+        {address}
+        <Copy size={12} aria-hidden="true" />
+      </button>
+      on emails from your own inbox to log them here.
+    </p>
   )
 }
 

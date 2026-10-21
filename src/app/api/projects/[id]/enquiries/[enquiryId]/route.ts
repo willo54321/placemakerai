@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { authorizeProject } from '@/lib/api-auth'
 import { logAudit } from '@/lib/audit'
-import { organisationDomain } from '@/lib/stakeholder-email-log'
+import { hasStoredFirstMessage, organisationDomain } from '@/lib/stakeholder-email-log'
 
 const VALID_STATUSES = ['new', 'open', 'closed'] as const
 type EnquiryStatus = (typeof VALID_STATUSES)[number]
@@ -19,6 +19,7 @@ type ThreadEntry = {
   authorEmail: string | null
   deliveryStatus: string
   attachments: unknown
+  to: string[]
   cc: string[]
   bcc: string[]
   createdAt: Date
@@ -55,16 +56,17 @@ export async function GET(
     authorEmail: enquiry.submitterEmail,
     deliveryStatus: 'delivered',
     attachments: null,
+    to: [],
     cc: [],
     bcc: [],
     createdAt: enquiry.createdAt,
     isOriginal: true,
   }
 
-  // A thread the team started has no submission to synthesise: its first
-  // message is the stored outbound email.
+  // A thread the team started, or correspondence copied to the project, has
+  // no submission to synthesise: its first message is the stored email.
   const thread: ThreadEntry[] = [
-    ...(enquiry.channel === 'outbound' ? [] : [root]),
+    ...(hasStoredFirstMessage(enquiry.channel) ? [] : [root]),
     ...enquiry.messages.map(m => ({
       id: m.id,
       direction: m.direction as 'inbound' | 'outbound',
@@ -73,6 +75,7 @@ export async function GET(
       authorEmail: m.authorEmail,
       deliveryStatus: m.deliveryStatus,
       attachments: m.attachments,
+      to: m.to,
       cc: m.cc,
       bcc: m.bcc,
       createdAt: m.createdAt,
@@ -80,7 +83,7 @@ export async function GET(
     })),
   ]
 
-  // The people on this thread (correspondent, inbound authors, CC'd) and how
+  // The people on this thread (correspondent, inbound authors, To/CC'd) and how
   // each relates to the stakeholder register: an exact address match, or a
   // suggestion when another stakeholder shares their organisation's domain.
   const names = new Map<string, string>()
@@ -89,7 +92,10 @@ export async function GET(
     if (m.direction === 'inbound' && m.authorEmail && m.authorName) names.set(m.authorEmail.toLowerCase(), m.authorName)
   }
   const addresses = Array.from(new Set(
-    [enquiry.submitterEmail, ...enquiry.messages.flatMap(m => (m.direction === 'inbound' ? [m.authorEmail] : m.cc))]
+    [
+      enquiry.submitterEmail,
+      ...enquiry.messages.flatMap(m => [...(m.direction === 'inbound' ? [m.authorEmail] : []), ...m.to, ...m.cc]),
+    ]
       .filter((a): a is string => !!a)
       .map(a => a.toLowerCase())
   ))

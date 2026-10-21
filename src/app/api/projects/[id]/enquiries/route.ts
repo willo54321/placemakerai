@@ -8,7 +8,7 @@ import { getProjectReplyAddress, inboundEmailEnabled } from '@/lib/email-identit
 import { parseCopiedRecipients, withSignature } from '@/lib/email-compose'
 import { logAudit } from '@/lib/audit'
 import { captureEmailEvents } from '@/lib/engagement-ai'
-import { messageEvent } from '@/lib/stakeholder-email-log'
+import { hasStoredFirstMessage, messageEvent } from '@/lib/stakeholder-email-log'
 
 // GET - List a project's enquiries for the desk inbox. Read access (CLIENT) is
 // enough to view; mutations live on the per-enquiry route and require ADMIN.
@@ -45,9 +45,9 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
       status: enquiry.status,
       read: enquiry.read,
       assigneeId: enquiry.assigneeId,
-      channel: enquiry.channel as 'form' | 'email' | 'outbound',
-      // A team-started thread's first message is the email itself, not a reply.
-      replyCount: enquiry._count.messages - (enquiry.channel === 'outbound' ? 1 : 0),
+      channel: enquiry.channel as 'form' | 'email' | 'outbound' | 'copied',
+      // A team-started or copied thread's first message is the email itself, not a reply.
+      replyCount: enquiry._count.messages - (hasStoredFirstMessage(enquiry.channel) ? 1 : 0),
       lastActivityAt: latest?.createdAt ?? enquiry.createdAt,
       createdAt: enquiry.createdAt,
     }

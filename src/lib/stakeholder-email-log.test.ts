@@ -15,8 +15,8 @@ describe('emailEventsForEnquiry', () => {
     const events = emailEventsForEnquiry({
       ...base,
       messages: [
-        { id: 'm1', direction: 'outbound', body: 'Yes', authorEmail: 'staff@x.com', cc: ['cllr@council.gov.uk'], bcc: ['pm@x.com'], createdAt: new Date('2026-10-02') },
-        { id: 'm2', direction: 'inbound', body: 'Thanks', authorEmail: 'Cllr@Council.gov.uk', cc: [], bcc: [], createdAt: new Date('2026-10-03') },
+        { id: 'm1', direction: 'outbound', body: 'Yes', authorEmail: 'staff@x.com', to: [], cc: ['cllr@council.gov.uk'], bcc: ['pm@x.com'], createdAt: new Date('2026-10-02') },
+        { id: 'm2', direction: 'inbound', body: 'Thanks', authorEmail: 'Cllr@Council.gov.uk', to: [], cc: [], bcc: [], createdAt: new Date('2026-10-03') },
       ],
     })
     expect(events.map(e => [e.key, e.direction, e.addresses])).toEqual([
@@ -30,9 +30,27 @@ describe('emailEventsForEnquiry', () => {
     const events = emailEventsForEnquiry({
       ...base,
       channel: 'outbound',
-      messages: [{ id: 'm1', direction: 'outbound', body: 'Hello', authorEmail: 'staff@x.com', cc: [], bcc: [], createdAt: new Date() }],
+      messages: [{ id: 'm1', direction: 'outbound', body: 'Hello', authorEmail: 'staff@x.com', to: [], cc: [], bcc: [], createdAt: new Date() }],
     })
     expect(events.map(e => e.key)).toEqual(['msg:m1'])
+  })
+
+  it('logs copied correspondence against everyone on it', () => {
+    const events = emailEventsForEnquiry({
+      ...base,
+      channel: 'copied',
+      submitterEmail: 'cllr@council.gov.uk',
+      messages: [
+        // A team member's own email, copied to the project address.
+        { id: 'm1', direction: 'outbound', body: 'Briefing', authorEmail: 'staff@x.com', to: ['cllr@council.gov.uk', 'clerk@parish.org'], cc: ['resident@example.com'], bcc: [], createdAt: new Date() },
+        // A reply-all: the other people on it are logged as well as its author.
+        { id: 'm2', direction: 'inbound', body: 'Thanks', authorEmail: 'clerk@parish.org', to: ['cllr@council.gov.uk'], cc: ['resident@example.com'], bcc: [], createdAt: new Date() },
+      ],
+    })
+    expect(events.map(e => [e.key, e.direction, e.addresses])).toEqual([
+      ['msg:m1', 'outbound', ['cllr@council.gov.uk', 'clerk@parish.org', 'resident@example.com']],
+      ['msg:m2', 'inbound', ['clerk@parish.org', 'cllr@council.gov.uk', 'resident@example.com']],
+    ])
   })
 })
 

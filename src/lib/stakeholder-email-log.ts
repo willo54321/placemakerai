@@ -2,7 +2,9 @@ import { prisma } from './db'
 
 // Automatic stakeholder engagement log from the enquiry desk. Every email to
 // or from a stakeholder — an enquiry's original submission, inbound replies,
-// and staff emails including CC/BCC — becomes one engagement entry, matched
+// staff emails including CC/BCC, and correspondence the project address was
+// copied on (including stakeholders on its To/CC) — becomes one engagement
+// entry per stakeholder on it, matched
 // on exact (case-insensitive) email address. Matching is deliberately
 // deterministic: attaching the wrong person's email to a stakeholder is a
 // GDPR problem, so no fuzzy or AI matching here. Entries are idempotent per
@@ -16,7 +18,7 @@ export interface EmailEvent {
   date: Date
   subject: string
   body: string
-  /** The non-staff addresses on the email: sender for inbound; To/CC/BCC for outbound. */
+  /** The non-staff addresses on the email: sender plus other To/CC for inbound; To/CC/BCC for outbound. */
   addresses: string[]
 }
 
@@ -32,6 +34,7 @@ interface EnquiryWithMessages {
     direction: string
     body: string
     authorEmail: string | null
+    to: string[]
     cc: string[]
     bcc: string[]
     createdAt: Date
@@ -59,7 +62,12 @@ export function submissionEvent(enquiry: ThreadRef & Pick<EnquiryWithMessages, '
   }
 }
 
-/** One message in a thread: inbound from its author, outbound to the correspondent plus CC/BCC. */
+/**
+ * One message in a thread: inbound from its author (plus anyone else it was
+ * addressed or copied to), outbound to its recipients — the correspondent,
+ * unless the message records its own To list (a team member's email copied
+ * in from their mail client), plus CC/BCC.
+ */
 export function messageEvent(enquiry: ThreadRef, m: MessageRef): EmailEvent {
   const outbound = m.direction === 'outbound'
   return {
@@ -70,15 +78,20 @@ export function messageEvent(enquiry: ThreadRef, m: MessageRef): EmailEvent {
     subject: enquiry.subject,
     body: m.body,
     addresses: outbound
-      ? normalise([enquiry.submitterEmail, ...m.cc, ...m.bcc])
-      : normalise([m.authorEmail]),
+      ? normalise([...(m.to.length ? m.to : [enquiry.submitterEmail]), ...m.cc, ...m.bcc])
+      : normalise([m.authorEmail, ...m.to, ...m.cc]),
   }
 }
 
-/** Every email in a thread, as events. A team-started thread has no synthetic root. */
+/** Threads whose first email is stored as a message, so there's no synthetic root. */
+export function hasStoredFirstMessage(channel: string): boolean {
+  return channel === 'outbound' || channel === 'copied'
+}
+
+/** Every email in a thread, as events. */
 export function emailEventsForEnquiry(enquiry: EnquiryWithMessages): EmailEvent[] {
   return [
-    ...(enquiry.channel !== 'outbound' ? [submissionEvent(enquiry)] : []),
+    ...(hasStoredFirstMessage(enquiry.channel) ? [] : [submissionEvent(enquiry)]),
     ...enquiry.messages.map(m => messageEvent(enquiry, m)),
   ]
 }
@@ -155,6 +168,7 @@ export async function syncStakeholderEmailHistory(stakeholder: {
           messages: {
             some: {
               OR: [
+                { to: { has: email } },
                 { cc: { has: email } },
                 { bcc: { has: email } },
                 { direction: 'inbound', authorEmail: { equals: email, mode: 'insensitive' } },

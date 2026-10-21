@@ -4,24 +4,32 @@ import { logAudit } from '@/lib/audit'
 import { NextResponse, after } from 'next/server'
 import { syncStakeholderEmailHistory } from '@/lib/stakeholder-email-log'
 import { summariseEmailEngagements } from '@/lib/engagement-ai'
+import { getSenderDomain, inboundEmailEnabled } from '@/lib/email-identity'
 
 // GET - The project's stakeholder register. Read access (CLIENT) is enough.
 // Returns each stakeholder with an engagement count and the date of the most
 // recent engagement, so the register table can show activity without loading
-// every timeline.
+// every timeline. logAddress is the project's own address, which the team can
+// CC or BCC from their own mail client to log correspondence here.
 export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   const denied = await authorizeProject(params.id, 'CLIENT')
   if (denied) return denied
 
-  const stakeholders = await prisma.stakeholder.findMany({
-    where: { projectId: params.id },
-    orderBy: { name: 'asc' },
-    include: {
-      _count: { select: { engagements: true } },
-      engagements: { orderBy: { date: 'desc' }, take: 1, select: { date: true } },
-    },
-  })
+  const [stakeholders, project] = await Promise.all([
+    prisma.stakeholder.findMany({
+      where: { projectId: params.id },
+      orderBy: { name: 'asc' },
+      include: {
+        _count: { select: { engagements: true } },
+        engagements: { orderBy: { date: 'desc' }, take: 1, select: { date: true } },
+      },
+    }),
+    prisma.project.findUnique({ where: { id: params.id }, select: { emailLocalPart: true } }),
+  ])
+  const logAddress = inboundEmailEnabled() && project?.emailLocalPart
+    ? `${project.emailLocalPart}@${getSenderDomain()}`
+    : null
 
   const rows = stakeholders.map(s => ({
     id: s.id,
@@ -41,7 +49,7 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
     createdAt: s.createdAt,
   }))
 
-  return NextResponse.json({ stakeholders: rows })
+  return NextResponse.json({ stakeholders: rows, logAddress })
 }
 
 export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {

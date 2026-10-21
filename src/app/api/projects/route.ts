@@ -42,7 +42,7 @@ export async function GET() {
       orderBy: { createdAt: 'desc' },
       include: {
         _count: {
-          select: { feedbackForms: true, publicPins: true, enquiries: { where: { channel: { not: 'outbound' } } } },
+          select: { feedbackForms: true, publicPins: true, enquiries: { where: { channel: { notIn: ['outbound', 'copied'] } } } },
         },
         // Response totals ride along on the forms so we don't N+1.
         feedbackForms: { select: { _count: { select: { responses: true } } } },
@@ -82,7 +82,7 @@ export async function GET() {
       }),
       prisma.enquiry.groupBy({
         by: ['projectId'],
-        where: { projectId: { in: ids }, channel: { not: 'outbound' } },
+        where: { projectId: { in: ids }, channel: { notIn: ['outbound', 'copied'] } },
         _max: { createdAt: true },
       }),
     ])

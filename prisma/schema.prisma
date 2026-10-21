@@ -95,12 +95,17 @@ model Enquiry {
   threadToken     String?                 @unique
   // How the enquiry arrived: 'form' (embed enquiry form) | 'email' (inbound
   // mail to the project's sending address) | 'outbound' (a thread the team
-  // started by emailing someone — not public feedback, so kept out of
-  // analysis and activity counts). externalId is the Resend inbound
-  // email id for email-origin enquiries — unique so webhook retries can't
-  // create duplicates.
+  // started by emailing someone) | 'copied' (correspondence the project
+  // address was only CC'd/BCC'd on, or a team member sent from their own mail
+  // client — kept as a record for the stakeholder log). 'outbound' and
+  // 'copied' aren't public feedback, so they're kept out of analysis and
+  // activity counts. externalId is the Resend inbound email id for
+  // email-origin enquiries — unique so webhook retries can't create
+  // duplicates. messageId is the originating email's Message-ID, so replies
+  // sent to the bare project address thread back in via In-Reply-To.
   channel         String                  @default("form")
   externalId      String?                 @unique
+  messageId       String?
   createdAt       DateTime                @default(now())
   updatedAt       DateTime                @updatedAt
   project         Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -109,6 +114,7 @@ model Enquiry {
 
   @@index([projectId, createdAt])
   @@index([projectId, status])
+  @@index([messageId])
 }
 
 // A message in an enquiry's conversation thread. The originating submission is
@@ -126,16 +132,23 @@ model EnquiryMessage {
   // are always 'delivered'; outbound advances as the provider reports back.
   deliveryStatus String   @default("stored")
   attachments    Json? // [{ name, url, size, mime }]
-  // Copied recipients on outbound messages (staff-visible only).
+  // Recipients other than the correspondent (staff-visible only). Replies
+  // sent from Placemaker use cc/bcc; emails received via the project address
+  // also record their external To/CC recipients — the project's own
+  // addresses and the team's are left out.
+  to             String[] @default([])
   cc             String[] @default([])
   bcc            String[] @default([])
-  // Resend inbound email id for inbound messages — unique so webhook retries
-  // can't append the same reply twice.
+  // Resend inbound email id for received messages — unique so webhook
+  // retries can't append the same reply twice. messageId is the email's
+  // Message-ID header, for threading later replies by In-Reply-To/References.
   externalId     String?  @unique
+  messageId      String?
   createdAt      DateTime @default(now())
   enquiry        Enquiry  @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
 
   @@index([enquiryId, createdAt])
+  @@index([messageId])
 }
 
 // A named contact/organisation the project team engages with directly — the

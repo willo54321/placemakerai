@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { GoogleMap, useJsApiLoader, MarkerF, PolygonF, PolylineF, OverlayView } from '@react-google-maps/api'
 import { getPinIcon, createPendingPinIcon, getCategoryColor, PIN_COLORS } from '@/lib/map-pin-icons'
 import { MapPinPopup } from '@/components/MapPinPopup'
+import { RotatableOverlay } from '@/components/RotatableOverlay'
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''
 const LIBRARIES: ('drawing' | 'geometry' | 'visualization')[] = ['drawing', 'geometry', 'visualization']
@@ -14,6 +15,15 @@ const CATEGORY_LABELS: Record<string, string> = {
   negative: 'NEGATIVE',
   question: 'IDEA/QUESTION',
   comment: 'COMMENT',
+}
+
+/** An image overlay (masterplan, site plan) drawn under the pins for context. */
+export interface FeedbackMapOverlay {
+  id: string
+  imageUrl: string
+  bounds: [[number, number], [number, number]]
+  rotation: number
+  opacity: number
 }
 
 export interface FeedbackMapPin {
@@ -46,10 +56,12 @@ function shapePath(pin: FeedbackMapPin): google.maps.LatLngLiteral[] {
 
 export function FeedbackMap({
   pins,
+  overlays = [],
   onSelect,
   height = '420px',
 }: {
   pins: FeedbackMapPin[]
+  overlays?: FeedbackMapOverlay[]
   onSelect?: (pinId: string) => void
   height?: string
 }) {
@@ -61,7 +73,19 @@ export function FeedbackMap({
   })
 
   const mapRef = useRef<google.maps.Map | null>(null)
+  const [map, setMap] = useState<google.maps.Map | null>(null)
   const [selected, setSelected] = useState<FeedbackMapPin | null>(null)
+
+  // Overlays sit under the pins, non-interactive, so responses read against the plan.
+  useEffect(() => {
+    if (!map) return
+    const drawn = overlays.map(o => {
+      const overlay = new RotatableOverlay({ imageUrl: o.imageUrl, bounds: o.bounds, rotation: o.rotation, opacity: o.opacity, clickable: false })
+      overlay.setMap(map)
+      return overlay
+    })
+    return () => drawn.forEach(o => o.setMap(null))
+  }, [map, overlays])
 
   useEffect(() => {
     if (selected && !pins.some(p => p.id === selected.id)) setSelected(null)
@@ -85,16 +109,25 @@ export function FeedbackMap({
         hasPoint = true
       }
     }
+    // No responses yet: frame the overlays instead.
+    if (!hasPoint) {
+      for (const o of overlays) {
+        bounds.extend({ lat: o.bounds[0][0], lng: o.bounds[0][1] })
+        bounds.extend({ lat: o.bounds[1][0], lng: o.bounds[1][1] })
+        hasPoint = true
+      }
+    }
     if (!hasPoint) return
     map.fitBounds(bounds, 48)
     google.maps.event.addListenerOnce(map, 'idle', () => {
       if ((map.getZoom() ?? 0) > 17) map.setZoom(17)
     })
-  }, [pins])
+  }, [pins, overlays])
 
-  const onLoad = useCallback((map: google.maps.Map) => {
-    mapRef.current = map
-    fitToPins(map)
+  const onLoad = useCallback((loaded: google.maps.Map) => {
+    mapRef.current = loaded
+    setMap(loaded)
+    fitToPins(loaded)
   }, [fitToPins])
 
   useEffect(() => {

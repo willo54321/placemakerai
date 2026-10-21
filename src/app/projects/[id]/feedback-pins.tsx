@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -54,6 +54,10 @@ interface Project {
   name: string
   embedEnabled: boolean
   publicPins: PublicPin[]
+  imageOverlays?: Array<{
+    id: string; imageUrl: string; visible: boolean; opacity: number; rotation: number | null
+    southLat: number; westLng: number; northLat: number; eastLng: number
+  }>
 }
 
 export function FeedbackPinsTab({
@@ -146,6 +150,15 @@ export function FeedbackPinsTab({
 
   // Construction-issue reports are moderated in the Issues tab, not here.
   const feedbackPins = (project.publicPins || []).filter(pin => (pin as { mode?: string }).mode !== 'issues')
+  const mapOverlays = useMemo(() => (project.imageOverlays || [])
+    .filter(o => o.visible)
+    .map(o => ({
+      id: o.id,
+      imageUrl: o.imageUrl,
+      bounds: [[o.southLat, o.westLng], [o.northLat, o.eastLng]] as [[number, number], [number, number]],
+      rotation: o.rotation || 0,
+      opacity: o.opacity,
+    })), [project.imageOverlays])
 
   const categoryStats = feedbackPins.reduce((acc, pin) => {
     acc[pin.category] = (acc[pin.category] || 0) + 1
@@ -198,6 +211,7 @@ export function FeedbackPinsTab({
           </div>
           <FeedbackMap
             pins={feedbackPins}
+            overlays={mapOverlays}
             onSelect={(pinId) => {
               setHighlightedId(pinId)
               document.getElementById(`pin-row-${pinId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })

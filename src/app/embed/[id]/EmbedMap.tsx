@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback, useMemo, forwardRef, useImper
 import { GoogleMap, useJsApiLoader, MarkerF, OverlayView, PolygonF, PolylineF, DrawingManagerF } from '@react-google-maps/api'
 import { ThumbsUp, ThumbsDown, Lightbulb, MessageCircle, X, AlertTriangle } from 'lucide-react'
 import { RotatableOverlay } from '@/components/RotatableOverlay'
+import { OverlayStack, footprintKey } from '@/components/OverlayStack'
 import { startFlyTo } from '@/lib/fly-to'
 import { getPinIcon, createPendingPinIcon, getCategoryColor, tourStopPinUrl } from '@/lib/map-pin-icons'
 import { TOUR_STOP_ICON_PATHS } from '@/lib/tour-icons'
@@ -269,56 +270,73 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
     return startFlyTo(map, tourCamera)
   }, [map, tourCamera])
 
-  // Manage ground overlays - only update what changed, don't recreate all
+  // Ground overlays. Layers sharing one footprint (a plan imported layer by
+  // layer) are stacked into a single canvas overlay, so the map moves one
+  // texture per frame however many layers are on; a layer toggle redraws the
+  // canvas. Overlays with their own footprint are drawn individually.
+  const stacksRef = useRef<Map<string, OverlayStack>>(new Map())
   useEffect(() => {
     if (!map) return
 
-    // Create a set of current overlay IDs
-    const currentOverlayIds = new Set(overlays.map(o => o.id))
+    const groups = new Map<string, Overlay[]>()
+    for (const overlay of overlays) {
+      const key = footprintKey(overlay)
+      const group = groups.get(key)
+      if (group) group.push(overlay)
+      else groups.set(key, [overlay])
+    }
+    const wanted = new Map<string, Overlay[]>()
+    groups.forEach((members, key) => wanted.set(members.length > 1 ? `stack:${key}` : members[0].id, members))
 
-    // Remove overlays that no longer exist
-    overlayRefs.current.forEach((overlay, id) => {
-      if (!currentOverlayIds.has(id)) {
-        overlay.setMap(null)
+    // Remove what's gone
+    overlayRefs.current.forEach((drawn, id) => {
+      if (!wanted.has(id)) {
+        drawn.setMap(null)
         overlayRefs.current.delete(id)
+        stacksRef.current.get(id)?.dispose()
+        stacksRef.current.delete(id)
       }
     })
 
-    // Add or update overlays
-    overlays.forEach(overlay => {
-      const existingOverlay = overlayRefs.current.get(overlay.id)
-
-      if (existingOverlay) {
-        // Update opacity if changed
-        if (existingOverlay.getOpacity() !== overlay.opacity) {
-          existingOverlay.setOpacity(overlay.opacity)
+    wanted.forEach((members, id) => {
+      const first = members[0]
+      const stacked = members.length > 1
+      const existing = overlayRefs.current.get(id)
+      if (existing) {
+        if (stacked) {
+          stacksRef.current.get(id)?.setLayers(members.map(m => ({ id: m.id, imageUrl: m.imageUrl, opacity: m.opacity })))
+        } else if (existing.getOpacity() !== first.opacity) {
+          existing.setOpacity(first.opacity)
         }
-        // Update rotation if changed
-        if (existingOverlay.getRotation() !== (overlay.rotation || 0)) {
-          existingOverlay.setRotation(overlay.rotation || 0)
-        }
-      } else {
-        // Create new overlay using RotatableOverlay
-        const rotatableOverlay = new RotatableOverlay({
-          imageUrl: overlay.imageUrl,
-          bounds: overlay.bounds,
-          rotation: overlay.rotation || 0,
-          opacity: overlay.opacity,
-          clickable: false
-        })
-
-        rotatableOverlay.setMap(map)
-        overlayRefs.current.set(overlay.id, rotatableOverlay)
+        if (existing.getRotation() !== (first.rotation || 0)) existing.setRotation(first.rotation || 0)
+        return
       }
+      let stack: OverlayStack | undefined
+      if (stacked) {
+        stack = new OverlayStack()
+        stack.setLayers(members.map(m => ({ id: m.id, imageUrl: m.imageUrl, opacity: m.opacity })))
+        stacksRef.current.set(id, stack)
+      }
+      const drawn = new RotatableOverlay({
+        imageUrl: first.imageUrl,
+        canvas: stack?.canvas,
+        bounds: first.bounds,
+        rotation: first.rotation || 0,
+        // Per-layer opacity is applied inside the stack's canvas
+        opacity: stacked ? 1 : first.opacity,
+        clickable: false,
+      })
+      drawn.setMap(map)
+      overlayRefs.current.set(id, drawn)
     })
 
     return () => {
-      overlayRefs.current.forEach((overlay) => {
-        overlay.setMap(null)
-      })
+      overlayRefs.current.forEach(drawn => drawn.setMap(null))
       overlayRefs.current.clear()
+      stacksRef.current.forEach(stack => stack.dispose())
+      stacksRef.current.clear()
     }
-  }, [map, JSON.stringify(overlays.map(o => ({ id: o.id, opacity: o.opacity, rotation: o.rotation })))])
+  }, [map, JSON.stringify(overlays.map(o => ({ id: o.id, url: o.imageUrl, opacity: o.opacity, rotation: o.rotation, bounds: o.bounds })))])
 
   // Update drawing manager mode when drawMode changes
   useEffect(() => {

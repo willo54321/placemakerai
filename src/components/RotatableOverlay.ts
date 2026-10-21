@@ -7,6 +7,8 @@
 
 export interface RotatableOverlayOptions {
   imageUrl: string
+  /** Draw this canvas instead of loading imageUrl (a stack of layers). */
+  canvas?: HTMLCanvasElement
   bounds: [[number, number], [number, number]] // [[southLat, westLng], [northLat, eastLng]]
   rotation: number // Degrees (0-360)
   opacity: number
@@ -53,7 +55,7 @@ export class RotatableOverlay implements IRotatableOverlay {
 
     class InternalOverlay extends google.maps.OverlayView {
       private div: HTMLDivElement | null = null
-      private image: HTMLImageElement | null = null
+      private image: HTMLImageElement | HTMLCanvasElement | null = null
       // Layout size the element was last given; everything else is a transform
       private baseWidth = 0
       private baseHeight = 0
@@ -74,12 +76,17 @@ export class RotatableOverlay implements IRotatableOverlay {
         this.div.style.backfaceVisibility = 'hidden'
         this.div.style.willChange = 'transform'
 
-        this.image = document.createElement('img')
-        this.image.src = self._imageUrl
+        if (options.canvas) {
+          this.image = options.canvas
+        } else {
+          const img = document.createElement('img')
+          img.src = self._imageUrl
+          img.draggable = false
+          this.image = img
+        }
         // Use explicit dimensions set in draw() instead of percentages for Safari
         this.image.style.display = 'block'
         this.image.style.opacity = String(self._opacity)
-        this.image.draggable = false
         this.image.style.userSelect = 'none'
         this.image.style.webkitBackfaceVisibility = 'hidden'
         this.image.style.backfaceVisibility = 'hidden'
@@ -161,7 +168,7 @@ export class RotatableOverlay implements IRotatableOverlay {
       }
 
       updateImageUrl(imageUrl: string): void {
-        if (this.image) {
+        if (this.image instanceof HTMLImageElement) {
           this.image.src = imageUrl
         }
       }

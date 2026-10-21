@@ -464,13 +464,6 @@ export function EmbedExperience({
     if (stop) setTourCamera(cameraForStop(stop))
   }
 
-  const handleStartTour = () => {
-    cancelDrawing()
-    setTourOpen(true)
-    setTourStopIndex(-1)
-    if (tours.length === 1) setActiveTourId(tours[0].id)
-  }
-
   const handleTourSelect = (tourId: string) => {
     setActiveTourId(tourId || null)
     setTourStopIndex(-1)

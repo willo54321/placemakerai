@@ -5,6 +5,7 @@ import { Plus, Trash2, X, Eye, Copy, FileText, Check, GripVertical, List, Chevro
 import { toast } from 'sonner'
 import { useState, useRef, useEffect } from 'react'
 import { usePermissions } from '@/hooks/usePermissions'
+import { FormCharts } from '@/components/FormCharts'
 
 interface FeedbackResponse {
   id: string
@@ -53,6 +54,7 @@ export function FormsTab({
   const [fields, setFields] = useState<any[]>([])
   const [viewingForm, setViewingForm] = useState<FeedbackForm | null>(null)
   const [viewingResponses, setViewingResponses] = useState<string | null>(null)
+  const [responsesView, setResponsesView] = useState<'charts' | 'list'>('charts')
   const [expandedResponse, setExpandedResponse] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
@@ -75,6 +77,7 @@ export function FormsTab({
   useEffect(() => {
     if (!focusResponse) return
     setViewingResponses(focusResponse.formId)
+    setResponsesView('list')
     setExpandedResponse(focusResponse.responseId)
   }, [focusResponse])
 
@@ -396,7 +399,7 @@ export function FormsTab({
               <div className="flex items-center gap-2 pt-3 border-t border-slate-100">
                 {(form._count?.responses || 0) > 0 && (
                   <button
-                    onClick={() => setViewingResponses(form.id)}
+                    onClick={() => { setResponsesView('charts'); setViewingResponses(form.id) }}
                     className="btn-ghost text-sm py-1.5 text-blue-600"
                     aria-label={`View responses for ${form.name}`}
                   >
@@ -634,6 +637,24 @@ export function FormsTab({
                 </div>
               </div>
 
+              {(responsesData?.responses?.length || 0) > 0 && (
+                <div className="px-6 border-b border-slate-200 bg-white flex gap-1" role="tablist" aria-label="Response views">
+                  {([['charts', 'Charts'], ['list', 'Responses']] as const).map(([id, label]) => (
+                    <button
+                      key={id}
+                      role="tab"
+                      aria-selected={responsesView === id}
+                      onClick={() => setResponsesView(id)}
+                      className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                        responsesView === id ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               <div className="overflow-y-auto flex-1 p-6 bg-slate-50">
                 {loadingResponses ? (
                   <div className="flex flex-col items-center justify-center py-16">
@@ -648,6 +669,8 @@ export function FormsTab({
                     <p className="text-slate-500 font-medium">No responses yet</p>
                     <p className="text-sm text-slate-400 mt-1">Responses will appear here when submitted</p>
                   </div>
+                ) : responsesView === 'charts' ? (
+                  <FormCharts fields={responsesData?.fields || []} responses={responsesData?.responses || []} />
                 ) : (
                   <div className="space-y-4">
                     {numberedResponses.map((response) => {

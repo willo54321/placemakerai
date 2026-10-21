@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { fetchJson } from '@/lib/fetch-json'
+import { toMapImageOverlays } from '@/components/useImageOverlays'
 import {
   BarChart3, TrendingUp, TrendingDown, Minus, RefreshCw,
   MessageSquare, AlertCircle, CheckCircle,
@@ -206,6 +207,12 @@ type AnalyticsView = typeof ANALYTICS_VIEWS[number]['id']
 
 export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
   const queryClient = useQueryClient()
+  // Same query (and cache) as the project page: its image overlays give the heatmap context.
+  const { data: projectData } = useQuery<{ imageOverlays?: Parameters<typeof toMapImageOverlays>[0] }>({
+    queryKey: ['project', projectId],
+    queryFn: () => fetchJson(`/api/projects/${projectId}`),
+  })
+  const mapOverlays = useMemo(() => toMapImageOverlays(projectData?.imageOverlays), [projectData?.imageOverlays])
   // Newest feedback-kind Word template (if any) powers the Export Word button
   const { data: reportTemplates } = useQuery<Array<{ id: string; kind: string }>>({
     queryKey: ['report-templates', projectId],
@@ -899,7 +906,7 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
             Support & opposition map
           </h3>
           <div className="mt-4" />
-          <SentimentHeatmap clusters={analysis.geographic.clusters} height="400px" />
+          <SentimentHeatmap clusters={analysis.geographic.clusters} overlays={mapOverlays} height="400px" />
         </div>
       )}
 

@@ -2,11 +2,14 @@
 
 import { useCallback, useMemo, useState } from 'react'
 import { GoogleMap, HeatmapLayerF, useJsApiLoader } from '@react-google-maps/api'
+import { useImageOverlays, type MapImageOverlay } from './useImageOverlays'
 
 // Same key, id, version, and library set as every other map in the app —
 // @react-google-maps/api requires identical loader options across components.
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''
 const LIBRARIES: ("drawing" | "geometry" | "visualization")[] = ['drawing', 'geometry', 'visualization']
+
+const NO_OVERLAYS: MapImageOverlay[] = []
 
 interface SentimentCluster {
   latitude: number
@@ -17,6 +20,8 @@ interface SentimentCluster {
 
 interface SentimentHeatmapProps {
   clusters: SentimentCluster[]
+  /** Masterplan / site plan overlays shown faintly under the heat for context. */
+  overlays?: MapImageOverlay[]
   height?: string
 }
 
@@ -49,9 +54,14 @@ const MAP_STYLES: google.maps.MapTypeStyle[] = [
   { featureType: 'road', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
 ]
 
-export function SentimentHeatmap({ clusters, height = '400px' }: SentimentHeatmapProps) {
+export function SentimentHeatmap({ clusters, overlays = NO_OVERLAYS, height = '400px' }: SentimentHeatmapProps) {
   const [showPositive, setShowPositive] = useState(true)
   const [showNegative, setShowNegative] = useState(true)
+  const [map, setMap] = useState<google.maps.Map | null>(null)
+  // Under the heat layers, so support/opposition reads against the plan; the
+  // heat is lighter over a plan so the plan stays legible through it.
+  useImageOverlays(map, overlays)
+  const heatOpacity = overlays.length > 0 ? 0.5 : 0.6
 
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script-embed', // Same ID as all other maps to avoid conflicts
@@ -88,6 +98,7 @@ export function SentimentHeatmap({ clusters, height = '400px' }: SentimentHeatma
 
   const onLoad = useCallback(
     (map: google.maps.Map) => {
+      setMap(map)
       if (clusters.length === 0) return
       const bounds = new google.maps.LatLngBounds()
       clusters.forEach(c => bounds.extend({ lat: c.latitude, lng: c.longitude }))
@@ -130,13 +141,13 @@ export function SentimentHeatmap({ clusters, height = '400px' }: SentimentHeatma
         {showPositive && positivePoints.length > 0 && (
           <HeatmapLayerF
             data={positivePoints}
-            options={{ gradient: POSITIVE_GRADIENT, radius: 46, maxIntensity: 1.1 }}
+            options={{ gradient: POSITIVE_GRADIENT, radius: 46, maxIntensity: 1.1, opacity: heatOpacity }}
           />
         )}
         {showNegative && negativePoints.length > 0 && (
           <HeatmapLayerF
             data={negativePoints}
-            options={{ gradient: NEGATIVE_GRADIENT, radius: 46, maxIntensity: 1.1 }}
+            options={{ gradient: NEGATIVE_GRADIENT, radius: 46, maxIntensity: 1.1, opacity: heatOpacity }}
           />
         )}
       </GoogleMap>

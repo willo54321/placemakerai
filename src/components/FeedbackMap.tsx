@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { GoogleMap, useJsApiLoader, MarkerF, PolygonF, PolylineF, OverlayView } from '@react-google-maps/api'
 import { getPinIcon, createPendingPinIcon, getCategoryColor, PIN_COLORS } from '@/lib/map-pin-icons'
 import { MapPinPopup } from '@/components/MapPinPopup'
-import { RotatableOverlay } from '@/components/RotatableOverlay'
+import { useImageOverlays, type MapImageOverlay } from '@/components/useImageOverlays'
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''
 const LIBRARIES: ('drawing' | 'geometry' | 'visualization')[] = ['drawing', 'geometry', 'visualization']
@@ -15,15 +15,6 @@ const CATEGORY_LABELS: Record<string, string> = {
   negative: 'NEGATIVE',
   question: 'IDEA/QUESTION',
   comment: 'COMMENT',
-}
-
-/** An image overlay (masterplan, site plan) drawn under the pins for context. */
-export interface FeedbackMapOverlay {
-  id: string
-  imageUrl: string
-  bounds: [[number, number], [number, number]]
-  rotation: number
-  opacity: number
 }
 
 export interface FeedbackMapPin {
@@ -61,7 +52,7 @@ export function FeedbackMap({
   height = '420px',
 }: {
   pins: FeedbackMapPin[]
-  overlays?: FeedbackMapOverlay[]
+  overlays?: MapImageOverlay[]
   onSelect?: (pinId: string) => void
   height?: string
 }) {
@@ -76,16 +67,8 @@ export function FeedbackMap({
   const [map, setMap] = useState<google.maps.Map | null>(null)
   const [selected, setSelected] = useState<FeedbackMapPin | null>(null)
 
-  // Overlays sit under the pins, non-interactive, so responses read against the plan.
-  useEffect(() => {
-    if (!map) return
-    const drawn = overlays.map(o => {
-      const overlay = new RotatableOverlay({ imageUrl: o.imageUrl, bounds: o.bounds, rotation: o.rotation, opacity: o.opacity, clickable: false })
-      overlay.setMap(map)
-      return overlay
-    })
-    return () => drawn.forEach(o => o.setMap(null))
-  }, [map, overlays])
+  // Overlays sit under the pins so responses read against the plan.
+  useImageOverlays(map, overlays)
 
   useEffect(() => {
     if (selected && !pins.some(p => p.id === selected.id)) setSelected(null)

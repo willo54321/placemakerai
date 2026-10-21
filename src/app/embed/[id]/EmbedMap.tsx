@@ -5,7 +5,7 @@ import { GoogleMap, useJsApiLoader, MarkerF, OverlayView, PolygonF, PolylineF, D
 import { ThumbsUp, ThumbsDown, Lightbulb, MessageCircle, X, AlertTriangle } from 'lucide-react'
 import { RotatableOverlay } from '@/components/RotatableOverlay'
 import { startFlyTo } from '@/lib/fly-to'
-import { getPinIcon, createPendingPinIcon, getCategoryColor } from '@/lib/map-pin-icons'
+import { getPinIcon, createPendingPinIcon, getCategoryColor, tourStopPinUrl } from '@/lib/map-pin-icons'
 import { TOUR_STOP_ICON_PATHS } from '@/lib/tour-icons'
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''
@@ -554,36 +554,33 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
           />
         )}
 
-        {/* Tour stop markers — numbered badges, clickable to jump to a stop */}
-        {tourStops.map((stop, index) => (
-          <OverlayView
-            key={`tour-stop-${stop.id}`}
-            position={{ lat: stop.latitude, lng: stop.longitude }}
-            mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
-          >
-            <button
-              onClick={() => onTourStopClick?.(index)}
-              aria-label={`Tour stop ${index + 1}: ${stop.title}`}
-              style={{
-                transform: 'translate(-50%, -50%)',
-                backgroundColor: primaryColor || '#10B981',
-                width: activeTourStopIndex === index ? 36 : 28,
-                height: activeTourStopIndex === index ? 36 : 28,
-                fontSize: activeTourStopIndex === index ? 15 : 13,
-                zIndex: activeTourStopIndex === index ? 30 : 20,
-              }}
-              className="relative flex items-center justify-center rounded-full text-white font-bold border-2 border-white shadow-lg cursor-pointer transition-all duration-200"
+        {/* Tour stop markers — the feedback pin shape in the project colour, clickable to jump to a stop */}
+        {tourStops.map((stop, index) => {
+          const active = activeTourStopIndex === index
+          const width = active ? 52 : 44
+          return (
+            <OverlayView
+              key={`tour-stop-${stop.id}`}
+              position={{ lat: stop.latitude, lng: stop.longitude }}
+              mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
             >
-              {stop.icon && TOUR_STOP_ICON_PATHS[stop.icon] ? (
-                <svg viewBox="6 4 24 24" className="w-[70%] h-[70%]" aria-hidden="true">
-                  <path d={TOUR_STOP_ICON_PATHS[stop.icon]} fill="currentColor" />
-                </svg>
-              ) : (
-                index + 1
-              )}
-            </button>
-          </OverlayView>
-        ))}
+              <button
+                onClick={() => onTourStopClick?.(index)}
+                aria-label={`Tour stop ${index + 1}: ${stop.title}`}
+                style={{ transform: 'translate(-50%, -100%)', width, zIndex: active ? 30 : 20 }}
+                className="relative block cursor-pointer transition-all duration-200"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={tourStopPinUrl(primaryColor || '#10B981', stop.icon && TOUR_STOP_ICON_PATHS[stop.icon] ? { iconPath: TOUR_STOP_ICON_PATHS[stop.icon] } : { number: index + 1 })}
+                  alt=""
+                  draggable={false}
+                  className="block w-full h-auto select-none"
+                />
+              </button>
+            </OverlayView>
+          )
+        })}
 
         {/* Plot zones — client-drawn boundaries, underneath feedback */}
         {zones.map(zone => {

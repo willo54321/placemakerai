@@ -164,3 +164,42 @@ export function getCategoryColor(category: string, opacity: number = 1): string 
   }
   return feedbackColors[category] || feedbackColors.comment
 }
+
+// ---- tour stops --------------------------------------------------------------
+
+/**
+ * A tour stop drawn as the same pin as feedback (body, white head, glyph), in
+ * the project colour, with the stop's icon or its number in the head.
+ * `iconPath` is a TOUR_STOP_ICON_PATHS glyph (authored centred on 18,16).
+ * Pure string — safe before the Maps API loads (used as an <img> in the embed).
+ */
+export function tourStopPinSvg(color: string, glyph: { iconPath?: string | null; number?: number | string }): string {
+  const content = glyph.iconPath
+    // Scale the 24px glyph box to fill the head (centre 24,22), recoloured
+    ? `<g transform="translate(10.5 10) scale(0.75)"><path d="${glyph.iconPath}" fill="${color}"/></g>`
+    : `<text x="24" y="27.5" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="${String(glyph.number ?? '').length > 1 ? 14 : 16}" font-weight="700" fill="${color}">${glyph.number ?? ''}</text>`
+  return `<svg width="48" height="58" viewBox="0 0 48 58" xmlns="http://www.w3.org/2000/svg">
+    <defs><filter id="stopShadow" x="-30%" y="-20%" width="160%" height="150%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000000" flood-opacity="0.25"/>
+    </filter></defs>
+    <g filter="url(#stopShadow)">
+      <path d="M24 2C12.95 2 4 10.95 4 22c0 14.25 20 32 20 32s20-17.75 20-32c0-11.05-8.95-20-20-20z" fill="${color}"/>
+      <circle cx="24" cy="22" r="14" fill="white"/>
+      ${content}
+    </g>
+  </svg>`
+}
+
+export const tourStopPinUrl = (color: string, glyph: { iconPath?: string | null; number?: number | string }) =>
+  `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(tourStopPinSvg(color, glyph))}`
+
+/** Tour stop pin as a google.maps.Icon (feedback pin size, larger when hovered). */
+export function tourStopPinIcon(color: string, glyph: { iconPath?: string | null; number?: number | string }, isHovered = false): google.maps.Icon {
+  const size = isHovered ? 48 : 44
+  const height = isHovered ? 58 : 53
+  return {
+    url: tourStopPinUrl(color, glyph),
+    scaledSize: new google.maps.Size(size, height),
+    anchor: new google.maps.Point(size / 2, height),
+  }
+}

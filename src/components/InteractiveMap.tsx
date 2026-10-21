@@ -6,6 +6,7 @@ import { X } from 'lucide-react'
 import { RotatableOverlay, calculateRotationAngle, snapAngle } from './RotatableOverlay'
 import { startFlyTo, type FlyToTarget } from '@/lib/fly-to'
 import { TOUR_STOP_ICON_PATHS } from '@/lib/tour-icons'
+import { tourStopPinIcon } from '@/lib/map-pin-icons'
 import { featureColor, type LayerStyle } from '@/lib/layer-style'
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''
@@ -121,64 +122,12 @@ function createMarkerIcon(color: string, isHovered: boolean = false): google.map
   }
 }
 
-function createNumberedMarkerIcon(color: string, number: string | number, isHovered: boolean = false): google.maps.Icon {
-  const shadowBlur = isHovered ? '3' : '2'
-  const shadowOpacity = isHovered ? '0.3' : '0.2'
-  const size = isHovered ? 40 : 36
-  const height = isHovered ? 50 : 45
-  const fontSize = String(number).length > 1 ? '11' : '13'
+// Numbered and icon markers (tour stops) use the shared feedback-pin shape
+const createNumberedMarkerIcon = (color: string, number: string | number, isHovered: boolean = false) =>
+  tourStopPinIcon(color, { number }, isHovered)
 
-  const svg = `
-    <svg width="${size}" height="${height}" viewBox="0 0 36 45" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <filter id="shadow" x="-30%" y="-20%" width="160%" height="150%">
-          <feDropShadow dx="0" dy="2" stdDeviation="${shadowBlur}" flood-color="#000000" flood-opacity="${shadowOpacity}"/>
-        </filter>
-      </defs>
-      <g filter="url(#shadow)">
-        <path d="M18 2C9.7 2 3 8.7 3 17c0 11 15 25 15 25s15-14 15-25c0-8.3-6.7-15-15-15z" fill="${color}"/>
-        <circle cx="18" cy="16" r="9" fill="white"/>
-        <text x="18" y="20" text-anchor="middle" font-family="Arial, sans-serif" font-size="${fontSize}" font-weight="bold" fill="${color}">${number}</text>
-      </g>
-    </svg>
-  `
-  return {
-    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
-    scaledSize: new google.maps.Size(size, height),
-    anchor: new google.maps.Point(size / 2, height)
-  }
-}
-
-// Pin marker with a themed glyph in the head (tour stop icons)
-function createIconMarkerIcon(color: string, iconType: string, isHovered: boolean = false): google.maps.Icon {
-  const shadowBlur = isHovered ? '3' : '2'
-  const shadowOpacity = isHovered ? '0.3' : '0.2'
-  const size = isHovered ? 40 : 36
-  const height = isHovered ? 50 : 45
-  const iconPath = TOUR_STOP_ICON_PATHS[iconType] || TOUR_STOP_ICON_PATHS.info
-
-  const svg = `
-    <svg width="${size}" height="${height}" viewBox="0 0 36 45" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <filter id="shadow" x="-30%" y="-20%" width="160%" height="150%">
-          <feDropShadow dx="0" dy="2" stdDeviation="${shadowBlur}" flood-color="#000000" flood-opacity="${shadowOpacity}"/>
-        </filter>
-      </defs>
-      <g filter="url(#shadow)">
-        <path d="M18 2C9.7 2 3 8.7 3 17c0 11 15 25 15 25s15-14 15-25c0-8.3-6.7-15-15-15z" fill="${color}"/>
-        <circle cx="18" cy="16" r="10" fill="white"/>
-        <g transform="translate(9, 7) scale(0.5)">
-          <path d="${iconPath}" fill="${color}"/>
-        </g>
-      </g>
-    </svg>
-  `
-  return {
-    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
-    scaledSize: new google.maps.Size(size, height),
-    anchor: new google.maps.Point(size / 2, height)
-  }
-}
+const createIconMarkerIcon = (color: string, iconType: string, isHovered: boolean = false) =>
+  tourStopPinIcon(color, { iconPath: TOUR_STOP_ICON_PATHS[iconType] || TOUR_STOP_ICON_PATHS.info }, isHovered)
 
 // Cache marker icons so we don't allocate a brand-new google.maps.Icon object
 // (which triggers marker.setIcon churn) on every render / every hover. Keyed by

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useSession } from 'next-auth/react'
 import { ArrowLeft, Users, MapPin, Settings, LayoutDashboard, BarChart3, Globe, Eye, FileText, HelpCircle, Inbox, Mail, Route, HardHat } from 'lucide-react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { useState, Suspense, use, useCallback } from 'react';
 import dynamic from 'next/dynamic'
 import { OverviewTab } from './overview'
@@ -144,10 +145,23 @@ const tabGroups: TabGroup[] = [
   { id: 'help', label: 'Help', tabs: ['howto'] },
 ]
 
+const ALL_TABS = new Set<string>(tabGroups.flatMap(g => g.tabs))
+
 export default function ProjectPage(props: { params: Promise<{ id: string }> }) {
+  // useSearchParams needs a Suspense boundary
+  return (
+    <Suspense fallback={null}>
+      <ProjectPageContent {...props} />
+    </Suspense>
+  )
+}
+
+function ProjectPageContent(props: { params: Promise<{ id: string }> }) {
   const params = use(props.params);
   const { data: session } = useSession()
-  const [activeTab, setActiveTab] = useState<Tab>('overview')
+  // ?tab=forms etc. opens a tab directly (e.g. returning from a form's results page)
+  const requestedTab = useSearchParams().get('tab')
+  const [activeTab, setActiveTab] = useState<Tab>(() => (requestedTab && ALL_TABS.has(requestedTab) ? requestedTab as Tab : 'overview'))
   const [focusItem, setFocusItem] = useState<FocusItem | null>(null)
 
   const navigateTo = (tab: Tab, focus?: FocusItem) => {

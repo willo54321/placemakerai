@@ -1,11 +1,11 @@
 'use client'
 
-import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
-import { Plus, Trash2, X, Eye, Copy, FileText, Check, GripVertical, List, ChevronDown, ChevronUp, Download } from 'lucide-react'
-import { toast } from 'sonner'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Plus, Trash2, X, Eye, Copy, FileText, Check, GripVertical, List } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { usePermissions } from '@/hooks/usePermissions'
-import { FormCharts } from '@/components/FormCharts'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 interface FeedbackResponse {
   id: string
@@ -53,52 +53,22 @@ export function FormsTab({
   const [formName, setFormName] = useState('')
   const [fields, setFields] = useState<any[]>([])
   const [viewingForm, setViewingForm] = useState<FeedbackForm | null>(null)
-  const [viewingResponses, setViewingResponses] = useState<string | null>(null)
-  const [responsesView, setResponsesView] = useState<'charts' | 'list'>('charts')
-  const [expandedResponse, setExpandedResponse] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const nameInputRef = useRef<HTMLInputElement>(null)
-
-  // Fetch responses when viewing a form's responses
-  const { data: responsesData, isLoading: loadingResponses } = useQuery({
-    queryKey: ['form-responses', viewingResponses],
-    queryFn: () => fetch(`/api/projects/${projectId}/forms/${viewingResponses}`).then(r => r.json()),
-    enabled: !!viewingResponses,
-  })
 
   useEffect(() => {
     if (guideModalOpen === true) setShowForm(true)
     if (guideModalOpen === false) setShowForm(false)
   }, [guideModalOpen])
 
-  // Deep link from the activity feed: open the right form's responses with
-  // the target response expanded, then scroll to it once loaded.
+  // Deep link from the activity feed: a form response opens on its form's results page.
+  const router = useRouter()
   useEffect(() => {
     if (!focusResponse) return
-    setViewingResponses(focusResponse.formId)
-    setResponsesView('list')
-    setExpandedResponse(focusResponse.responseId)
-  }, [focusResponse])
-
-  useEffect(() => {
-    if (!focusResponse || loadingResponses || !responsesData) return
-    const timer = setTimeout(() => {
-      document
-        .getElementById(`response-${focusResponse.responseId}`)
-        ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      onFocusHandled?.()
-    }, 150)
-    return () => clearTimeout(timer)
-  }, [focusResponse, loadingResponses, responsesData, onFocusHandled])
-
-  // Response numbers are stable identifiers (submission order: first ever = #1,
-  // never renumbered), displayed newest-first so new arrivals are on top.
-  const numberedResponses = ((responsesData?.responses as FeedbackResponse[] | undefined) ?? [])
-    .slice()
-    .sort((a, b) => new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime())
-    .map((response, i) => ({ ...response, responseNumber: i + 1 }))
-    .reverse()
+    onFocusHandled?.()
+    router.push(`/projects/${projectId}/forms/${focusResponse.formId}?response=${focusResponse.responseId}`)
+  }, [focusResponse, onFocusHandled, projectId, router])
 
   // Focus name input when form opens
   useEffect(() => {
@@ -128,22 +98,6 @@ export function FormsTab({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['project', projectId] })
       setDeleteConfirm(null)
-    },
-  })
-
-  const deleteResponse = useMutation({
-    mutationFn: async (responseId: string) => {
-      const res = await fetch(`/api/projects/${projectId}/forms/${viewingResponses}/responses/${responseId}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error(`Failed to delete: ${res.status}`)
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['form-responses', viewingResponses] })
-      queryClient.invalidateQueries({ queryKey: ['project', projectId] })
-      setExpandedResponse(null)
-      toast.success('Response permanently deleted')
-    },
-    onError: () => {
-      toast.error('Failed to delete — the response is unchanged')
     },
   })
 
@@ -398,14 +352,14 @@ export function FormsTab({
 
               <div className="flex items-center gap-2 pt-3 border-t border-slate-100">
                 {(form._count?.responses || 0) > 0 && (
-                  <button
-                    onClick={() => { setResponsesView('charts'); setViewingResponses(form.id) }}
+                  <Link
+                    href={`/projects/${projectId}/forms/${form.id}`}
                     className="btn-ghost text-sm py-1.5 text-blue-600"
-                    aria-label={`View responses for ${form.name}`}
+                    aria-label={`View results for ${form.name}`}
                   >
                     <List size={16} aria-hidden="true" />
-                    Responses
-                  </button>
+                    Results
+                  </Link>
                 )}
                 <button
                   onClick={() => setViewingForm(form)}
@@ -579,291 +533,6 @@ export function FormsTab({
         </>
       )}
 
-      {/* View Responses Modal */}
-      {viewingResponses && (
-        <>
-          <div
-            className="modal-overlay"
-            onClick={() => {
-              setViewingResponses(null)
-              setExpandedResponse(null)
-            }}
-            aria-hidden="true"
-          />
-          <div
-            className="modal"
-            role="dialog"
-            aria-labelledby="responses-title"
-            aria-modal="true"
-          >
-            <div className="modal-content p-0 max-w-4xl max-h-[85vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
-              {/* Header */}
-              <div className="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-indigo-50">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
-                      <List size={20} className="text-blue-600" />
-                    </div>
-                    <div>
-                      <h3 id="responses-title" className="text-lg font-semibold text-slate-900">
-                        Form Responses
-                      </h3>
-                      <p className="text-sm text-slate-500">
-                        {responsesData?.responses?.length || 0} submissions received
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {(responsesData?.responses?.length || 0) > 0 && (
-                      <a
-                        href={`/api/projects/${projectId}/forms/${viewingResponses}/export`}
-                        className="flex items-center gap-1.5 text-sm text-blue-700 hover:text-blue-800 px-3 py-1.5 bg-white/70 hover:bg-white rounded-lg border border-blue-200 transition-colors"
-                      >
-                        <Download size={14} aria-hidden="true" />
-                        Export CSV
-                      </a>
-                    )}
-                    <button
-                      onClick={() => {
-                        setViewingResponses(null)
-                        setExpandedResponse(null)
-                      }}
-                      className="p-2 hover:bg-white/50 rounded-lg transition-colors"
-                      aria-label="Close responses"
-                    >
-                      <X size={20} className="text-slate-500" aria-hidden="true" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {(responsesData?.responses?.length || 0) > 0 && (
-                <div className="px-6 border-b border-slate-200 bg-white flex gap-1" role="tablist" aria-label="Response views">
-                  {([['charts', 'Charts'], ['list', 'Responses']] as const).map(([id, label]) => (
-                    <button
-                      key={id}
-                      role="tab"
-                      aria-selected={responsesView === id}
-                      onClick={() => setResponsesView(id)}
-                      className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
-                        responsesView === id ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-700'
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              <div className="overflow-y-auto flex-1 p-6 bg-slate-50">
-                {loadingResponses ? (
-                  <div className="flex flex-col items-center justify-center py-16">
-                    <div className="w-10 h-10 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mb-3" />
-                    <span className="text-slate-600">Loading responses...</span>
-                  </div>
-                ) : responsesData?.responses?.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-16">
-                    <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
-                      <FileText size={28} className="text-slate-400" />
-                    </div>
-                    <p className="text-slate-500 font-medium">No responses yet</p>
-                    <p className="text-sm text-slate-400 mt-1">Responses will appear here when submitted</p>
-                  </div>
-                ) : responsesView === 'charts' ? (
-                  <FormCharts fields={responsesData?.fields || []} responses={responsesData?.responses || []} />
-                ) : (
-                  <div className="space-y-4">
-                    {numberedResponses.map((response) => {
-                      const name = response.data.name || response.data.Name || response.data.fullName || response.data.full_name
-                      const email = response.data.email || response.data.Email || response.data.emailAddress
-                      const isExpanded = expandedResponse === response.id
-
-                      // Build a map of data keys to form field labels
-                      const formFields = responsesData?.fields || []
-                      const fieldLabelMap: Record<string, string> = {}
-                      formFields.forEach((field: any) => {
-                        if (field.label) {
-                          // Map the label itself (for forms created in Placemaker)
-                          fieldLabelMap[field.label] = field.label
-                          // Also map common key formats that external forms might use
-                          const camelCase = field.label.replace(/[^a-zA-Z0-9]+(.)/g, (_: any, chr: string) => chr.toUpperCase()).replace(/^(.)/, (chr: string) => chr.toLowerCase())
-                          const snakeCase = field.label.toLowerCase().replace(/[^a-z0-9]+/g, '_')
-                          const pascalCase = field.label.replace(/[^a-zA-Z0-9]+(.)/g, (_: any, chr: string) => chr.toUpperCase()).replace(/^(.)/, (chr: string) => chr.toUpperCase())
-                          fieldLabelMap[camelCase] = field.label
-                          fieldLabelMap[snakeCase] = field.label
-                          fieldLabelMap[pascalCase] = field.label
-                        }
-                      })
-
-                      // Helper to get display label for a key
-                      const getDisplayLabel = (key: string): string => {
-                        if (fieldLabelMap[key]) return fieldLabelMap[key]
-                        // Fallback: format the key nicely
-                        return key
-                          .replace(/([A-Z])/g, ' $1')
-                          .replace(/_/g, ' ')
-                          .replace(/\b\w/g, l => l.toUpperCase())
-                          .trim()
-                      }
-
-                      // Get preview fields (excluding name, email, and consent fields)
-                      const excludeKeys = ['name', 'Name', 'fullName', 'full_name', 'email', 'Email', 'emailAddress', 'gdprConsent', 'consent', 'dataConsent']
-                      const previewEntries = Object.entries(response.data)
-                        .filter(([key]) => !excludeKeys.includes(key))
-                        .slice(0, 2)
-
-                      return (
-                        <div
-                          key={response.id}
-                          id={`response-${response.id}`}
-                          className={`bg-white rounded-xl border transition-all duration-200 ${
-                            isExpanded ? 'border-blue-200 shadow-md ring-1 ring-blue-100' : 'border-slate-200 hover:border-slate-300 hover:shadow-sm'
-                          }`}
-                        >
-                          <button
-                            onClick={() => setExpandedResponse(isExpanded ? null : response.id)}
-                            className="w-full p-4 flex items-start gap-4 text-left"
-                          >
-                            {/* Avatar / Number */}
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 font-semibold text-sm ${
-                              isExpanded ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
-                            }`}>
-                              {name ? name.charAt(0).toUpperCase() : `#${response.responseNumber}`}
-                            </div>
-
-                            <div className="flex-1 min-w-0">
-                              {/* Name & Email row */}
-                              <div className="flex items-center gap-2 flex-wrap">
-                                {name ? (
-                                  <span className="font-semibold text-slate-900">{name}</span>
-                                ) : (
-                                  <span className="font-medium text-slate-600">Response #{response.responseNumber}</span>
-                                )}
-                                {email && (
-                                  <a
-                                    href={`mailto:${email}`}
-                                    onClick={e => e.stopPropagation()}
-                                    className="text-sm text-blue-600 hover:underline"
-                                  >
-                                    {email}
-                                  </a>
-                                )}
-                              </div>
-
-                              {/* Date */}
-                              <p className="text-xs text-slate-400 mt-0.5">
-                                {new Date(response.submittedAt).toLocaleDateString('en-GB', {
-                                  weekday: 'short',
-                                  day: 'numeric',
-                                  month: 'short',
-                                  year: 'numeric',
-                                  hour: '2-digit',
-                                  minute: '2-digit'
-                                })}
-                              </p>
-
-                              {/* Preview of first fields (when collapsed) */}
-                              {!isExpanded && previewEntries.length > 0 && (
-                                <p className="text-sm text-slate-500 mt-2 line-clamp-1">
-                                  {previewEntries.map(([key, value], i) => (
-                                    <span key={key}>
-                                      {i > 0 && ' · '}
-                                      <span className="text-slate-400">{getDisplayLabel(key)}:</span>{' '}
-                                      {Array.isArray(value) ? value.join(', ') : String(value).substring(0, 50)}
-                                    </span>
-                                  ))}
-                                </p>
-                              )}
-                            </div>
-
-                            <div className={`p-1.5 rounded-lg transition-colors ${isExpanded ? 'bg-blue-100' : 'bg-slate-100'}`}>
-                              {isExpanded ? (
-                                <ChevronUp size={18} className="text-blue-600" />
-                              ) : (
-                                <ChevronDown size={18} className="text-slate-400" />
-                              )}
-                            </div>
-                          </button>
-
-                          {/* Expanded content */}
-                          {isExpanded && (
-                            <div className="px-4 pb-4 pt-0">
-                              <div className="border-t border-slate-100 pt-4">
-                                <div className="grid gap-4 sm:grid-cols-2">
-                                  {Object.entries(response.data)
-                                    .filter(([key]) => !['gdprConsent', 'consent', 'dataConsent'].includes(key))
-                                    .map(([key, value]) => {
-                                      const isLongText = typeof value === 'string' && value.length > 100
-                                      const displayLabel = getDisplayLabel(key)
-                                      return (
-                                        <div
-                                          key={key}
-                                          className={`${isLongText ? 'sm:col-span-2' : ''}`}
-                                        >
-                                          <dt className="text-sm font-medium text-slate-600 mb-1">
-                                            {displayLabel}
-                                          </dt>
-                                          <dd className={`text-sm text-slate-900 ${isLongText ? 'whitespace-pre-wrap bg-slate-50 p-3 rounded-lg border border-slate-100' : ''}`}>
-                                            {Array.isArray(value) ? (
-                                              <div className="flex flex-wrap gap-1">
-                                                {value.map((v, i) => (
-                                                  <span key={i} className="inline-flex px-2 py-0.5 bg-blue-50 text-blue-700 text-xs rounded-full">
-                                                    {v}
-                                                  </span>
-                                                ))}
-                                              </div>
-                                            ) : typeof value === 'boolean' ? (
-                                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${value ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                                {value ? 'Yes' : 'No'}
-                                              </span>
-                                            ) : (
-                                              String(value) || <span className="text-slate-400 italic">Not provided</span>
-                                            )}
-                                          </dd>
-                                        </div>
-                                      )
-                                    })}
-                                </div>
-                                <div className="mt-4 pt-3 border-t border-slate-100 flex justify-end">
-                                  <button
-                                    onClick={() => {
-                                      if (confirm('Permanently delete this response?\n\nIt will be removed from exports and from the next AI analysis run. This cannot be undone.')) {
-                                        deleteResponse.mutate(response.id)
-                                      }
-                                    }}
-                                    disabled={deleteResponse.isPending}
-                                    className="flex items-center gap-1.5 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
-                                  >
-                                    <Trash2 size={14} aria-hidden="true" />
-                                    Delete response
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Footer */}
-              <div className="px-6 py-4 border-t border-slate-200 bg-white flex justify-end">
-                <button
-                  onClick={() => {
-                    setViewingResponses(null)
-                    setExpandedResponse(null)
-                  }}
-                  className="btn-primary"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
     </div>
   )
 }

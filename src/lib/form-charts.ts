@@ -55,7 +55,7 @@ export function buildFormCharts(fields: FormField[], responses: Array<{ data: Re
   const charts: FormChart[] = []
   fields.forEach((field, index) => {
     const answers = responses.map(r => answerFor(r.data ?? {}, field)).filter(v => !isBlank(v))
-    const key = field.id != null ? String(field.id) : `field-${index}`
+    const key = fieldKeyOf(field, index)
     const base = { key, title: field.label || `Question ${index + 1}`, respondents: answers.length }
 
     if (field.type === 'radio' || field.type === 'select') {
@@ -94,4 +94,84 @@ export function buildFormCharts(fields: FormField[], responses: Array<{ data: Re
 export function chartFileName(title: string): string {
   const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60)
   return `${slug || 'chart'}.png`
+}
+
+// ---- filters ---------------------------------------------------------------
+
+/** Field types that can be filtered (and charted) by answer. */
+const FILTERABLE = new Set(['radio', 'select', 'checkbox', 'rating'])
+
+/** Stable key for a field: its id, or its position for fields without one. */
+export function fieldKeyOf(field: FormField, index: number): string {
+  return field.id != null ? String(field.id) : `field-${index}`
+}
+
+export interface FilterQuestion {
+  key: string
+  title: string
+  /** Answer values in display order: the form's options, then any others given. */
+  values: string[]
+}
+
+/** An answer as the list of filterable values it contains. */
+function answerValues(field: FormField, raw: unknown): string[] {
+  if (isBlank(raw)) return []
+  if (field.type === 'rating') {
+    const n = Math.round(Number(raw))
+    return Number.isFinite(n) && n >= 1 && n <= 5 ? [String(n)] : []
+  }
+  return Array.isArray(raw) ? raw.map(String) : [String(raw)]
+}
+
+export function filterQuestions(fields: FormField[], responses: Array<{ data: Record<string, unknown> }>): FilterQuestion[] {
+  return fields.flatMap((field, index) => {
+    if (!FILTERABLE.has(field.type)) return []
+    const seen = new Set(field.type === 'rating' ? ['1', '2', '3', '4', '5'] : field.options ?? [])
+    for (const r of responses) for (const v of answerValues(field, answerFor(r.data ?? {}, field))) seen.add(v)
+    if (seen.size === 0) return []
+    return [{ key: fieldKeyOf(field, index), title: field.label || `Question ${index + 1}`, values: Array.from(seen) }]
+  })
+}
+
+export interface ResponseFilters {
+  /** Inclusive dates, YYYY-MM-DD in local time. */
+  from?: string
+  to?: string
+  /** Question key → accepted answers. Any accepted answer matches; questions combine with AND. */
+  answers: Record<string, string[]>
+}
+
+export function hasActiveFilters(filters: ResponseFilters): boolean {
+  return Boolean(filters.from || filters.to || Object.values(filters.answers).some(v => v.length > 0))
+}
+
+export function applyFilters<R extends { data: Record<string, unknown>; submittedAt: string | Date }>(
+  fields: FormField[], responses: R[], filters: ResponseFilters,
+): R[] {
+  const from = filters.from ? new Date(`${filters.from}T00:00:00`).getTime() : -Infinity
+  const to = filters.to ? new Date(`${filters.to}T23:59:59.999`).getTime() : Infinity
+  const active = fields
+    .map((field, index) => ({ field, accepted: filters.answers[fieldKeyOf(field, index)] ?? [] }))
+    .filter(f => f.accepted.length > 0)
+  return responses.filter(r => {
+    const t = new Date(r.submittedAt).getTime()
+    if (t < from || t > to) return false
+    return active.every(({ field, accepted }) =>
+      answerValues(field, answerFor(r.data ?? {}, field)).some(v => accepted.includes(v)))
+  })
+}
+
+/** One line describing active filters, for chart subtitles and exported PNGs. */
+export function describeFilters(filters: ResponseFilters, questions: FilterQuestion[]): string | null {
+  const parts: string[] = []
+  const day = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+  if (filters.from && filters.to) parts.push(`${day(filters.from)} – ${day(filters.to)}`)
+  else if (filters.from) parts.push(`from ${day(filters.from)}`)
+  else if (filters.to) parts.push(`up to ${day(filters.to)}`)
+  for (const q of questions) {
+    const accepted = filters.answers[q.key] ?? []
+    // "Where do you live? Freckenham", "Overall view: Oppose"
+    if (accepted.length) parts.push(`${q.title}${/[?:]$/.test(q.title.trim()) ? '' : ':'} ${accepted.join(' or ')}`)
+  }
+  return parts.length ? `Filtered — ${parts.join('; ')}` : null
 }

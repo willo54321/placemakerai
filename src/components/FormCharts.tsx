@@ -26,7 +26,7 @@ function subtitle(chart: FormChart): string {
   return n
 }
 
-function ChartCard({ chart, register }: { chart: FormChart; register: (el: HTMLDivElement | null) => void }) {
+function ChartCard({ chart, note, register }: { chart: FormChart; note?: string | null; register: (el: HTMLDivElement | null) => void }) {
   const [exporting, setExporting] = useState(false)
   const ref = useRef<HTMLDivElement | null>(null)
   const longest = Math.max(...chart.bars.map(b => b.label.length))
@@ -57,6 +57,7 @@ function ChartCard({ chart, register }: { chart: FormChart; register: (el: HTMLD
         <div className="min-w-0">
           <h4 className="font-semibold text-slate-900 leading-snug">{chart.title}</h4>
           <p className="text-sm text-slate-500 mt-0.5">{subtitle(chart)}</p>
+          {note && <p className="text-xs text-amber-700 mt-1">{note}</p>}
         </div>
         <button
           type="button"
@@ -108,13 +109,22 @@ function ChartCard({ chart, register }: { chart: FormChart; register: (el: HTMLD
  * One chart per structured question in a form, each exportable as a PNG
  * that carries its question title and respondent count.
  */
-export function FormCharts({ fields, responses }: { fields: FormField[]; responses: Array<{ data: Record<string, unknown> }> }) {
+export function FormCharts({ fields, responses, note }: {
+  fields: FormField[]
+  responses: Array<{ data: Record<string, unknown> }>
+  /** Shown on every chart (and its PNG), e.g. the active filters. */
+  note?: string | null
+}) {
   const charts = useMemo(() => buildFormCharts(fields, responses), [fields, responses])
   const cards = useRef(new Map<string, HTMLDivElement>())
   const [exportingAll, setExportingAll] = useState(false)
 
   if (charts.length === 0) {
-    return <p className="text-sm text-slate-500 text-center py-12">This form has no choice or rating questions to chart.</p>
+    return (
+      <p className="text-sm text-slate-500 text-center py-12">
+        {responses.length === 0 ? 'No responses match these filters.' : 'This form has no choice or rating questions to chart.'}
+      </p>
+    )
   }
 
   const exportAll = async () => {
@@ -149,6 +159,7 @@ export function FormCharts({ fields, responses }: { fields: FormField[]; respons
         <ChartCard
           key={chart.key}
           chart={chart}
+          note={note}
           register={el => { if (el) cards.current.set(chart.key, el); else cards.current.delete(chart.key) }}
         />
       ))}

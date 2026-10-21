@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { answerFor, buildFormCharts, chartFileName, type FormField } from './form-charts'
+import { answerFor, applyFilters, buildFormCharts, chartFileName, describeFilters, filterQuestions, hasActiveFilters, type FormField } from './form-charts'
 
 const fields: FormField[] = [
   { id: 1, type: 'radio', label: 'Overall view', options: ['Support', 'Neutral', 'Oppose'] },
@@ -69,5 +69,39 @@ describe('answerFor', () => {
 describe('chartFileName', () => {
   it('slugs the question title', () => {
     expect(chartFileName('Overall, what is your view of the proposals?')).toBe('overall-what-is-your-view-of-the-proposals.png')
+  })
+})
+
+describe('filters', () => {
+  const dated = [
+    { data: { 1: 'Oppose', 2: ['Traffic', 'Views'], 3: 2 }, submittedAt: '2026-10-01T09:00:00' },
+    { data: { 1: 'Oppose', 2: ['Traffic'], 3: 4 }, submittedAt: '2026-10-05T18:30:00' },
+    { data: { 1: 'Support', 2: [], 3: 5 }, submittedAt: '2026-10-10T12:00:00' },
+  ]
+
+  it('lists filterable questions with their options first', () => {
+    const qs = filterQuestions(fields, dated)
+    expect(qs.map(q => q.title)).toEqual(['Overall view', 'Topics', 'Information quality'])
+    expect(qs[0].values).toEqual(['Support', 'Neutral', 'Oppose'])
+    expect(qs[2].values).toEqual(['1', '2', '3', '4', '5'])
+  })
+
+  it('filters by inclusive date range', () => {
+    expect(applyFilters(fields, dated, { from: '2026-10-05', to: '2026-10-05', answers: {} })).toHaveLength(1)
+    expect(applyFilters(fields, dated, { to: '2026-10-05', answers: {} })).toHaveLength(2)
+  })
+
+  it('ORs answers within a question and ANDs across questions', () => {
+    expect(applyFilters(fields, dated, { answers: { 1: ['Oppose', 'Support'] } })).toHaveLength(3)
+    expect(applyFilters(fields, dated, { answers: { 1: ['Oppose'], 2: ['Views'] } })).toHaveLength(1)
+    expect(applyFilters(fields, dated, { answers: { 3: ['4', '5'] } })).toHaveLength(2)
+  })
+
+  it('describes active filters for exported charts', () => {
+    const qs = filterQuestions(fields, dated)
+    expect(describeFilters({ answers: {} }, qs)).toBeNull()
+    expect(hasActiveFilters({ answers: { 1: [] } })).toBe(false)
+    expect(describeFilters({ from: '2026-10-01', answers: { 1: ['Oppose'] } }, qs)).toBe('Filtered — from 1 Oct 2026; Overall view: Oppose')
+    expect(describeFilters({ answers: { a: ['Freckenham'] } }, [{ key: 'a', title: 'Where do you live?', values: [] }])).toBe('Filtered — Where do you live? Freckenham')
   })
 })

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { answerFields } from '@/lib/form-fields'
 
 export interface NumberedResponse {
   id: string
@@ -63,7 +64,7 @@ export function FormResponseList({
       const isExpanded = expandedResponse === response.id
 
       // Build a map of data keys to form field labels
-      const formFields = fields
+      const formFields = answerFields(fields)
       const fieldLabelMap: Record<string, string> = {}
       formFields.forEach((field: any) => {
         if (field.label) {

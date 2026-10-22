@@ -231,6 +231,15 @@ export async function GET(request: Request, { params }: { params: { id: string }
 - Drag-drop form builder with JSON field config
 - Public form pages: `/forms/{formId}`
 - External form submissions: `POST /api/projects/{id}/feedback` (auto-detects fields)
+- Field types (`src/lib/form-fields.ts`): text/textarea/email/number/select/radio/checkbox/rating plus
+  `heading` (section title + text, collects nothing), `matrix` (one single-choice answer per `rows`
+  entry, stored as `{id}:{rowIndex}`), `subscribe` (mailing-list opt-in; ticked + an email field →
+  `recordMailingConsent`), and `specify` on radio/checkbox (options that open a text box, stored as
+  `{id}:specify:{optionIndex}`). Every field may carry `description` help text. Charts, CSV export,
+  the response list and the AI corpus all go through `answerFields()` so matrix rows and specify
+  boxes appear as their own questions.
+- Client forms are seeded from `prisma/seed-*.ts` (e.g. `seed-finberry-form.ts`, run against prod
+  with `npm run seed:finberry:prod`, user runs it).
 - GDPR consent required on all submissions
 
 ### 3. AI Analysis

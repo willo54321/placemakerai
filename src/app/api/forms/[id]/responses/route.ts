@@ -1,6 +1,8 @@
 import { prisma } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { rateLimitResponse } from '@/lib/rate-limit'
+import { recordMailingConsent } from '@/lib/subscribers'
+import { answerFields, fieldKey, type FormFieldDef } from '@/lib/form-fields'
 
 // CORS headers for cross-origin form submissions
 const corsHeaders = {
@@ -76,6 +78,28 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       gdprConsentDate: new Date(),
     },
   })
+
+  // Opt-in to the project mailing list: the form's own opt-in box ticked
+  // (strict === true) and an email given in one of its email fields.
+  const fields = answerFields((form.fields as unknown as FormFieldDef[]) ?? [])
+  const optedIn = body.mailingConsent === true && fields.some(f => f.type === 'subscribe' && body.data[fieldKey(f)] === true)
+  if (optedIn) {
+    const text = (match: (f: FormFieldDef) => boolean) => {
+      const field = fields.find(match)
+      const value = field ? body.data[fieldKey(field)] : null
+      return typeof value === 'string' && value.trim() ? value.trim() : null
+    }
+    const email = text(f => f.type === 'email')
+    if (email) {
+      await recordMailingConsent({
+        projectId: form.projectId,
+        email,
+        name: text(f => f.type === 'text' && /name/i.test(f.label)),
+        source: 'feedback_form',
+        sourceId: response.id,
+      })
+    }
+  }
 
   return NextResponse.json(response, { headers: corsHeaders })
 }

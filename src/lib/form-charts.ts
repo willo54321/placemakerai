@@ -3,12 +3,9 @@
 // multiple choice (checkbox), 1–5 rating and number. Free-text questions
 // have no chart — they go to AI analysis instead.
 
-export interface FormField {
-  id?: string | number
-  type: string
-  label: string
-  options?: string[]
-}
+import { answerFields, type FormFieldDef } from './form-fields'
+
+export type FormField = FormFieldDef
 
 export interface ChartBar {
   label: string
@@ -53,7 +50,7 @@ function tally(values: string[], options: string[] | undefined, respondents: num
 
 export function buildFormCharts(fields: FormField[], responses: Array<{ data: Record<string, unknown> }>): FormChart[] {
   const charts: FormChart[] = []
-  fields.forEach((field, index) => {
+  answerFields(fields).forEach((field, index) => {
     const answers = responses.map(r => answerFor(r.data ?? {}, field)).filter(v => !isBlank(v))
     const key = fieldKeyOf(field, index)
     const base = { key, title: field.label || `Question ${index + 1}`, respondents: answers.length }
@@ -124,7 +121,7 @@ function answerValues(field: FormField, raw: unknown): string[] {
 }
 
 export function filterQuestions(fields: FormField[], responses: Array<{ data: Record<string, unknown> }>): FilterQuestion[] {
-  return fields.flatMap((field, index) => {
+  return answerFields(fields).flatMap((field, index) => {
     if (!FILTERABLE.has(field.type)) return []
     const seen = new Set(field.type === 'rating' ? ['1', '2', '3', '4', '5'] : field.options ?? [])
     for (const r of responses) for (const v of answerValues(field, answerFor(r.data ?? {}, field))) seen.add(v)
@@ -150,7 +147,7 @@ export function applyFilters<R extends { data: Record<string, unknown>; submitte
 ): R[] {
   const from = filters.from ? new Date(`${filters.from}T00:00:00`).getTime() : -Infinity
   const to = filters.to ? new Date(`${filters.to}T23:59:59.999`).getTime() : Infinity
-  const active = fields
+  const active = answerFields(fields)
     .map((field, index) => ({ field, accepted: filters.answers[fieldKeyOf(field, index)] ?? [] }))
     .filter(f => f.accepted.length > 0)
   return responses.filter(r => {

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { authorizeProject } from '@/lib/api-auth'
 import { logAudit } from '@/lib/audit'
+import { answerFields, type FormFieldDef } from '@/lib/form-fields'
 
 /**
  * Per-form CSV export: one row per response, one column per question,
@@ -21,7 +22,7 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
     return NextResponse.json({ error: 'Form not found' }, { status: 404 })
   }
 
-  const fields = (form.fields as Array<{ id: string; label: string }>) || []
+  const fields = answerFields((form.fields as unknown as FormFieldDef[]) || []).map(f => ({ id: String(f.id ?? f.label), label: f.label }))
 
   // A response value may be keyed by the field id (our own form page) or by
   // the field label (external submissions that auto-detect fields).

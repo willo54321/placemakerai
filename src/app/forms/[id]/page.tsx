@@ -4,6 +4,7 @@ import { useQuery, useMutation } from '@tanstack/react-query'
 import { CheckCircle, AlertCircle } from 'lucide-react'
 import { useState, use } from 'react';
 import { fetchJson } from '@/lib/fetch-json'
+import { fieldKey, matrixRowKey, specifyKey, type FormFieldDef } from '@/lib/form-fields'
 
 export default function PublicFormPage(props: { params: Promise<{ id: string }> }) {
   const params = use(props.params);
@@ -20,7 +21,7 @@ export default function PublicFormPage(props: { params: Promise<{ id: string }> 
   })
 
   const submitResponse = useMutation({
-    mutationFn: (payload: { data: Record<string, any>; gdprConsent: boolean }) =>
+    mutationFn: (payload: { data: Record<string, any>; gdprConsent: boolean; mailingConsent: boolean }) =>
       fetchJson(`/api/forms/${params.id}/responses`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -54,9 +55,15 @@ export default function PublicFormPage(props: { params: Promise<{ id: string }> 
     )
   }
 
-  const fieldKey = (field: any) => field.id ?? field.label
-
+  const fields: FormFieldDef[] = form.fields || []
   const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+  const setValue = (key: string, value: unknown) => setFormData(d => ({ ...d, [key]: value }))
+
+  /** The chosen option(s) of a choice field, as a list. */
+  const chosen = (field: FormFieldDef): string[] => {
+    const v = formData[fieldKey(field)]
+    return Array.isArray(v) ? v : v ? [v] : []
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -64,17 +71,26 @@ export default function PublicFormPage(props: { params: Promise<{ id: string }> 
 
     const errors: Record<string, string> = {}
 
-    for (const field of (form.fields || [])) {
+    for (const field of fields) {
       const key = fieldKey(field)
       const value = formData[key]
 
-      // Required-field enforcement for rating and checkbox groups (native
-      // `required` doesn't cover these custom controls).
+      // Required-field enforcement for custom controls (native `required`
+      // doesn't cover these).
       if (field.required) {
         if (field.type === 'rating' && (value === undefined || value === null || value === '')) {
           errors[key] = 'Please select a rating.'
         } else if (field.type === 'checkbox' && (!Array.isArray(value) || value.length === 0)) {
           errors[key] = 'Please select at least one option.'
+        } else if (field.type === 'matrix' && (field.rows ?? []).some((_, i) => !formData[matrixRowKey(field, i)])) {
+          errors[key] = 'Please answer every row.'
+        }
+      }
+
+      // An option that asks for details needs them.
+      for (const option of field.specify ?? []) {
+        if (chosen(field).includes(option) && !String(formData[specifyKey(field, option)] ?? '').trim()) {
+          errors[specifyKey(field, option)] = 'Please give details.'
         }
       }
 
@@ -96,37 +112,73 @@ export default function PublicFormPage(props: { params: Promise<{ id: string }> 
 
     setValidationErrors({})
     setSubmitError(null)
-    submitResponse.mutate({ data: formData, gdprConsent })
+    const mailingConsent = fields.some(f => f.type === 'subscribe' && formData[fieldKey(f)] === true)
+    submitResponse.mutate({ data: formData, gdprConsent, mailingConsent })
+  }
+
+  const specifyInput = (field: FormFieldDef, option: string) => {
+    const key = specifyKey(field, option)
+    const error = validationErrors[key]
+    return (
+      <div className="ml-6 mt-1">
+        <input
+          type="text"
+          aria-label={`${option} — details`}
+          placeholder="Please specify"
+          value={formData[key] || ''}
+          onChange={e => setValue(key, e.target.value)}
+          className={`w-full p-2 border rounded text-sm ${error ? 'border-red-500' : ''}`}
+        />
+        {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
+      </div>
+    )
   }
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-lg mx-auto bg-white rounded-lg shadow p-6">
+      <div className="max-w-2xl mx-auto bg-white rounded-lg shadow p-6 sm:p-8">
         <h1 className="text-2xl font-bold mb-6">{form.name}</h1>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {form.fields?.map((field: any, i: number) => {
+          {fields.map((field, i) => {
             const key = fieldKey(field)
             const fieldError = validationErrors[key]
+
+            if (field.type === 'heading') {
+              return (
+                <div key={i} className={i > 0 ? 'pt-6 border-t border-gray-200' : ''}>
+                  {field.label && <h2 className="text-lg font-semibold">{field.label}</h2>}
+                  {field.description && (
+                    <p className={`text-sm text-gray-600 whitespace-pre-line ${field.label ? 'mt-2' : ''}`}>{field.description}</p>
+                  )}
+                </div>
+              )
+            }
+
             return (
             <div key={i}>
-              <label className="block text-sm font-medium mb-2">
-                {field.label} {field.required && <span className="text-red-500">*</span>}
-              </label>
+              {field.type !== 'subscribe' && (
+                <label className="block text-sm font-medium mb-1">
+                  {field.label} {field.required && <span className="text-red-500">*</span>}
+                </label>
+              )}
+              {field.description && (
+                <p className="text-sm text-gray-500 whitespace-pre-line mb-2">{field.description}</p>
+              )}
 
               {field.type === 'textarea' ? (
                 <textarea
                   required={field.required}
                   value={formData[key] || ''}
-                  onChange={e => setFormData({ ...formData, [key]: e.target.value })}
+                  onChange={e => setValue(key, e.target.value)}
                   className="w-full p-2 border rounded"
-                  rows={3}
+                  rows={4}
                 />
               ) : field.type === 'select' ? (
                 <select
                   required={field.required}
                   value={formData[key] || ''}
-                  onChange={e => setFormData({ ...formData, [key]: e.target.value })}
+                  onChange={e => setValue(key, e.target.value)}
                   className="w-full p-2 border rounded"
                 >
                   <option value="">Select...</option>
@@ -135,39 +187,65 @@ export default function PublicFormPage(props: { params: Promise<{ id: string }> 
               ) : field.type === 'radio' ? (
                 <div className="space-y-2">
                   {field.options?.map((o: string) => (
-                    <label key={o} className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        name={key}
-                        value={o}
-                        required={field.required}
-                        checked={formData[key] === o}
-                        onChange={e => setFormData({ ...formData, [key]: e.target.value })}
-                      />
-                      {o}
-                    </label>
+                    <div key={o}>
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name={key}
+                          value={o}
+                          required={field.required}
+                          checked={formData[key] === o}
+                          onChange={e => setValue(key, e.target.value)}
+                        />
+                        {o}
+                      </label>
+                      {field.specify?.includes(o) && formData[key] === o && specifyInput(field, o)}
+                    </div>
                   ))}
                 </div>
               ) : field.type === 'checkbox' ? (
                 <div className={`space-y-2 ${fieldError ? 'rounded border border-red-500 p-2' : ''}`}>
-                  {field.options?.map((o: string) => (
-                    <label key={o} className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={(formData[key] || []).includes(o)}
-                        onChange={e => {
-                          const current = formData[key] || []
-                          setFormData({
-                            ...formData,
-                            [key]: e.target.checked
-                              ? [...current, o]
-                              : current.filter((v: string) => v !== o),
-                          })
-                        }}
-                      />
-                      {o}
-                    </label>
-                  ))}
+                  {field.options?.map((o: string) => {
+                    const current: string[] = formData[key] || []
+                    return (
+                      <div key={o}>
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={current.includes(o)}
+                            onChange={e => setValue(key, e.target.checked ? [...current, o] : current.filter(v => v !== o))}
+                          />
+                          {o}
+                        </label>
+                        {field.specify?.includes(o) && current.includes(o) && specifyInput(field, o)}
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : field.type === 'matrix' ? (
+                <div className={`space-y-3 ${fieldError ? 'rounded border border-red-500 p-2' : ''}`}>
+                  {field.rows?.map((row, r) => {
+                    const rowKey = matrixRowKey(field, r)
+                    return (
+                      <fieldset key={r} className="border border-gray-200 rounded p-3">
+                        <legend className="text-sm px-1">{row}</legend>
+                        <div className="flex flex-wrap gap-x-4 gap-y-2">
+                          {field.options?.map(o => (
+                            <label key={o} className="flex items-center gap-1.5 text-sm">
+                              <input
+                                type="radio"
+                                name={rowKey}
+                                value={o}
+                                checked={formData[rowKey] === o}
+                                onChange={e => setValue(rowKey, e.target.value)}
+                              />
+                              {o}
+                            </label>
+                          ))}
+                        </div>
+                      </fieldset>
+                    )
+                  })}
                 </div>
               ) : field.type === 'rating' ? (
                 <div className={`flex gap-2 ${fieldError ? 'rounded border border-red-500 p-2' : ''}`}>
@@ -176,18 +254,28 @@ export default function PublicFormPage(props: { params: Promise<{ id: string }> 
                       key={n}
                       type="button"
                       className={`w-10 h-10 border rounded ${formData[key] === n ? 'bg-blue-600 text-white' : 'hover:bg-gray-50'}`}
-                      onClick={() => setFormData({ ...formData, [key]: n })}
+                      onClick={() => setValue(key, n)}
                     >
                       {n}
                     </button>
                   ))}
                 </div>
+              ) : field.type === 'subscribe' ? (
+                <label className="flex items-start gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={formData[key] === true}
+                    onChange={e => setValue(key, e.target.checked)}
+                  />
+                  {field.options?.[0] || 'I would like to receive updates about this project.'}
+                </label>
               ) : (
                 <input
                   type={field.type}
                   required={field.required}
                   value={formData[key] || ''}
-                  onChange={e => setFormData({ ...formData, [key]: e.target.value })}
+                  onChange={e => setValue(key, e.target.value)}
                   className={`w-full p-2 border rounded ${fieldError ? 'border-red-500' : ''}`}
                 />
               )}

@@ -105,3 +105,29 @@ describe('filters', () => {
     expect(describeFilters({ answers: { a: ['Freckenham'] } }, [{ key: 'a', title: 'Where do you live?', values: [] }])).toBe('Filtered — Where do you live? Freckenham')
   })
 })
+
+describe('matrix and specify questions', () => {
+  const grid: FormField[] = [
+    { id: 'green', type: 'matrix', label: 'Green spaces', rows: ['Buffer', 'Play area'], options: ['Support', 'Oppose'] },
+    { id: 'homes', type: 'checkbox', label: 'Homes', options: ['Flats', 'Other – please specify'], specify: ['Other – please specify'] },
+    { id: 'about', type: 'heading', label: 'About you' },
+  ]
+  const rows = [
+    { data: { 'green:0': 'Support', 'green:1': 'Oppose', homes: ['Other – please specify'], 'homes:specify:1': 'Bungalows' }, submittedAt: '2026-10-01T10:00:00Z' },
+    { data: { 'green:0': 'Support', homes: ['Flats'] }, submittedAt: '2026-10-02T10:00:00Z' },
+  ]
+
+  it('charts each matrix row as a single-choice question', () => {
+    const charts = buildFormCharts(grid, rows)
+    expect(charts.map(c => [c.title, c.kind, c.respondents])).toEqual([
+      ['Green spaces — Buffer', 'single', 2], ['Green spaces — Play area', 'single', 1], ['Homes', 'multiple', 2],
+    ])
+    expect(charts[0].bars).toEqual([{ label: 'Support', count: 2, percent: 100 }, { label: 'Oppose', count: 0, percent: 0 }])
+  })
+
+  it('filters by a matrix row', () => {
+    const questions = filterQuestions(grid, rows)
+    expect(questions.map(q => q.key)).toEqual(['green:0', 'green:1', 'homes'])
+    expect(applyFilters(grid, rows, { answers: { 'green:1': ['Oppose'] } })).toHaveLength(1)
+  })
+})

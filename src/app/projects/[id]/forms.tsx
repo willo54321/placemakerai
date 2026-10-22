@@ -6,6 +6,7 @@ import { useState, useRef, useEffect } from 'react'
 import { usePermissions } from '@/hooks/usePermissions'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { CHOICE_TYPES, FIELD_TYPES } from '@/lib/form-fields'
 
 interface FeedbackResponse {
   id: string
@@ -22,16 +23,7 @@ interface FeedbackForm {
   responses?: FeedbackResponse[]
 }
 
-const FIELD_TYPES = [
-  { value: 'text', label: 'Text Input' },
-  { value: 'textarea', label: 'Long Text' },
-  { value: 'email', label: 'Email' },
-  { value: 'number', label: 'Number' },
-  { value: 'select', label: 'Dropdown' },
-  { value: 'radio', label: 'Radio Buttons' },
-  { value: 'checkbox', label: 'Checkboxes' },
-  { value: 'rating', label: 'Rating (1-5)' },
-]
+const splitList = (text: string) => text.split(',').map((s: string) => s.trim()).filter(Boolean)
 
 export function FormsTab({
   projectId,
@@ -254,7 +246,36 @@ export function FormsTab({
                             </label>
                           </div>
                         </div>
-                        {['select', 'radio', 'checkbox'].includes(field.type) && (
+                        <div className="mt-3">
+                          <label htmlFor={`field-description-${field.id}`} className="sr-only">
+                            {field.type === 'heading' ? 'Text' : 'Help text'}
+                          </label>
+                          <textarea
+                            id={`field-description-${field.id}`}
+                            placeholder={field.type === 'heading' ? 'Text shown under the heading (optional)' : 'Help text shown under the question (optional)'}
+                            value={field.description || ''}
+                            onChange={e => updateField(field.id, { description: e.target.value })}
+                            className="input"
+                            rows={2}
+                          />
+                        </div>
+                        {field.type === 'matrix' && (
+                          <div className="mt-3">
+                            <label htmlFor={`field-rows-${field.id}`} className="sr-only">
+                              Rows
+                            </label>
+                            <input
+                              id={`field-rows-${field.id}`}
+                              type="text"
+                              placeholder="Rows (comma separated)"
+                              value={field.rows?.join(', ') || ''}
+                              onChange={e => updateField(field.id, { rows: splitList(e.target.value) })}
+                              className="input"
+                            />
+                            <p className="helper-text">One row per item to rate, separated by commas</p>
+                          </div>
+                        )}
+                        {[...CHOICE_TYPES, 'matrix'].includes(field.type) && (
                           <div className="mt-3">
                             <label htmlFor={`field-options-${field.id}`} className="sr-only">
                               Options
@@ -264,10 +285,42 @@ export function FormsTab({
                               type="text"
                               placeholder="Options (comma separated)"
                               value={field.options?.join(', ') || ''}
-                              onChange={e => updateField(field.id, { options: e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean) })}
+                              onChange={e => updateField(field.id, { options: splitList(e.target.value) })}
                               className="input"
                             />
                             <p className="helper-text">Enter options separated by commas</p>
+                          </div>
+                        )}
+                        {['radio', 'checkbox'].includes(field.type) && (
+                          <div className="mt-3">
+                            <label htmlFor={`field-specify-${field.id}`} className="sr-only">
+                              Options that ask for details
+                            </label>
+                            <input
+                              id={`field-specify-${field.id}`}
+                              type="text"
+                              placeholder="Options that ask for details, e.g. Other – please specify"
+                              value={field.specify?.join(', ') || ''}
+                              onChange={e => updateField(field.id, { specify: splitList(e.target.value) })}
+                              className="input"
+                            />
+                            <p className="helper-text">Choosing one of these options opens a text box; must match an option exactly</p>
+                          </div>
+                        )}
+                        {field.type === 'subscribe' && (
+                          <div className="mt-3">
+                            <label htmlFor={`field-optin-${field.id}`} className="sr-only">
+                              Checkbox wording
+                            </label>
+                            <input
+                              id={`field-optin-${field.id}`}
+                              type="text"
+                              placeholder="Checkbox wording, e.g. I would like to receive updates about the proposals"
+                              value={field.options?.[0] || ''}
+                              onChange={e => updateField(field.id, { options: e.target.value ? [e.target.value] : [] })}
+                              className="input"
+                            />
+                            <p className="helper-text">Ticked responses join the mailing list using the form&apos;s email field</p>
                           </div>
                         )}
                       </div>
@@ -452,13 +505,40 @@ export function FormsTab({
               <p className="text-sm text-slate-500 mb-4">Form preview (disabled)</p>
 
               <div className="space-y-4">
-                {viewingForm.fields?.map((field: any, i: number) => (
+                {viewingForm.fields?.map((field: any, i: number) => field.type === 'heading' ? (
+                  <div key={i} className={i > 0 ? 'pt-4 border-t border-slate-200' : ''}>
+                    {field.label && <h4 className="font-semibold text-slate-900">{field.label}</h4>}
+                    {field.description && <p className="text-sm text-slate-600 whitespace-pre-line mt-1">{field.description}</p>}
+                  </div>
+                ) : (
                   <div key={i}>
                     <label className="label">
                       {field.label}
                       {field.required && <span className="text-red-500 ml-1">*</span>}
                     </label>
-                    {field.type === 'textarea' ? (
+                    {field.description && <p className="text-sm text-slate-500 whitespace-pre-line mb-2">{field.description}</p>}
+                    {field.type === 'matrix' ? (
+                      <div className="space-y-2">
+                        {field.rows?.map((row: string) => (
+                          <div key={row} className="text-sm text-slate-700">
+                            <span className="block mb-1">{row}</span>
+                            <div className="flex flex-wrap gap-x-4 gap-y-1">
+                              {field.options?.map((o: string) => (
+                                <label key={o} className="flex items-center gap-1.5">
+                                  <input type="radio" disabled className="w-4 h-4 border-slate-300" aria-disabled="true" />
+                                  {o}
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : field.type === 'subscribe' ? (
+                      <label className="flex items-center gap-2 text-sm text-slate-700">
+                        <input type="checkbox" disabled className="w-4 h-4 rounded border-slate-300" aria-disabled="true" />
+                        {field.options?.[0] || 'I would like to receive updates about this project.'}
+                      </label>
+                    ) : field.type === 'textarea' ? (
                       <textarea className="input" rows={3} disabled aria-disabled="true" />
                     ) : field.type === 'select' ? (
                       <select className="input" disabled aria-disabled="true">

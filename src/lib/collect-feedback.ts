@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db'
+import { answerFields, type FormFieldDef } from '@/lib/form-fields'
 import { FeedbackItem } from '@/lib/ai'
 
 /**
@@ -37,7 +38,7 @@ export async function collectFeedback(projectId: string): Promise<FeedbackItem[]
   })
 
   forms.forEach(form => {
-    const fields = form.fields as Array<{ id: string; label: string; type: string }>
+    const fields = answerFields((form.fields as unknown as FormFieldDef[]) ?? []).map(f => ({ ...f, id: String(f.id ?? f.label) }))
 
     form.responses.forEach(response => {
       const data = response.data as Record<string, unknown>

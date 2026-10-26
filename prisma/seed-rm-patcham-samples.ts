@@ -2,8 +2,9 @@
  * SAMPLE DATA for the Royal Mail Patcham project (see seed-rm-patcham.ts for
  * the project itself and its real representatives).
  *
- * Adds fictitious construction-issue reports and enquiries so the Construction
- * Issues tab, enquiry inbox and AI analysis have something to show. Every
+ * Adds fictitious construction-issue reports, enquiries and mailing-list
+ * subscribers so the Construction Issues tab, enquiry inbox, Mailing List tab
+ * and AI analysis have something to show. Every
  * sample person is invented and every email address is on example.com — that
  * domain is the marker this script uses to find and remove its own rows on
  * rerun, so real resident reports and enquiries are never touched. Streets are
@@ -175,6 +176,35 @@ const ENQUIRIES: Enquiry[] = [
   },
 ]
 
+type Sub = {
+  name: string; email: string
+  // manual | enquiry | feedback_form | subscribe_embed | issue_report
+  source: string; day: number
+  unsubscribedDay?: number
+}
+
+// Mix of sign-ups from the website's "Stay Updated" form, consent ticked on
+// issue reports and enquiries above, and a few added by hand from the
+// exhibition sign-in sheet. One has since unsubscribed.
+const SUBSCRIBERS: Sub[] = [
+  { name: 'Karen Whitfield', email: 'karen.whitfield@example.com', source: 'issue_report', day: 38 },
+  { name: 'Stephen Mole', email: 'stephen.mole@example.com', source: 'issue_report', day: 36 },
+  { name: 'Margaret Doyle', email: 'margaret.doyle@example.com', source: 'enquiry', day: 28 },
+  { name: 'Tom Reeves', email: 'tom.reeves@example.com', source: 'enquiry', day: 20 },
+  { name: 'Denise Carr', email: 'denise.carr@example.com', source: 'issue_report', day: 18 },
+  { name: 'Eleanor Finch', email: 'eleanor.finch@example.com', source: 'enquiry', day: 3 },
+  { name: 'Barbara Lynch', email: 'barbara.lynch@example.com', source: 'subscribe_embed', day: 41 },
+  { name: 'Omar Siddiqui', email: 'omar.siddiqui@example.com', source: 'subscribe_embed', day: 33 },
+  { name: 'Lucy Hargreaves', email: 'lucy.hargreaves@example.com', source: 'subscribe_embed', day: 27 },
+  { name: 'Peter Vance', email: 'peter.vance@example.com', source: 'subscribe_embed', day: 19 },
+  { name: 'Hannah Okoro', email: 'hannah.okoro@example.com', source: 'subscribe_embed', day: 11 },
+  { name: 'David Mercer', email: 'david.mercer@example.com', source: 'subscribe_embed', day: 4 },
+  { name: 'June Albright', email: 'june.albright@example.com', source: 'manual', day: 45 },
+  { name: 'Raymond Tsang', email: 'raymond.tsang@example.com', source: 'manual', day: 45 },
+  { name: 'Patcham Residents’ Association', email: 'secretary.pra@example.com', source: 'manual', day: 45 },
+  { name: 'Colin Brightwell', email: 'colin.brightwell@example.com', source: 'subscribe_embed', day: 30, unsubscribedDay: 8 },
+]
+
 async function main() {
   const project = await prisma.project.findUnique({ where: { id: PROJECT_ID }, select: { name: true } })
   if (!project) {
@@ -189,9 +219,12 @@ async function main() {
   const removedEnquiries = await prisma.enquiry.deleteMany({
     where: { projectId: PROJECT_ID, submitterEmail: { endsWith: SAMPLE_DOMAIN } },
   })
+  const removedSubscribers = await prisma.subscriber.deleteMany({
+    where: { projectId: PROJECT_ID, email: { endsWith: SAMPLE_DOMAIN } },
+  })
   // Cached analysis is stale once the corpus changes; the next run rebuilds it.
   await prisma.analysisResult.deleteMany({ where: { projectId: PROJECT_ID } })
-  console.log(`  cleared earlier samples: ${removedPins.count} issue reports, ${removedEnquiries.count} enquiries`)
+  console.log(`  cleared earlier samples: ${removedPins.count} issue reports, ${removedEnquiries.count} enquiries, ${removedSubscribers.count} subscribers`)
 
   for (const issue of ISSUES) {
     await prisma.publicPin.create({
@@ -242,6 +275,24 @@ async function main() {
     })
   }
   console.log(`  enquiries: ${ENQUIRIES.length} (inbound only, no seeded replies)`)
+
+  for (const sub of SUBSCRIBERS) {
+    await prisma.subscriber.create({
+      data: {
+        projectId: PROJECT_ID,
+        email: sub.email,
+        name: sub.name,
+        source: sub.source,
+        subscribed: sub.unsubscribedDay == null,
+        unsubscribedAt: sub.unsubscribedDay != null ? d(sub.unsubscribedDay, 20, 0) : null,
+        gdprConsent: true,
+        gdprConsentDate: d(sub.day, 12, 0),
+        createdAt: d(sub.day, 12, 0),
+      },
+    })
+  }
+  const unsubscribed = SUBSCRIBERS.filter(s => s.unsubscribedDay != null).length
+  console.log(`  subscribers: ${SUBSCRIBERS.length} (${SUBSCRIBERS.length - unsubscribed} subscribed, ${unsubscribed} unsubscribed)`)
   console.log('Done.')
 }
 

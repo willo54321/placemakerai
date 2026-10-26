@@ -7,23 +7,29 @@
  * record was lost in a database move, so this recreates it under the SAME id
  * and the existing embed starts working again without a client-side redeploy.
  *
- * Project settings only — no fabricated pins, enquiries or stakeholders. The
- * script is idempotent (upsert) and never deletes children, so it is safe to
- * re-run on a database that already holds real reports.
+ * Project settings plus the project's REAL elected representatives (the
+ * Brighton Pavilion MP and the Patcham & Hollingbury councillors, resolved live
+ * from the project coordinates via src/lib/representatives.ts). Nothing is
+ * fabricated here — sample enquiries and issue reports live in
+ * seed-rm-patcham-samples.ts. Idempotent (upsert; the representative import
+ * skips people already on the register) and never deletes children, so it is
+ * safe to re-run on a database that already holds real reports.
  *
  * Run locally:    npx tsx prisma/seed-rm-patcham.ts
  * Run on prod:    npm run seed:rmpatcham:prod   (user runs this)
  */
 import 'dotenv/config'
 import { PrismaClient } from '@prisma/client'
+import { importRepresentativesForProject } from '../src/lib/import-representatives'
 
 const prisma = new PrismaClient()
 
 // Fixed: must match the iframe src on the client website.
 const PROJECT_ID = 'cmmkjinxt0000hsj72ivalz84'
 
-// Patcham Court Farm, Vale Avenue, Brighton BN1 8YF (OSM geocode).
-const CENTRE = { lat: 50.8673, lng: -0.1514 }
+// The new delivery/sorting office site: Patcham Court Farm, between Vale
+// Avenue and the A23 London Road, just south of the A27 (Brighton BN1 8YF).
+const CENTRE = { lat: 50.8678, lng: -0.1505 }
 
 async function main() {
   console.log('Seeding "Royal Mail Brighton Delivery Office (Patcham)"…')
@@ -31,7 +37,7 @@ async function main() {
   const projectData = {
     name: 'Royal Mail Brighton Delivery Office (Patcham)',
     description:
-      'Construction of the new Royal Mail Brighton Delivery Office at Patcham Court Farm, Vale Avenue, Patcham. Construction-phase community relations: residents report noise, dust, traffic and other site issues via the map on the project website.',
+      'Construction of the new Royal Mail Brighton Delivery Office (sorting and delivery hub) on the former Patcham Court Farm site, Vale Avenue, Patcham. Construction-phase community relations: residents report noise, dust, traffic and other site issues via the map on the project website.',
     latitude: CENTRE.lat,
     longitude: CENTRE.lng,
     mapZoom: 17,
@@ -70,6 +76,19 @@ async function main() {
       create: { userId: admin.id, projectId: PROJECT_ID, role: 'ADMIN' },
       update: { role: 'ADMIN' },
     })
+  }
+
+  // Real elected representatives onto the stakeholder register (MP + ward
+  // councillors, from the Parliament Members API and the council's ModernGov
+  // service). Skips anyone already registered, so reruns add nothing.
+  const reps = await importRepresentativesForProject(PROJECT_ID)
+  if (reps) {
+    console.log(
+      `  representatives: ${reps.imported} imported, ${reps.skipped} already present` +
+        ` (MP ${reps.mp ?? '—'}, ${reps.councillors} councillors, ${reps.ward ?? ''} / ${reps.constituency ?? ''})`
+    )
+  } else {
+    console.log('  representatives: lookup unavailable — add via the Stakeholders tab')
   }
 
   const base = process.env.NEXTAUTH_URL || 'http://localhost:3002'

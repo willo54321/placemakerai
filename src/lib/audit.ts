@@ -19,7 +19,9 @@ export interface AuditEntry {
 
 export async function logAudit(entry: AuditEntry): Promise<void> {
   try {
-    const user = await getCurrentUser()
+    // No session outside a request (seed scripts, cron): record the action
+    // without an actor rather than losing the entry.
+    const user = await getCurrentUser().catch(() => null)
     await prisma.auditLog.create({
       data: {
         projectId: entry.projectId ?? null,

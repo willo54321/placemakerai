@@ -2,16 +2,24 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+
+// Embedded surfaces live inside the client's own website, which carries its
+// own cookie notice; the Placemaker banner must not appear in the iframe.
+const EMBED_PREFIXES = ['/embed/', '/forms/']
 
 export default function CookieConsent() {
+  const pathname = usePathname()
+  const embedded = EMBED_PREFIXES.some(prefix => pathname?.startsWith(prefix))
   const [showBanner, setShowBanner] = useState(false)
 
   useEffect(() => {
+    if (embedded) return
     const consent = localStorage.getItem('cookie-consent')
     if (!consent) {
       setShowBanner(true)
     }
-  }, [])
+  }, [embedded])
 
   const acceptCookies = () => {
     localStorage.setItem('cookie-consent', 'accepted')
@@ -25,7 +33,7 @@ export default function CookieConsent() {
     setShowBanner(false)
   }
 
-  if (!showBanner) return null
+  if (embedded || !showBanner) return null
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 p-4 bg-white border-t border-slate-200 shadow-lg">

@@ -663,7 +663,7 @@ export function EmbedExperience({
           zoom={project.mapZoom || 15}
           tourCamera={embedTourCamera}
           overlays={displayOverlays}
-          pins={tourActive ? [] : filteredPins}
+          pins={tourActive || project.embedReferenceOnly ? [] : filteredPins}
           zones={(project.zones || []).filter(z => !hiddenZoneIds.has(z.id))}
           pendingPin={pendingShape?.type === 'pin' ? { lat: pendingShape.lat!, lng: pendingShape.lng! } : null}
           pendingShape={pendingShape && pendingShape.type === 'polygon' ? { type: pendingShape.type, geometry: pendingShape.geometry } : null}
@@ -751,19 +751,21 @@ export function EmbedExperience({
           </div>
         )}
 
-        {/* Left Sidebar (hidden in reference mode and while a tour is open) */}
-        {!tourActive && !project.embedReferenceOnly && (
+        {/* Left Sidebar (hidden while a tour is open; in reference mode it holds only the map key) */}
+        {!tourActive && (!project.embedReferenceOnly || (project.zones?.length ?? 0) > 0) && (
         <div className={`absolute top-4 left-4 z-10 transition-all duration-300 ${sidebarCollapsed ? 'w-auto' : 'w-80'}`}>
           {/* Sidebar Header */}
           <div className={`bg-brand-600 p-4 flex items-start justify-between ${sidebarCollapsed ? 'rounded-xl' : 'rounded-t-xl'}`}>
             {!sidebarCollapsed && (
               <div className="text-white flex-1 mr-3">
-                <h2 className="font-bold text-lg">{issuesMode ? 'Report a Construction Issue' : 'Feedback Map'}</h2>
-                <p className="text-brand-200 text-sm mt-1">
-                  {issuesMode
-                    ? 'Reports go directly to the project team.'
-                    : 'Click feedback to view details or add your own.'}
-                </p>
+                <h2 className="font-bold text-lg">{issuesMode ? 'Report a Construction Issue' : project.embedReferenceOnly ? project.name : 'Feedback Map'}</h2>
+                {!project.embedReferenceOnly && (
+                  <p className="text-brand-200 text-sm mt-1">
+                    {issuesMode
+                      ? 'Reports go directly to the project team.'
+                      : 'Click feedback to view details or add your own.'}
+                  </p>
+                )}
               </div>
             )}
             <button
@@ -778,7 +780,7 @@ export function EmbedExperience({
           {!sidebarCollapsed && (
             <div className="bg-white rounded-b-xl shadow-lg max-h-[calc(100vh-6rem)] overflow-y-auto">
               <div className="p-4">
-                {issuesMode ? (
+                {project.embedReferenceOnly ? null : issuesMode ? (
                   <div className="space-y-3">
                     <ol className="space-y-3">
                       {[
@@ -847,7 +849,7 @@ export function EmbedExperience({
                     hiddenIds={hiddenZoneIds}
                     onToggle={toggleZone}
                     defaultOpen
-                    className="mt-4 border-t border-gray-100 pt-4"
+                    className={project.embedReferenceOnly ? '' : 'mt-4 border-t border-gray-100 pt-4'}
                   />
                 )}
               </div>

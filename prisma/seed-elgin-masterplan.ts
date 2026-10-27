@@ -60,7 +60,15 @@ async function main() {
 
   await prisma.project.update({
     where: { id: project.id },
-    data: { latitude: CENTRE.lat, longitude: CENTRE.lng, mapZoom: CENTRE.zoom, embedEnabled: true },
+    data: {
+      latitude: CENTRE.lat, longitude: CENTRE.lng, mapZoom: CENTRE.zoom,
+      embedEnabled: true,
+      // Elgin brand navy (the ELGIN wordmark / website header), satellite base,
+      // and reference mode: the public map shows the plan and its key only.
+      embedPrimaryColor: '#005480',
+      embedDefaultSatellite: true,
+      embedReferenceOnly: true,
+    },
   })
 
   const removed = await prisma.geoLayer.deleteMany({ where: { projectId: project.id, name: { in: LAYERS.map(l => l.name) } } })

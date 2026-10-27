@@ -651,6 +651,9 @@ export function EmbedExperience({
         .bg-brand-700 { background-color: ${primaryColor} !important; filter: brightness(0.9); }
         .text-brand-600 { color: ${primaryColor} !important; }
         .border-brand-500 { border-color: ${primaryColor} !important; }
+        .bg-brand-500 { background-color: ${primaryColor} !important; }
+        .bg-brand-500\\/50 { background-color: ${primaryColor}80 !important; }
+        .hover\\:bg-brand-500:hover { background-color: ${primaryColor} !important; }
         .bg-brand-50 { background-color: ${primaryColor}15 !important; }
         .ring-brand-300 { --tw-ring-color: ${primaryColor}50 !important; }
         .focus\\:ring-brand-500:focus { --tw-ring-color: ${primaryColor} !important; }
@@ -845,7 +848,7 @@ export function EmbedExperience({
                 )}
                 {(project.zones?.length ?? 0) > 0 && (
                   <MapKey
-                    layers={(project.zones || []).map(z => ({ id: z.id, name: z.name, color: z.color }))}
+                    layers={(project.zones || []).map(z => ({ id: z.id, name: z.name, color: z.color })).reverse()}
                     hiddenIds={hiddenZoneIds}
                     onToggle={toggleZone}
                     defaultOpen

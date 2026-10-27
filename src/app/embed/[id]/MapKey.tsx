@@ -15,14 +15,15 @@ export interface MapKeyLayer {
  * top-most layer first, as a plan's own key does.
  */
 export function MapKey({
-  layers, hiddenIds, onToggle, className = '',
+  layers, hiddenIds, onToggle, className = '', defaultOpen = false,
 }: {
   layers: MapKeyLayer[]
   hiddenIds: Set<string>
   onToggle: (id: string) => void
   className?: string
+  defaultOpen?: boolean
 }) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(defaultOpen)
   if (layers.length === 0) return null
   const hidden = layers.filter(l => hiddenIds.has(l.id)).length
   return (

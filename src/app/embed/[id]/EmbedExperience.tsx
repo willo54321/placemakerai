@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useJsApiLoader } from '@react-google-maps/api'
 import { MessageCircle, ThumbsUp, ThumbsDown, X, Send, MapPin, ChevronLeft, ChevronRight, Lightbulb, Pentagon, CheckCircle, AlertCircle, Layers, HardHat, Camera, Volume2, Wind, Car, Home, ShieldAlert, Clock, MoreHorizontal } from 'lucide-react'
 import dynamic from 'next/dynamic'
+import { MapKey } from './MapKey'
 import { TourPlayer } from './TourPlayer'
 import type { TourData, TourStopData, TourResponse } from './TourPlayer'
 import { ISSUE_CATEGORY_LABELS } from '@/lib/issues'
@@ -74,6 +75,10 @@ interface Zone {
   blurb: string
   color: string
   geometry: GeoJSONGeometry | null
+  geometries?: GeoJSONGeometry[]
+  fillOpacity?: number | null
+  strokeWidth?: number | null
+  lineStyle?: 'solid' | 'dashed' | 'dotted'
 }
 
 interface ProjectData {
@@ -200,6 +205,13 @@ export function EmbedExperience({
   const [overlayOpacity, setOverlayOpacity] = useState<number | null>(null)
   // Plan layers the visitor has switched off in the map key
   const [hiddenOverlayIds, setHiddenOverlayIds] = useState<Set<string>>(new Set())
+  // Plan layers (zones) the visitor has switched off in the map key.
+  const [hiddenZoneIds, setHiddenZoneIds] = useState<Set<string>>(new Set())
+  const toggleZone = (id: string) => setHiddenZoneIds(prev => {
+    const next = new Set(prev)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    return next
+  })
   const toggleOverlay = (id: string) => setHiddenOverlayIds(prev => {
     const next = new Set(prev)
     if (next.has(id)) next.delete(id)
@@ -652,7 +664,7 @@ export function EmbedExperience({
           tourCamera={embedTourCamera}
           overlays={displayOverlays}
           pins={tourActive ? [] : filteredPins}
-          zones={project.zones || []}
+          zones={(project.zones || []).filter(z => !hiddenZoneIds.has(z.id))}
           pendingPin={pendingShape?.type === 'pin' ? { lat: pendingShape.lat!, lng: pendingShape.lng! } : null}
           pendingShape={pendingShape && pendingShape.type === 'polygon' ? { type: pendingShape.type, geometry: pendingShape.geometry } : null}
           isAddingPin={drawMode === 'pin'}
@@ -828,6 +840,15 @@ export function EmbedExperience({
                   })}
                 </div>
                 </>
+                )}
+                {(project.zones?.length ?? 0) > 0 && (
+                  <MapKey
+                    layers={(project.zones || []).map(z => ({ id: z.id, name: z.name, color: z.color }))}
+                    hiddenIds={hiddenZoneIds}
+                    onToggle={toggleZone}
+                    defaultOpen
+                    className="mt-4 border-t border-gray-100 pt-4"
+                  />
                 )}
               </div>
             </div>

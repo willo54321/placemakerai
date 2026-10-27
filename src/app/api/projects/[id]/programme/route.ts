@@ -96,7 +96,14 @@ export async function GET(request: Request, props0: { params: Promise<{ id: stri
 
   // --- plots --------------------------------------------------------------
   type PlotAgg = { key: string; name: string; color: string; pins: number; support: number; neutral: number; object: number; surveyResponses: number; theme: string | null; headline: string | null }
-  const plots: PlotAgg[] = plotLayers.map((layer, idx) => {
+  // Only polygon zones take part in plot bucketing; plan layers of lines or
+  // points (hedgerows, access points…) are drawn on the map but aren't zones.
+  const isPolygonLayer = (layer: { geojson: unknown }) => {
+    const gj = layer.geojson as any
+    const t = (gj?.type === 'FeatureCollection' ? gj.features?.[0] : gj)?.geometry?.type
+    return t === 'Polygon' || t === 'MultiPolygon'
+  }
+  const plots: PlotAgg[] = plotLayers.filter(isPolygonLayer).map((layer, idx) => {
     const gj = layer.geojson as any
     const feature = gj?.type === 'FeatureCollection' ? gj.features?.[0] : gj
     const props = feature?.properties || {}

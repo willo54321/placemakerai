@@ -51,6 +51,11 @@ interface Zone {
   blurb: string
   color: string
   geometry: GeoJSONGeometry | null
+  /** Every feature's geometry (polygons, lines or points); falls back to `geometry`. */
+  geometries?: GeoJSONGeometry[]
+  fillOpacity?: number | null
+  strokeWidth?: number | null
+  lineStyle?: 'solid' | 'dashed' | 'dotted'
 }
 
 interface HighlightGeometry {
@@ -600,29 +605,60 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
           )
         })}
 
-        {/* Plot zones — client-drawn boundaries, underneath feedback */}
-        {zones.map(zone => {
-          const geom = zone.geometry as any
-          if (!geom || geom.type !== 'Polygon') return null
-          const path = (geom.coordinates?.[0] ?? []).map(([lng, lat]: number[]) => ({ lat, lng }))
-          if (path.length < 3) return null
+        {/* Plot zones — client-drawn boundaries and plan layers, underneath feedback */}
+        {zones.flatMap(zone => {
           const isSelected = selectedZone === zone.id
-          return (
-            <PolygonF
-              key={`zone-${zone.id}`}
-              paths={path}
-              options={{
-                fillColor: zone.color,
-                fillOpacity: isSelected ? 0.28 : 0.16,
-                strokeColor: zone.color,
-                strokeWeight: isSelected ? 3 : 2,
-                strokeOpacity: 1,
-                clickable: true,
-                zIndex: 0,
-              }}
-              onClick={() => { setSelectedPin(null); setSelectedZone(zone.id) }}
-            />
-          )
+          const geoms = (zone.geometries && zone.geometries.length > 0 ? zone.geometries : zone.geometry ? [zone.geometry] : []) as any[]
+          const baseFill = zone.fillOpacity ?? 0.16
+          const fillOpacity = isSelected ? Math.min(1, baseFill + 0.12) : baseFill
+          const strokeWeight = (zone.strokeWidth ?? 2) + (isSelected ? 1 : 0)
+          const select = () => { setSelectedPin(null); setSelectedZone(zone.id) }
+          const toPath = (ring: number[][]) => ring.map(([lng, lat]) => ({ lat, lng }))
+          // Dashed / dotted lines: Google draws the stroke invisible and repeats a symbol along it.
+          const lineOptions = zone.lineStyle && zone.lineStyle !== 'solid'
+            ? {
+                strokeOpacity: 0,
+                icons: [{
+                  icon: zone.lineStyle === 'dotted'
+                    ? { path: google.maps.SymbolPath.CIRCLE, scale: strokeWeight * 0.9, fillColor: zone.color, fillOpacity: 1, strokeOpacity: 0 }
+                    : { path: 'M 0,-1 0,1', strokeColor: zone.color, strokeOpacity: 1, strokeWeight, scale: 3 },
+                  offset: '0', repeat: zone.lineStyle === 'dotted' ? `${strokeWeight * 4}px` : '12px',
+                }],
+              }
+            : { strokeColor: zone.color, strokeOpacity: 1, strokeWeight }
+          return geoms.flatMap((geom, gi) => {
+            const key = `zone-${zone.id}-${gi}`
+            if (geom.type === 'Polygon' || geom.type === 'MultiPolygon') {
+              const polys: number[][][][] = geom.type === 'Polygon' ? [geom.coordinates] : geom.coordinates
+              return polys.map((rings, pi) => (
+                <PolygonF
+                  key={`${key}-${pi}`}
+                  paths={rings.map(toPath)}
+                  options={{ fillColor: zone.color, fillOpacity, strokeColor: zone.color, strokeWeight, strokeOpacity: 1, clickable: true, zIndex: 0 }}
+                  onClick={select}
+                />
+              ))
+            }
+            if (geom.type === 'LineString' || geom.type === 'MultiLineString') {
+              const lines: number[][][] = geom.type === 'LineString' ? [geom.coordinates] : geom.coordinates
+              return lines.map((line, li) => (
+                <PolylineF key={`${key}-${li}`} path={toPath(line)} options={{ ...lineOptions, clickable: true, zIndex: 1 }} onClick={select} />
+              ))
+            }
+            if (geom.type === 'Point') {
+              const [lng, lat] = geom.coordinates as number[]
+              return [(
+                <MarkerF
+                  key={key}
+                  position={{ lat, lng }}
+                  icon={{ path: google.maps.SymbolPath.CIRCLE, scale: isSelected ? 9 : 7, fillColor: zone.color, fillOpacity: 1, strokeColor: '#ffffff', strokeWeight: 2 }}
+                  onClick={select}
+                  zIndex={2}
+                />
+              )]
+            }
+            return []
+          })
         })}
 
         {/* Existing Polygon Pins */}
@@ -720,8 +756,13 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
         {/* Selected Zone Popup */}
         {selectedZone && (() => {
           const zone = zones.find(z => z.id === selectedZone)
-          if (!zone || !zone.geometry) return null
-          const position = getShapeCentroid(zone.geometry)
+          const first = (zone?.geometries?.[0] ?? zone?.geometry) as any
+          if (!zone || !first) return null
+          const position = first.type === 'Point'
+            ? { lat: first.coordinates[1], lng: first.coordinates[0] }
+            : first.type === 'MultiPolygon' ? getShapeCentroid({ type: 'Polygon', coordinates: first.coordinates[0] } as GeoJSONGeometry)
+            : first.type === 'MultiLineString' ? getShapeCentroid({ type: 'LineString', coordinates: first.coordinates[0] } as GeoJSONGeometry)
+            : getShapeCentroid(first as GeoJSONGeometry)
           return (
             <OverlayView position={position} mapPaneName={OverlayView.FLOAT_PANE}>
               <div style={{ transform: 'translate(-50%, -100%)' }} className="mb-2">

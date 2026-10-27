@@ -19,6 +19,7 @@
     "seed:finberry:prod": "set -a && . ./.env.prod && set +a && npx tsx prisma/seed-finberry-form.ts",
     "seed:rmpatcham:prod": "set -a && . ./.env.prod && set +a && npx tsx prisma/seed-rm-patcham.ts",
     "seed:rmpatcham:samples:prod": "set -a && . ./.env.prod && set +a && npx tsx prisma/seed-rm-patcham-samples.ts",
+    "seed:elgin:prod": "set -a && . ./.env.prod && set +a && npx tsx prisma/seed-elgin-masterplan.ts",
     "seed:vistryford:prod": "set -a && . ./.env.prod && set +a && npx tsx prisma/seed-vistry-ford.ts",
     "db:backup:prod": "set -a && . ./.env.prod && set +a && mkdir -p backups && pg_dump \"$DATABASE_URL\" -Fc -f \"backups/prod-$(date +%Y%m%d-%H%M%S).dump\"",
     "db:studio": "prisma studio",

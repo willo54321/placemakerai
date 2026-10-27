@@ -110,7 +110,9 @@ export async function GET(request: Request, props0: { params: Promise<{ id: stri
         }))
       })),
     zones: project.geoLayers.map(l => {
-      const feature = (l.geojson as any)?.type === 'FeatureCollection' ? (l.geojson as any).features?.[0] : (l.geojson as any)
+      const gj = l.geojson as any
+      const features: any[] = gj?.type === 'FeatureCollection' ? (gj.features ?? []) : gj?.type === 'Feature' ? [gj] : []
+      const feature = features[0]
       const props = feature?.properties || {}
       const style = (l.style as any) || {}
       return {
@@ -120,6 +122,12 @@ export async function GET(request: Request, props0: { params: Promise<{ id: stri
         blurb: props.blurb || '',
         color: style.fillColor || style.strokeColor || '#0E7C86',
         geometry: feature?.geometry ?? null,
+        // Every feature's geometry, so a layer can be a set of parcels, a
+        // network of hedgerows or a handful of points rather than one polygon.
+        geometries: features.map(f => f?.geometry).filter(Boolean),
+        fillOpacity: typeof style.fillOpacity === 'number' ? style.fillOpacity : null,
+        strokeWidth: typeof style.strokeWidth === 'number' ? style.strokeWidth : null,
+        lineStyle: style.lineStyle === 'dashed' || style.lineStyle === 'dotted' ? style.lineStyle : 'solid',
       }
     })
   })

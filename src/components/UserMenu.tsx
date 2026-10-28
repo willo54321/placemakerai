@@ -28,9 +28,9 @@ export default function UserMenu() {
 
   if (status === 'loading') {
     return (
-      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200">
-        <div className="w-6 h-6 rounded-full bg-slate-200 animate-pulse" />
-        <div className="w-16 h-4 bg-slate-200 rounded animate-pulse" />
+      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-white/20">
+        <div className="w-6 h-6 rounded-full bg-white/20 animate-pulse" />
+        <div className="w-16 h-4 bg-white/20 rounded animate-pulse" />
       </div>
     )
   }
@@ -39,10 +39,10 @@ export default function UserMenu() {
     return (
       <Link
         href="/login"
-        className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors border border-slate-200"
+        className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-white/10 transition-colors border border-white/20"
       >
-        <User className="w-4 h-4 text-slate-500" />
-        <span className="text-sm font-medium text-slate-700">Sign In</span>
+        <User className="w-4 h-4 text-white/80" />
+        <span className="text-sm font-medium text-white">Sign In</span>
       </Link>
     )
   }
@@ -55,17 +55,17 @@ export default function UserMenu() {
     <div className="relative" ref={menuRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors border border-slate-200 w-full"
+        className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-white/10 transition-colors border border-white/20 w-full"
         aria-expanded={isOpen}
         aria-haspopup="true"
       >
         <div className={`w-6 h-6 rounded-full ${roleConfig.color} flex items-center justify-center flex-shrink-0`}>
           <Icon className="w-3.5 h-3.5 text-white" />
         </div>
-        <span className="text-sm font-medium text-slate-700 truncate flex-1 text-left">
+        <span className="text-sm font-medium text-white truncate flex-1 text-left">
           {session.user.name || session.user.email?.split('@')[0]}
         </span>
-        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-4 h-4 text-white/70 transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {isOpen && (

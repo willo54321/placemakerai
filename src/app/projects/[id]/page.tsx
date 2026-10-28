@@ -415,30 +415,26 @@ function ProjectPageContent(props: { params: Promise<{ id: string }> }) {
       </a>
 
       {/* Left Sidebar Navigation */}
-      <aside className="w-64 min-w-64 bg-white border-r border-slate-200 flex flex-col sticky top-0 h-screen">
+      <aside className="w-64 min-w-64 bg-brand-800 text-white flex flex-col sticky top-0 h-screen">
         {/* Project Header */}
-        <div className="p-4 border-b border-slate-200">
+        <div className="p-4 border-b border-white/10">
           <Link
             href="/projects"
-            className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-900 transition-colors mb-3"
+            className="inline-flex items-center gap-2 text-sm text-white/70 hover:text-white transition-colors mb-3"
           >
             <ArrowLeft size={16} aria-hidden="true" />
             All Projects
           </Link>
-          <h1 className="font-semibold text-slate-900 truncate" title={project.name}>
+          <h1 className="font-semibold text-white truncate" title={project.name}>
             {project.name}
           </h1>
           {project.description && (
-            <p className="text-sm text-slate-500 mt-1 line-clamp-2">{project.description}</p>
+            <p className="text-sm text-white/70 mt-1 line-clamp-2">{project.description}</p>
           )}
           {/* Role indicator */}
           {userRole && (
             <div className="mt-2">
-              <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${
-                isAdmin
-                  ? 'bg-green-100 text-green-700'
-                  : 'bg-blue-100 text-blue-700'
-              }`}>
+              <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-white/15 text-white">
                 {isAdmin ? (
                   <>
                     <Users size={10} />
@@ -470,7 +466,7 @@ function ProjectPageContent(props: { params: Promise<{ id: string }> }) {
             return (
               <div key={group.id} className={groupIndex > 0 ? 'mt-6' : ''}>
                 {group.label && (
-                  <p className="px-3 mb-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  <p className="px-3 mb-2 text-xs font-semibold text-white/60 uppercase tracking-wider">
                     {group.label}
                   </p>
                 )}
@@ -485,18 +481,18 @@ function ProjectPageContent(props: { params: Promise<{ id: string }> }) {
                         id={`${tab.id}-tab`}
                         className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                           activeTab === tab.id
-                            ? 'bg-green-50 text-green-700'
-                            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                            ? 'bg-white/15 text-white'
+                            : 'text-white/85 hover:bg-white/10 hover:text-white'
                         }`}
                       >
-                        <tab.icon size={18} aria-hidden="true" className={activeTab === tab.id ? 'text-green-600' : ''} />
+                        <tab.icon size={18} aria-hidden="true" />
                         <span className="flex-1 text-left">{tab.label}</span>
                         {tab.count > 0 && (
                           <span
                             className={`text-xs px-2 py-0.5 rounded-full ${
                               activeTab === tab.id
-                                ? 'bg-green-100 text-green-700'
-                                : 'bg-slate-100 text-slate-600'
+                                ? 'bg-white text-brand-800'
+                                : 'bg-white/15 text-white'
                             }`}
                             aria-label={`${tab.count} ${tab.label.toLowerCase()}`}
                           >
@@ -513,9 +509,9 @@ function ProjectPageContent(props: { params: Promise<{ id: string }> }) {
         </nav>
 
         {/* Footer with User Menu */}
-        <div className="p-4 border-t border-slate-200 space-y-3">
+        <div className="p-4 border-t border-white/10 space-y-3">
           <UserMenu />
-          <div className="text-xs text-slate-400 flex items-center justify-between">
+          <div className="text-xs text-white/60 flex items-center justify-between">
             <span>Last updated: {new Date(project.updatedAt).toLocaleDateString()}</span>
             <span title={`Build ${process.env.NEXT_PUBLIC_COMMIT_SHA}`}>
               v{process.env.NEXT_PUBLIC_APP_VERSION} · {process.env.NEXT_PUBLIC_COMMIT_SHA}

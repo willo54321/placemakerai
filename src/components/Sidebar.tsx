@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   FolderOpen,
-  MapPin,
   Users,
   Inbox,
   ScrollText,
@@ -39,10 +38,16 @@ export function Sidebar() {
     <aside className="sidebar flex flex-col">
       {/* Logo */}
       <div className="sidebar-logo">
-        <div className="w-9 h-9 bg-white rounded-xl flex items-center justify-center">
-          <MapPin className="w-5 h-5 text-brand-700" />
+        <div className="w-9 h-9 bg-white rounded-[10px] flex items-center justify-center shadow-[0_1px_2px_rgba(0,0,0,0.18),0_4px_10px_-2px_rgba(0,0,0,0.18)]">
+          <svg viewBox="0 0 24 24" className="w-[22px] h-[22px] text-brand-700" aria-hidden="true">
+            <path
+              fill="currentColor"
+              fillRule="evenodd"
+              d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7Zm0 9.75a2.75 2.75 0 1 1 0-5.5 2.75 2.75 0 0 1 0 5.5Z"
+            />
+          </svg>
         </div>
-        <span className="text-lg font-semibold text-white">Placemaker</span>
+        <span className="text-lg font-semibold tracking-[-0.015em] text-white">Placemaker</span>
       </div>
 
       {/* Navigation */}

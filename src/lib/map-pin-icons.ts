@@ -193,6 +193,53 @@ export function tourStopPinSvg(color: string, glyph: { iconPath?: string | null;
 export const tourStopPinUrl = (color: string, glyph: { iconPath?: string | null; number?: number | string }) =>
   `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(tourStopPinSvg(color, glyph))}`
 
+// ---- plan layers -------------------------------------------------------------
+
+/**
+ * A plan's line marker: the pin's white head on its own, rimmed in the layer
+ * colour, with the layer's glyph (e.g. a walker on a public right of way).
+ * Pure string — safe before the Maps API loads (also used in the map key).
+ */
+export function planBadgeSvg(color: string, iconPath: string): string {
+  return `<svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
+    <defs><filter id="badgeShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="1" stdDeviation="1.2" flood-color="#000000" flood-opacity="0.3"/>
+    </filter></defs>
+    <g filter="url(#badgeShadow)">
+      <circle cx="14" cy="14" r="11.5" fill="white" stroke="${color}" stroke-width="2.5"/>
+      <g transform="translate(14 14) scale(0.68) translate(-18 -16)"><path d="${iconPath}" fill="${color}"/></g>
+    </g>
+  </svg>`
+}
+
+export const planBadgeUrl = (color: string, iconPath: string) =>
+  `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(planBadgeSvg(color, iconPath))}`
+
+const planIconCache = new Map<string, google.maps.Icon>()
+
+/**
+ * Plan-layer icons as google.maps.Icons, cached so markers keep a stable icon:
+ * points (access, substation…) are the tour-stop pin in the layer colour, a
+ * little smaller than feedback pins so the plan stays legible; lines get the
+ * round badge, centred on the line.
+ */
+export function planLayerIcon(kind: 'point' | 'badge', color: string, iconPath: string, selected = false): google.maps.Icon {
+  const key = `${kind}|${color}|${selected ? 's' : 'n'}|${iconPath}`
+  const cached = planIconCache.get(key)
+  if (cached) return cached
+  let icon: google.maps.Icon
+  if (kind === 'point') {
+    const width = selected ? 42 : 36
+    const height = Math.round(width * 58 / 48)
+    icon = { url: tourStopPinUrl(color, { iconPath }), scaledSize: new google.maps.Size(width, height), anchor: new google.maps.Point(width / 2, height) }
+  } else {
+    const size = selected ? 32 : 26
+    icon = { url: planBadgeUrl(color, iconPath), scaledSize: new google.maps.Size(size, size), anchor: new google.maps.Point(size / 2, size / 2) }
+  }
+  planIconCache.set(key, icon)
+  return icon
+}
+
 /** Tour stop pin as a google.maps.Icon (feedback pin size, larger when hovered). */
 export function tourStopPinIcon(color: string, glyph: { iconPath?: string | null; number?: number | string }, isHovered = false): google.maps.Icon {
   const size = isHovered ? 48 : 44

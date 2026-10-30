@@ -31,13 +31,15 @@ type LayerDef = { file: string; name: string; style: Prisma.InputJsonObject }
 
 // Legend order from the plan (the key lists layers in creation order). The
 // diagonal-stripe PV fill becomes a light tint, as map polygons can't hatch.
+// `icon` is a shared marker glyph: points draw as Placemaker pins, lines carry
+// badges along their length.
 const LAYERS: LayerDef[] = [
   { file: 'boundary', name: 'Proposed site boundary', style: { fillColor: '#64BD31', strokeColor: '#FF0000', fillOpacity: 0.5, strokeWidth: 1.5 } },
   { file: 'pv', name: 'Proposed solar PV', style: { fillColor: '#C7B132', strokeColor: '#FCFF99', fillOpacity: 0.3, strokeWidth: 1.5 } },
   { file: 'hedgerow', name: 'Proposed hedgerows', style: { fillColor: '#165E22', strokeColor: '#165E22', fillOpacity: 0, strokeWidth: 4, lineStyle: 'dashed' } },
-  { file: 'prow', name: 'Public Right of Way', style: { fillColor: '#F200FF', strokeColor: '#F200FF', fillOpacity: 0, strokeWidth: 3, lineStyle: 'dotted' } },
-  { file: 'access', name: 'Potential access points', style: { fillColor: '#0000FF', strokeColor: '#0000FF', fillOpacity: 1, strokeWidth: 2 } },
-  { file: 'substation', name: 'Proposed substation location', style: { fillColor: '#F5A623', strokeColor: '#F5A623', fillOpacity: 1, strokeWidth: 2 } },
+  { file: 'prow', name: 'Public Right of Way', style: { fillColor: '#F200FF', strokeColor: '#F200FF', fillOpacity: 0, strokeWidth: 3, lineStyle: 'dotted', icon: 'walk' } },
+  { file: 'access', name: 'Potential access points', style: { fillColor: '#2563EB', strokeColor: '#2563EB', fillOpacity: 1, strokeWidth: 2, icon: 'entrance' } },
+  { file: 'substation', name: 'Proposed substation location', style: { fillColor: '#F5A623', strokeColor: '#F5A623', fillOpacity: 1, strokeWidth: 2, icon: 'power' } },
   { file: 'mitigation', name: 'Proposed mitigation and enhancement', style: { fillColor: '#64BD31', strokeColor: '#FF0000', fillOpacity: 0.5, strokeWidth: 1.5 } },
 ]
 

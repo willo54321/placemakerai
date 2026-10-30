@@ -80,6 +80,8 @@ interface Zone {
   fillOpacity?: number | null
   strokeWidth?: number | null
   lineStyle?: 'solid' | 'dashed' | 'dotted'
+  kind?: 'polygon' | 'line' | 'point'
+  icon?: string | null
 }
 
 interface ProjectData {
@@ -849,7 +851,7 @@ export function EmbedExperience({
                 )}
                 {(project.zones?.length ?? 0) > 0 && (
                   <MapKey
-                    layers={(project.zones || []).map(z => ({ id: z.id, name: z.name, color: z.color, outline: z.strokeColor })).reverse()}
+                    layers={(project.zones || []).map(z => ({ id: z.id, name: z.name, color: z.color, outline: z.strokeColor, kind: z.kind, lineStyle: z.lineStyle, icon: z.icon })).reverse()}
                     hiddenIds={hiddenZoneIds}
                     onToggle={toggleZone}
                     defaultOpen

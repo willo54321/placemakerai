@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db'
 import { NextResponse } from 'next/server'
 import { readMapAreas } from '@/lib/map-areas'
+import { isTourStopIcon } from '@/lib/tour-icons'
 
 // Public API - no auth required
 // Returns project data for embedding (if embedEnabled)
@@ -115,6 +116,7 @@ export async function GET(request: Request, props0: { params: Promise<{ id: stri
       const feature = features[0]
       const props = feature?.properties || {}
       const style = (l.style as any) || {}
+      const firstType = features.find(f => f?.geometry)?.geometry?.type
       return {
         id: l.id,
         name: l.name,
@@ -131,6 +133,10 @@ export async function GET(request: Request, props0: { params: Promise<{ id: stri
         fillOpacity: typeof style.fillOpacity === 'number' ? style.fillOpacity : null,
         strokeWidth: typeof style.strokeWidth === 'number' ? style.strokeWidth : null,
         lineStyle: style.lineStyle === 'dashed' || style.lineStyle === 'dotted' ? style.lineStyle : 'solid',
+        kind: firstType === 'Point' || firstType === 'MultiPoint' ? 'point'
+          : firstType === 'LineString' || firstType === 'MultiLineString' ? 'line' : 'polygon',
+        // Glyph from the shared marker set: points draw as pins, lines carry badges.
+        icon: isTourStopIcon(style.icon) ? style.icon : null,
       }
     })
   })

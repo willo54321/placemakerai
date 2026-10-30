@@ -6,7 +6,7 @@ import { ThumbsUp, ThumbsDown, Lightbulb, MessageCircle, X, AlertTriangle } from
 import { RotatableOverlay } from '@/components/RotatableOverlay'
 import { OverlayStack, footprintKey } from '@/components/OverlayStack'
 import { startFlyTo } from '@/lib/fly-to'
-import { getPinIcon, createPendingPinIcon, getCategoryColor, tourStopPinUrl } from '@/lib/map-pin-icons'
+import { getPinIcon, createPendingPinIcon, getCategoryColor, tourStopPinUrl, planLayerIcon } from '@/lib/map-pin-icons'
 import { TOUR_STOP_ICON_PATHS } from '@/lib/tour-icons'
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''
@@ -57,6 +57,9 @@ interface Zone {
   fillOpacity?: number | null
   strokeWidth?: number | null
   lineStyle?: 'solid' | 'dashed' | 'dotted'
+  kind?: 'polygon' | 'line' | 'point'
+  /** Shared marker glyph id (TOUR_STOP_ICON_PATHS). */
+  icon?: string | null
 }
 
 interface HighlightGeometry {
@@ -135,6 +138,31 @@ function getShapeCentroid(geometry: GeoJSONGeometry): { lat: number; lng: number
     return { lat: latSum / coords.length, lng: lngSum / coords.length }
   }
   return { lat: 0, lng: 0 }
+}
+
+// Plan lines shorter than this get no glyph badge (short connectors would clutter).
+const BADGE_MIN_LINE_M = 400
+
+// Point half-way along a [lng, lat] line by distance, or null if the line is
+// shorter than minLength metres. Equirectangular distances — fine at site scale.
+function lineMidpoint(line: number[][], minLength: number): { lat: number; lng: number } | null {
+  const seg = (a: number[], b: number[]) => {
+    const k = Math.cos(((a[1] + b[1]) / 2) * Math.PI / 180)
+    return Math.hypot((b[0] - a[0]) * k, b[1] - a[1]) * 111320
+  }
+  const lengths = line.slice(1).map((p, i) => seg(line[i], p))
+  const total = lengths.reduce((s, l) => s + l, 0)
+  if (total < minLength) return null
+  let remaining = total / 2
+  for (let i = 0; i < lengths.length; i++) {
+    if (remaining <= lengths[i]) {
+      const t = lengths[i] ? remaining / lengths[i] : 0
+      const [a, b] = [line[i], line[i + 1]]
+      return { lat: a[1] + (b[1] - a[1]) * t, lng: a[0] + (b[0] - a[0]) * t }
+    }
+    remaining -= lengths[i]
+  }
+  return null
 }
 
 export interface EmbedMapHandle {
@@ -616,6 +644,7 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
           const select = () => { setSelectedPin(null); setSelectedZone(zone.id) }
           const toPath = (ring: number[][]) => ring.map(([lng, lat]) => ({ lat, lng }))
           const stroke = zone.strokeColor || zone.color
+          const glyph = zone.icon ? TOUR_STOP_ICON_PATHS[zone.icon] : undefined
           // Dashed / dotted lines: Google draws the stroke invisible and repeats a symbol along it.
           const lineOptions = zone.lineStyle && zone.lineStyle !== 'solid'
             ? {
@@ -643,9 +672,18 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
             }
             if (geom.type === 'LineString' || geom.type === 'MultiLineString') {
               const lines: number[][][] = geom.type === 'LineString' ? [geom.coordinates] : geom.coordinates
-              return lines.map((line, li) => (
-                <PolylineF key={`${key}-${li}`} path={toPath(line)} options={{ ...lineOptions, clickable: true, zIndex: 1 }} onClick={select} />
-              ))
+              return lines.flatMap((line, li) => {
+                const polyline = (
+                  <PolylineF key={`${key}-${li}`} path={toPath(line)} options={{ ...lineOptions, clickable: true, zIndex: 1 }} onClick={select} />
+                )
+                // A glyph badge mid-way along each substantial stretch says what the line is.
+                const mid = glyph ? lineMidpoint(line, BADGE_MIN_LINE_M) : null
+                return mid
+                  ? [polyline, (
+                      <MarkerF key={`${key}-${li}-badge`} position={mid} icon={planLayerIcon('badge', stroke, glyph!, isSelected)} onClick={select} zIndex={3} />
+                    )]
+                  : [polyline]
+              })
             }
             if (geom.type === 'Point') {
               const [lng, lat] = geom.coordinates as number[]
@@ -653,9 +691,11 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
                 <MarkerF
                   key={key}
                   position={{ lat, lng }}
-                  icon={{ path: google.maps.SymbolPath.CIRCLE, scale: isSelected ? 9 : 7, fillColor: zone.color, fillOpacity: 1, strokeColor: '#ffffff', strokeWeight: 2 }}
+                  icon={glyph
+                    ? planLayerIcon('point', zone.color, glyph, isSelected)
+                    : { path: google.maps.SymbolPath.CIRCLE, scale: isSelected ? 9 : 7, fillColor: zone.color, fillOpacity: 1, strokeColor: '#ffffff', strokeWeight: 2 }}
                   onClick={select}
-                  zIndex={2}
+                  zIndex={glyph ? 4 : 2}
                 />
               )]
             }

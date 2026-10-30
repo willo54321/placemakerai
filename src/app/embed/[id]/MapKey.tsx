@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { ChevronDown, Eye, EyeOff } from 'lucide-react'
+import { TOUR_STOP_ICON_PATHS } from '@/lib/tour-icons'
+import { tourStopPinUrl, planBadgeUrl } from '@/lib/map-pin-icons'
 
 export interface MapKeyLayer {
   id: string
@@ -10,6 +12,50 @@ export interface MapKeyLayer {
   color?: string | null
   /** Swatch edge when the layer's outline differs from its fill. */
   outline?: string | null
+  /** How the layer draws on the map, so the swatch can match it. Default: an area. */
+  kind?: 'polygon' | 'line' | 'point'
+  lineStyle?: 'solid' | 'dashed' | 'dotted'
+  /** Shared marker glyph id (TOUR_STOP_ICON_PATHS). */
+  icon?: string | null
+}
+
+/** The layer as it appears on the map: its pin, a stretch of its line (with badge), or an area. */
+function Swatch({ layer }: { layer: MapKeyLayer }) {
+  const color = layer.color ?? '#94a3b8'
+  const glyph = layer.icon ? TOUR_STOP_ICON_PATHS[layer.icon] : undefined
+  if (layer.kind === 'point') {
+    return glyph
+      // eslint-disable-next-line @next/next/no-img-element
+      ? <img src={tourStopPinUrl(color, { iconPath: glyph })} alt="" className="w-5 h-6" />
+      : <span className="w-3 h-3 rounded-full ring-2 ring-white shadow-sm" style={{ backgroundColor: color }} />
+  }
+  if (layer.kind === 'line') {
+    const stroke = layer.outline || color
+    return (
+      <span className="relative w-9 h-5 flex items-center justify-center">
+        <svg viewBox="0 0 36 6" className="absolute inset-x-0 w-9 h-1.5" aria-hidden="true">
+          <line
+            x1="2" y1="3" x2="34" y2="3" stroke={stroke} strokeWidth="3"
+            strokeLinecap={layer.lineStyle === 'dotted' ? 'round' : 'butt'}
+            strokeDasharray={layer.lineStyle === 'dashed' ? '5 3' : layer.lineStyle === 'dotted' ? '0.1 5' : undefined}
+          />
+        </svg>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {glyph && <img src={planBadgeUrl(stroke, glyph)} alt="" className="relative w-5 h-5" />}
+      </span>
+    )
+  }
+  return (
+    <span
+      className="w-4 h-4 rounded-sm border border-black/10"
+      style={{
+        backgroundColor: color,
+        ...(layer.outline && layer.outline.toLowerCase() !== color.toLowerCase()
+          ? { borderColor: layer.outline, borderWidth: 2 }
+          : {}),
+      }}
+    />
+  )
 }
 
 /**
@@ -56,16 +102,9 @@ export function MapKey({
                 onClick={() => onToggle(layer.id)}
                 className="w-full flex items-center gap-3 px-3 py-2 rounded-lg border border-gray-100 hover:border-gray-200 text-left transition-colors"
               >
-                <span
-                  className="w-4 h-4 rounded-sm shrink-0 border border-black/10 transition-opacity"
-                  style={{
-                    backgroundColor: layer.color ?? '#94a3b8',
-                    opacity: shown ? 1 : 0.25,
-                    ...(layer.outline && layer.outline.toLowerCase() !== layer.color?.toLowerCase()
-                      ? { borderColor: layer.outline, borderWidth: 2 }
-                      : {}),
-                  }}
-                />
+                <span className="w-9 shrink-0 flex items-center justify-center transition-opacity" style={{ opacity: shown ? 1 : 0.25 }}>
+                  <Swatch layer={layer} />
+                </span>
                 <span className={`flex-1 text-sm ${shown ? 'text-gray-900' : 'text-gray-400'}`}>{layer.name}</span>
                 {shown ? <Eye size={14} className="text-gray-400" /> : <EyeOff size={14} className="text-gray-300" />}
               </button>

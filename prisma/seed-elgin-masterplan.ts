@@ -1,16 +1,17 @@
 /**
- * Elgin — Stone Pit Lane illustrative masterplan (Oct 2026) as interactive map
- * layers on the existing Elgin project.
+ * Elgin — Stone Pit Lane illustrative masterplan (v2, 28 Oct 2026) as
+ * interactive map layers on the existing Elgin project.
  *
- * The client's plan is a Mapbox print (raster, EPSG:25830 frame). Each legend
- * item was digitised from it into WGS84 GeoJSON (prisma/data/elgin-stone-pit-lane/)
- * and becomes one `plot` GeoLayer, styled to match the plan's key. The public
- * map lists them in its key (legend order) with toggles; polygons, lines and
- * points are all clickable.
+ * Source: the client's GeoJSON export of the plan ("Stone Pit Lane -
+ * Illustrative Masterplan v2.geojson"), split by legend item into
+ * prisma/data/elgin-stone-pit-lane/. Each item becomes one `plot` GeoLayer,
+ * styled to match the plan's key. The public map lists them in its key
+ * (legend order) with toggles; polygons, lines and points are all clickable.
  *
  * Target project: ELGIN_PROJECT_ID if set, otherwise the one project whose name
  * contains "Stone Pit" or "Elgin". Replaces earlier copies of these layers
- * (matched by name) and leaves everything else on the project alone.
+ * (matched by current or previous name) and leaves everything else on the
+ * project alone.
  *
  * Run locally:   npx tsx prisma/seed-elgin-masterplan.ts
  * Run on prod:   npm run seed:elgin:prod   (user runs it)
@@ -23,21 +24,25 @@ import { Prisma, PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 const DATA = join(__dirname, 'data', 'elgin-stone-pit-lane')
 
-// Site centre (from the digitised boundary) — Patcham Court Farm style: set once.
+// Site centre (middle of the site boundary and mitigation area).
 const CENTRE = { lat: 53.5591, lng: -0.2441, zoom: 15 }
 
 type LayerDef = { file: string; name: string; style: Prisma.InputJsonObject }
 
-// Legend order from the plan (the key lists layers in creation order).
+// Legend order from the plan (the key lists layers in creation order). The
+// diagonal-stripe PV fill becomes a light tint, as map polygons can't hatch.
 const LAYERS: LayerDef[] = [
-  { file: 'boundary', name: 'Proposed site boundary', style: { fillColor: '#DC2626', strokeColor: '#DC2626', fillOpacity: 0, strokeWidth: 3 } },
-  { file: 'hedgerow', name: 'Proposed hedgerow', style: { fillColor: '#166534', strokeColor: '#166534', fillOpacity: 0, strokeWidth: 3, lineStyle: 'dotted' } },
-  { file: 'pv', name: 'Proposed Solar PV', style: { fillColor: '#EAB308', strokeColor: '#CA8A04', fillOpacity: 0.35, strokeWidth: 1.5 } },
-  { file: 'prow', name: 'Public Right of Way', style: { fillColor: '#D946EF', strokeColor: '#D946EF', fillOpacity: 0, strokeWidth: 3, lineStyle: 'dashed' } },
-  { file: 'access', name: 'Potential access point', style: { fillColor: '#2563EB', strokeColor: '#2563EB', fillOpacity: 1, strokeWidth: 2 } },
-  { file: 'substation', name: 'Proposed substation location', style: { fillColor: '#F59E0B', strokeColor: '#F59E0B', fillOpacity: 1, strokeWidth: 2 } },
-  { file: 'mitigation', name: 'Proposed mitigation and enhancement areas', style: { fillColor: '#65A30D', strokeColor: '#4D7C0F', fillOpacity: 0.35, strokeWidth: 1.5 } },
+  { file: 'boundary', name: 'Proposed site boundary', style: { fillColor: '#64BD31', strokeColor: '#FF0000', fillOpacity: 0.5, strokeWidth: 1.5 } },
+  { file: 'pv', name: 'Proposed solar PV', style: { fillColor: '#C7B132', strokeColor: '#FCFF99', fillOpacity: 0.3, strokeWidth: 1.5 } },
+  { file: 'hedgerow', name: 'Proposed hedgerows', style: { fillColor: '#165E22', strokeColor: '#165E22', fillOpacity: 0, strokeWidth: 4, lineStyle: 'dashed' } },
+  { file: 'prow', name: 'Public Right of Way', style: { fillColor: '#F200FF', strokeColor: '#F200FF', fillOpacity: 0, strokeWidth: 3, lineStyle: 'dotted' } },
+  { file: 'access', name: 'Potential access points', style: { fillColor: '#0000FF', strokeColor: '#0000FF', fillOpacity: 1, strokeWidth: 2 } },
+  { file: 'substation', name: 'Proposed substation location', style: { fillColor: '#F5A623', strokeColor: '#F5A623', fillOpacity: 1, strokeWidth: 2 } },
+  { file: 'mitigation', name: 'Proposed mitigation and enhancement', style: { fillColor: '#64BD31', strokeColor: '#FF0000', fillOpacity: 0.5, strokeWidth: 1.5 } },
 ]
+
+// v1 (27 Oct) layer names that v2 renamed — removed so the key has no duplicates.
+const PREVIOUS_NAMES = ['Proposed Solar PV', 'Proposed hedgerow', 'Potential access point', 'Proposed mitigation and enhancement areas']
 
 async function findProject() {
   if (process.env.ELGIN_PROJECT_ID) {
@@ -71,7 +76,7 @@ async function main() {
     },
   })
 
-  const removed = await prisma.geoLayer.deleteMany({ where: { projectId: project.id, name: { in: LAYERS.map(l => l.name) } } })
+  const removed = await prisma.geoLayer.deleteMany({ where: { projectId: project.id, name: { in: [...LAYERS.map(l => l.name), ...PREVIOUS_NAMES] } } })
   if (removed.count) console.log(`  replaced ${removed.count} existing masterplan layer(s)`)
 
   for (const def of LAYERS) {

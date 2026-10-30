@@ -50,6 +50,7 @@ interface Zone {
   status: string
   blurb: string
   color: string
+  strokeColor?: string | null
   geometry: GeoJSONGeometry | null
   /** Every feature's geometry (polygons, lines or points); falls back to `geometry`. */
   geometries?: GeoJSONGeometry[]
@@ -614,18 +615,19 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
           const strokeWeight = (zone.strokeWidth ?? 2) + (isSelected ? 1 : 0)
           const select = () => { setSelectedPin(null); setSelectedZone(zone.id) }
           const toPath = (ring: number[][]) => ring.map(([lng, lat]) => ({ lat, lng }))
+          const stroke = zone.strokeColor || zone.color
           // Dashed / dotted lines: Google draws the stroke invisible and repeats a symbol along it.
           const lineOptions = zone.lineStyle && zone.lineStyle !== 'solid'
             ? {
                 strokeOpacity: 0,
                 icons: [{
                   icon: zone.lineStyle === 'dotted'
-                    ? { path: google.maps.SymbolPath.CIRCLE, scale: strokeWeight * 0.9, fillColor: zone.color, fillOpacity: 1, strokeOpacity: 0 }
-                    : { path: 'M 0,-1 0,1', strokeColor: zone.color, strokeOpacity: 1, strokeWeight, scale: 3 },
+                    ? { path: google.maps.SymbolPath.CIRCLE, scale: strokeWeight * 0.9, fillColor: stroke, fillOpacity: 1, strokeOpacity: 0 }
+                    : { path: 'M 0,-1 0,1', strokeColor: stroke, strokeOpacity: 1, strokeWeight, scale: 3 },
                   offset: '0', repeat: zone.lineStyle === 'dotted' ? `${strokeWeight * 4}px` : '12px',
                 }],
               }
-            : { strokeColor: zone.color, strokeOpacity: 1, strokeWeight }
+            : { strokeColor: stroke, strokeOpacity: 1, strokeWeight }
           return geoms.flatMap((geom, gi) => {
             const key = `zone-${zone.id}-${gi}`
             if (geom.type === 'Polygon' || geom.type === 'MultiPolygon') {
@@ -634,7 +636,7 @@ const EmbedMap = forwardRef<EmbedMapHandle, EmbedMapProps>(function EmbedMap({
                 <PolygonF
                   key={`${key}-${pi}`}
                   paths={rings.map(toPath)}
-                  options={{ fillColor: zone.color, fillOpacity, strokeColor: zone.color, strokeWeight, strokeOpacity: 1, clickable: true, zIndex: 0 }}
+                  options={{ fillColor: zone.color, fillOpacity, strokeColor: stroke, strokeWeight, strokeOpacity: 1, clickable: true, zIndex: 0 }}
                   onClick={select}
                 />
               ))

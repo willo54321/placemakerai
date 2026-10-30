@@ -8,6 +8,8 @@ export interface MapKeyLayer {
   name: string
   /** Swatch for a plan layer; null for a plain image. */
   color?: string | null
+  /** Swatch edge when the layer's outline differs from its fill. */
+  outline?: string | null
 }
 
 /**
@@ -56,7 +58,13 @@ export function MapKey({
               >
                 <span
                   className="w-4 h-4 rounded-sm shrink-0 border border-black/10 transition-opacity"
-                  style={{ backgroundColor: layer.color ?? '#94a3b8', opacity: shown ? 1 : 0.25 }}
+                  style={{
+                    backgroundColor: layer.color ?? '#94a3b8',
+                    opacity: shown ? 1 : 0.25,
+                    ...(layer.outline && layer.outline.toLowerCase() !== layer.color?.toLowerCase()
+                      ? { borderColor: layer.outline, borderWidth: 2 }
+                      : {}),
+                  }}
                 />
                 <span className={`flex-1 text-sm ${shown ? 'text-gray-900' : 'text-gray-400'}`}>{layer.name}</span>
                 {shown ? <Eye size={14} className="text-gray-400" /> : <EyeOff size={14} className="text-gray-300" />}

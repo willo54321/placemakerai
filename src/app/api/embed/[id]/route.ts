@@ -121,6 +121,9 @@ export async function GET(request: Request, props0: { params: Promise<{ id: stri
         status: props.status || '',
         blurb: props.blurb || '',
         color: style.fillColor || style.strokeColor || '#0E7C86',
+        // Outline / line colour when the plan draws it differently from the fill
+        // (e.g. a green site boundary with a red edge).
+        strokeColor: style.strokeColor || null,
         geometry: feature?.geometry ?? null,
         // Every feature's geometry, so a layer can be a set of parcels, a
         // network of hedgerows or a handful of points rather than one polygon.

@@ -74,6 +74,7 @@ interface Zone {
   status: string
   blurb: string
   color: string
+  strokeColor?: string | null
   geometry: GeoJSONGeometry | null
   geometries?: GeoJSONGeometry[]
   fillOpacity?: number | null
@@ -848,7 +849,7 @@ export function EmbedExperience({
                 )}
                 {(project.zones?.length ?? 0) > 0 && (
                   <MapKey
-                    layers={(project.zones || []).map(z => ({ id: z.id, name: z.name, color: z.color })).reverse()}
+                    layers={(project.zones || []).map(z => ({ id: z.id, name: z.name, color: z.color, outline: z.strokeColor })).reverse()}
                     hiddenIds={hiddenZoneIds}
                     onToggle={toggleZone}
                     defaultOpen

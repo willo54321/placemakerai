@@ -16,6 +16,7 @@ import {
   X,
   Check,
   FolderOpen,
+  Mail,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -86,6 +87,17 @@ export default function UsersPage() {
     queryKey: ['projects'],
     queryFn: () => fetch('/api/projects').then((r) => r.json()),
     enabled: status === 'authenticated',
+  })
+
+  // Send a fresh login invite email
+  const inviteMutation = useMutation({
+    mutationFn: (userId: string) =>
+      fetch(`/api/admin/users/${userId}/invite`, { method: 'POST' }).then(async (r) => {
+        if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.error || 'Failed to send invite')
+        return r.json()
+      }),
+    onSuccess: () => toast.success('Invite email sent'),
+    onError: (e: Error) => toast.error(e.message),
   })
 
   // Delete user mutation
@@ -240,6 +252,18 @@ export default function UsersPage() {
                   </div>
 
                   <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        if (confirm(`Send a fresh login invite to ${user.email}? Any previous invite link will stop working.`)) {
+                          inviteMutation.mutate(user.id)
+                        }
+                      }}
+                      disabled={inviteMutation.isPending}
+                      className="p-2 text-slate-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors disabled:opacity-50"
+                      title="Send login invite"
+                    >
+                      <Mail size={16} />
+                    </button>
                     <button
                       onClick={() => setEditingUser(user)}
                       className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"

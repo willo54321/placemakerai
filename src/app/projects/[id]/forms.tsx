@@ -1,12 +1,22 @@
 'use client'
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2, X, Eye, Copy, FileText, Check, GripVertical, List } from 'lucide-react'
+import { Plus, Trash2, X, Eye, Copy, FileText, Check, GripVertical, List, ScanLine } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
+import { toast } from 'sonner'
 import { usePermissions } from '@/hooks/usePermissions'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { CHOICE_TYPES, FIELD_TYPES } from '@/lib/form-fields'
+
+/** A picked file's bytes as base64 (without the data-URL prefix). */
+const fileToBase64 = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '')
+    reader.onerror = () => reject(new Error('Could not read the file'))
+    reader.readAsDataURL(file)
+  })
 
 interface FeedbackResponse {
   id: string
@@ -48,6 +58,36 @@ export function FormsTab({
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const nameInputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Read an uploaded paper form with AI, then open the builder pre-filled so the
+  // admin can check and edit the fields before saving. Nothing is stored until
+  // they click Create.
+  const readForm = useMutation({
+    mutationFn: async (file: File) => {
+      const base64 = await fileToBase64(file)
+      const res = await fetch(`/api/projects/${projectId}/forms/read`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ base64, mediaType: file.type }),
+      })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error || 'Could not read that form')
+      return res.json() as Promise<{ name: string; fields: any[] }>
+    },
+    onSuccess: data => {
+      setFormName(data.name || '')
+      setFields(data.fields || [])
+      setShowForm(true)
+      toast.success('Form read from your upload — check the fields before saving')
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+
+  const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = '' // let the same file be picked again
+    if (file) readForm.mutate(file)
+  }
 
   useEffect(() => {
     if (guideModalOpen === true) setShowForm(true)
@@ -127,15 +167,44 @@ export function FormsTab({
           <p className="text-sm text-slate-600">Create and manage feedback collection forms</p>
         </div>
         {canManageForms && (
-          <button
-            onClick={() => setShowForm(true)}
-            className="btn-primary"
-            aria-haspopup="dialog"
-            data-tour="create-form"
-          >
-            <Plus size={18} aria-hidden="true" />
-            Create Form
-          </button>
+          <div className="flex items-center gap-3">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/gif,image/webp,application/pdf"
+              onChange={onPickFile}
+              className="sr-only"
+              aria-hidden="true"
+              tabIndex={-1}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={readForm.isPending}
+              className="btn-secondary"
+              title="Upload a photo, scan or PDF of a paper form and turn it into an online form"
+            >
+              {readForm.isPending ? (
+                <>
+                  <span className="spinner" aria-hidden="true" />
+                  Reading form…
+                </>
+              ) : (
+                <>
+                  <ScanLine size={18} aria-hidden="true" />
+                  Scan paper form
+                </>
+              )}
+            </button>
+            <button
+              onClick={() => setShowForm(true)}
+              className="btn-primary"
+              aria-haspopup="dialog"
+              data-tour="create-form"
+            >
+              <Plus size={18} aria-hidden="true" />
+              Create Form
+            </button>
+          </div>
         )}
       </div>
 

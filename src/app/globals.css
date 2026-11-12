@@ -39,7 +39,8 @@
 @layer components {
   /* Sidebar navigation */
   .sidebar {
-    @apply w-64 bg-brand-800 text-white min-h-screen flex flex-col;
+    /* Pinned to the viewport so it stays put while the page content scrolls. */
+    @apply w-64 bg-brand-800 text-white h-screen sticky top-0 self-start flex flex-col overflow-y-auto;
   }
 
   .sidebar-logo {

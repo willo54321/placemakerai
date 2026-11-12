@@ -93,6 +93,11 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
     })
   }
 
+  // When the run began, for the UI's elapsed counter. Survives page reloads
+  // because it comes off the stored run, not client state.
+  const startedAt =
+    (cached.pending as { startedAt?: string } | null)?.startedAt ?? cached.updatedAt.toISOString()
+
   // A run is in flight — check whether its batch has finished and finalize it
   // here if so. Finalizing on the poll avoids needing a separate worker.
   if (cached.status === 'processing' && cached.batchId && cached.pending) {
@@ -163,6 +168,7 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
         ? null
         : (cached.data as unknown as FullAnalysisResult),
       processing: true,
+      startedAt,
       needsUpdate: false,
       feedbackCount: feedbackItems.length,
     })
@@ -184,6 +190,8 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
         ? null
         : (cached.data as unknown as FullAnalysisResult),
       processing: true,
+      finalizing: true,
+      startedAt,
       needsUpdate: false,
       feedbackCount: feedbackItems.length,
     })
@@ -259,6 +267,8 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     if (cached && (cached.status === 'processing' || cached.status === 'finalizing')) {
       return NextResponse.json({
         processing: true,
+        startedAt:
+          (cached.pending as { startedAt?: string } | null)?.startedAt ?? cached.updatedAt.toISOString(),
         feedbackCount: feedbackItems.length,
       })
     }
@@ -376,6 +386,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
 
     return NextResponse.json({
       processing: true,
+      startedAt: pending.startedAt,
       feedbackCount: feedbackItems.length,
     })
   } catch (error) {

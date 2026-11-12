@@ -195,6 +195,22 @@ const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<
   return null
 }
 
+/**
+ * A live m:ss counter from a start time, ticking once a second. Shows how long
+ * the run has actually been going — the Batch API doesn't report partial
+ * progress, so elapsed time is the honest measure while it cooks.
+ */
+function ElapsedCounter({ since }: { since: string | number }) {
+  const start = useMemo(() => new Date(since).getTime(), [since])
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [])
+  const secs = Math.max(0, Math.round((now - start) / 1000))
+  return <>{Math.floor(secs / 60)}:{String(secs % 60).padStart(2, '0')}</>
+}
+
 const ANALYTICS_VIEWS = [
   { id: 'summary', label: 'Summary' },
   { id: 'sentiment', label: 'Sentiment' },
@@ -271,6 +287,13 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
   const feedbackCount = data?.feedbackCount || 0
   const processing = Boolean(data?.processing)
   const analysisFailed = Boolean(data?.analysisFailed)
+  const finalizing = Boolean(data?.finalizing)
+  // When the in-flight run began, for the elapsed counter: the server's stored
+  // start time survives reloads; before the first poll lands, fall back to when
+  // this tab fired the run.
+  const runSince =
+    (data?.startedAt as string | undefined) ??
+    (runAnalysis.isPending && runAnalysis.submittedAt ? runAnalysis.submittedAt : undefined)
   const sentimentOverTime = data?.sentimentOverTime as
     | Array<{ week: string; support: number; neutral: number; object: number }>
     | undefined
@@ -348,6 +371,10 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
         <p className="text-slate-500 leading-relaxed">
           Classifying every one of <span className="font-semibold text-slate-700">{feedbackCount}</span> responses — sentiment, themes, material planning considerations and campaign detection. Results typically arrive within a few minutes. You can leave this page and come back.
         </p>
+        <div className="mt-6 inline-flex items-center gap-2 text-sm font-medium text-brand-700 bg-brand-50 px-4 py-2 rounded-full tabular-nums">
+          <span className="w-2 h-2 bg-brand-500 rounded-full animate-pulse" />
+          {finalizing ? 'Collecting results' : 'Classifying'} · {runSince ? <ElapsedCounter since={runSince} /> : '0:00'} elapsed
+        </div>
       </div>
     )
   }
@@ -376,7 +403,7 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
           {runAnalysis.isPending ? (
             <>
               <Spinner size="sm" />
-              <span>Analyzing feedback...</span>
+              <span className="tabular-nums">Analyzing feedback… {runSince ? <ElapsedCounter since={runSince} /> : '0:00'}</span>
             </>
           ) : (
             <>
@@ -438,9 +465,9 @@ export function AnalyticsTab({ projectId }: AnalyticsTabProps) {
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
           {processing && (
-            <span className="text-sm text-brand-700 bg-brand-50 px-3 py-1.5 rounded-full flex items-center gap-1.5">
+            <span className="text-sm text-brand-700 bg-brand-50 px-3 py-1.5 rounded-full flex items-center gap-1.5 tabular-nums">
               <span className="w-2 h-2 bg-brand-500 rounded-full animate-pulse" />
-              Re-analysis in progress — showing previous results
+              Re-analysis in progress{runSince && <> · <ElapsedCounter since={runSince} /></>} — showing previous results
             </span>
           )}
           {!processing && analysisFailed && (
